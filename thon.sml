@@ -31,7 +31,7 @@ fun typecheck ctx e =
        | App (f, n) => let val Arr (d, c) = typecheck ctx f
                            val argType = typecheck ctx n
                        in
-                           if c <> argType then raise TypeMismatch
+                           if d <> argType then raise TypeMismatch
                            else c
                        end
        | Rec (i, baseCase, recCase) =>
