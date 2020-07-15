@@ -69,7 +69,17 @@ fun subst' src dst bindingDepth =
 
 fun subst src dst = subst' src dst 0
 
+val Zero = subst Zero Zero;
+val Succ Zero = subst Zero (Succ Zero);
+val Succ Zero = subst (Succ Zero) (Var 0);
+val (Var 1) = subst (Succ Zero) (Var 1);
+val Lam(Nat, Var 0) = subst (Succ Zero) (Lam(Nat, Var 0));
+val Lam(Nat, (Succ Zero)) = subst (Succ Zero) (Lam(Nat, Var 1));
+val App(Lam(Nat, Succ Zero), (Succ Zero)) =
+    subst (Succ Zero) (App(Lam(Nat, Var 1), (Var 0)));
+
 fun step e =
+    let val _ = typecheck Nil e in
     if isVal e then e else
     case e of
         Succ(n) => if not (isVal n) then Succ(step n) else e
@@ -81,7 +91,12 @@ fun step e =
                                subst n f'
                            end
                           )
-      | _ => e (* TODO *)
+      | Var _  => raise Unimplemented (* TODO need to have list of terms to plug in here *)
+      | Rec (i, baseCase, recCase) => raise Unimplemented
+      | _ => if (isVal e) then e else raise No
+    end
+
+fun eval e = if isVal e then e else eval (step e)
 
 val Zero = step Zero;
 val Succ(Zero) = step (Succ(Zero));
@@ -92,8 +107,16 @@ val Succ (Succ Zero) = step (App(Lam(Nat, Succ(Var(0))), Succ Zero));
 val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Var(0))), Succ (Succ Zero)));
 val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Succ(Var(0)))), Succ Zero));
 
-val _ = step (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
-                  Zero));
+(* Take in a nat -> nat and apply to zero. Input nat -> nat is Succ *)
+val App(Lam(Nat, Succ(Var(0))), Zero) = step (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
+                                                  Lam(Nat, Succ(Var(0)))));
+val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero));
+
+val Succ Zero = eval (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
+                          Lam(Nat, Succ(Var(0)))));
+
+(* TODO tests with nested scopes *)
+
 
 (******* Tests *******)
 
