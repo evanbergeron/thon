@@ -31,13 +31,15 @@ fun typecheck ctx e =
      of  Zero => Nat
        | Var i => get ctx i
        | Succ e2 => (typecheck ctx e2)
-       | Lam (argType, funcBody) => Arr (argType, typecheck (Cons(argType, ctx)) funcBody)
-       | App (f, n) => let val Arr (d, c) = typecheck ctx f
-                           val argType = typecheck ctx n
-                       in
-                           if d <> argType then raise TypeMismatch
-                           else c
-                       end
+       | Lam (argType, funcBody) =>
+            Arr (argType, typecheck (Cons(argType, ctx)) funcBody)
+       | App (f, n) =>
+            let val Arr (d, c) = typecheck ctx f
+                val argType = typecheck ctx n
+            in
+                if d <> argType then raise TypeMismatch
+                else c
+            end
        | Rec (i, baseCase, recCase) =>
             let val Nat = typecheck ctx i
                 val t = typecheck ctx baseCase
