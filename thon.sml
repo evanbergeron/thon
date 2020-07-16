@@ -9,7 +9,7 @@ datatype Idx = int
 datatype Exp = Zero
              | Var of int (* idx into ctx *)
              | Succ of Exp
-             | Lam of Typ (*argType*) * Exp(*funcBody*)
+             | Lam of Typ (*argType*) * Exp (*funcBody*)
              | App of Exp * Exp
              | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
 
@@ -55,14 +55,6 @@ fun isVal e =
       | _ => false
 
 
-val true = isVal Zero;
-val true = isVal (Succ(Zero));
-val true = isVal (Lam(Nat, Succ(Zero)));
-val true = isVal (Lam(Nat, Zero));
-val true = isVal (Lam(Nat, Succ(Var(0))));
-val false = isVal (App(Lam(Nat, Zero), Zero));
-
-
 fun subst' src dst bindingDepth =
     case dst
      of  Zero => Zero
@@ -74,16 +66,6 @@ fun subst' src dst bindingDepth =
 
 
 fun subst src dst = subst' src dst 0
-
-
-val Zero = subst Zero Zero;
-val Succ Zero = subst Zero (Succ Zero);
-val Succ Zero = subst (Succ Zero) (Var 0);
-val (Var 1) = subst (Succ Zero) (Var 1);
-val Lam(Nat, Var 0) = subst (Succ Zero) (Lam(Nat, Var 0));
-val Lam(Nat, (Succ Zero)) = subst (Succ Zero) (Lam(Nat, Var 1));
-val App(Lam(Nat, Succ Zero), (Succ Zero)) =
-    subst (Succ Zero) (App(Lam(Nat, Var 1), (Var 0)));
 
 
 fun step e =
@@ -111,43 +93,28 @@ fun step e =
       | _ => if (isVal e) then e else raise No
     end
 
+
 fun eval e = if isVal e then e else eval (step e)
-
-val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0)));
-
-val Succ(Succ(Rec(Zero, Zero, Succ(Succ(Var 0))))) =
-    step (Rec(Succ(Zero), Zero, Succ(Succ(Var 0))));
-
-val Zero = step (Rec(Zero, Zero, Succ(Var 0)));
-val Succ(Succ(Zero)) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Var 0)));
-val Succ(Succ(Succ(Succ(Zero)))) =
-    eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var 0))));
-
-val Succ(Succ(Succ(Succ(Zero)))) =
-    eval (Rec(App(Lam(Nat, Succ(Var 0)), Succ(Zero)),
-              Zero, Succ(Succ(Var 0))));
-
-val Zero = step Zero;
-val Succ(Zero) = step (Succ(Zero));
-val Lam(Nat, Zero) = step (Lam(Nat, Zero));
-val Succ Zero = step (App(Lam(Nat, Succ(Zero)), Zero));
-val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero));
-val Succ (Succ Zero) = step (App(Lam(Nat, Succ(Var(0))), Succ Zero));
-val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Var(0))), Succ (Succ Zero)));
-val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Succ(Var(0)))), Succ Zero));
-
-(* Take in a nat -> nat and apply to zero. Input nat -> nat is Succ *)
-val App(Lam(Nat, Succ(Var(0))), Zero) = step (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
-                                                  Lam(Nat, Succ(Var(0)))));
-val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero));
-
-val Succ Zero = eval (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
-                          Lam(Nat, Succ(Var(0)))));
-
-(* TODO tests with nested scopes *)
 
 
 (******* Tests *******)
+
+
+val true = isVal Zero;
+val true = isVal (Succ(Zero));
+val true = isVal (Lam(Nat, Succ(Zero)));
+val true = isVal (Lam(Nat, Zero));
+val true = isVal (Lam(Nat, Succ(Var(0))));
+val false = isVal (App(Lam(Nat, Zero), Zero));
+
+val Zero = subst Zero Zero;
+val Succ Zero = subst Zero (Succ Zero);
+val Succ Zero = subst (Succ Zero) (Var 0);
+val (Var 1) = subst (Succ Zero) (Var 1);
+val Lam(Nat, Var 0) = subst (Succ Zero) (Lam(Nat, Var 0));
+val Lam(Nat, (Succ Zero)) = subst (Succ Zero) (Lam(Nat, Var 1));
+val App(Lam(Nat, Succ Zero), (Succ Zero)) =
+    subst (Succ Zero) (App(Lam(Nat, Var 1), (Var 0)));
 
 val Nat = get (Cons(Nat, Nil)) 0;
 val Arr(Nat, Nat) = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 1;
@@ -196,3 +163,34 @@ val Nat = typecheck Nil (Rec(Lam(Nat, Zero), Lam(Nat, Succ(Zero)), Lam(Nat, Succ
 (* Ill-formed; base case type does not match rec case type. *)
 val Nat = (typecheck Nil (Rec(Zero, Succ(Zero), Lam(Nat, Succ(Zero))))
           handle TypeMismatch => Nat);
+
+val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0)));
+
+val Succ(Succ(Rec(Zero, Zero, Succ(Succ(Var 0))))) =
+    step (Rec(Succ(Zero), Zero, Succ(Succ(Var 0))));
+
+val Zero = step (Rec(Zero, Zero, Succ(Var 0)));
+val Succ(Succ(Zero)) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Var 0)));
+val Succ(Succ(Succ(Succ(Zero)))) =
+    eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var 0))));
+
+val Succ(Succ(Succ(Succ(Zero)))) =
+    eval (Rec(App(Lam(Nat, Succ(Var 0)), Succ(Zero)),
+              Zero, Succ(Succ(Var 0))));
+
+val Zero = step Zero;
+val Succ(Zero) = step (Succ(Zero));
+val Lam(Nat, Zero) = step (Lam(Nat, Zero));
+val Succ Zero = step (App(Lam(Nat, Succ(Zero)), Zero));
+val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero));
+val Succ (Succ Zero) = step (App(Lam(Nat, Succ(Var(0))), Succ Zero));
+val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Var(0))), Succ (Succ Zero)));
+val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Succ(Var(0)))), Succ Zero));
+
+(* Take in a nat -> nat and apply to zero. Input nat -> nat is Succ *)
+val App(Lam(Nat, Succ(Var(0))), Zero) = step (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
+                                                  Lam(Nat, Succ(Var(0)))));
+val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero));
+
+val Succ Zero = eval (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
+                          Lam(Nat, Succ(Var(0)))));
