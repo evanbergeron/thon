@@ -11,17 +11,20 @@ datatype Exp = Zero
              | Succ of Exp
              | Lam of Typ (*argType*) * Exp(*funcBody*)
              | App of Exp * Exp
-             | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase*)
+             | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
+
 
 (* Holds typing assertions we already know. Head of the list
  * represents the type of the variable most recently seen. (The
  * "lowest" scope variable). *)
-datatype Ctx = Nil | Cons of Typ * Ctx
+datatype 'a List = Nil | Cons of 'a * 'a List
+
 
 fun get ctx i =
     case ctx of
         Nil => raise No
       | Cons (h, t) => if i = 0 then h else get t (i-1)
+
 
 fun typecheck ctx e =
     case e
@@ -51,12 +54,14 @@ fun isVal e =
       | Lam(_, _) => true
       | _ => false
 
+
 val true = isVal Zero;
 val true = isVal (Succ(Zero));
 val true = isVal (Lam(Nat, Succ(Zero)));
 val true = isVal (Lam(Nat, Zero));
 val true = isVal (Lam(Nat, Succ(Var(0))));
 val false = isVal (App(Lam(Nat, Zero), Zero));
+
 
 fun subst' src dst bindingDepth =
     case dst
@@ -67,7 +72,9 @@ fun subst' src dst bindingDepth =
        | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
        | Rec (i, baseCase, recCase) => raise Unimplemented
 
+
 fun subst src dst = subst' src dst 0
+
 
 val Zero = subst Zero Zero;
 val Succ Zero = subst Zero (Succ Zero);
@@ -77,6 +84,7 @@ val Lam(Nat, Var 0) = subst (Succ Zero) (Lam(Nat, Var 0));
 val Lam(Nat, (Succ Zero)) = subst (Succ Zero) (Lam(Nat, Var 1));
 val App(Lam(Nat, Succ Zero), (Succ Zero)) =
     subst (Succ Zero) (App(Lam(Nat, Var 1), (Var 0)));
+
 
 fun step e =
     let val _ = typecheck Nil e in
@@ -91,12 +99,21 @@ fun step e =
                                subst n f'
                            end
                           )
-      | Var _  => raise Unimplemented (* TODO need to have list of terms to plug in here *)
-      | Rec (i, baseCase, recCase) => raise Unimplemented
+      | Var x => Var x
+      | Rec (Zero, baseCase, recCase) => baseCase
+      | Rec (Succ(i), baseCase, recCase) =>
+            (* Doesn't evaluate recursive call if not required. *)
+            subst (Rec(i, baseCase, recCase)) recCase
+      | Rec (i, baseCase, recCase) =>
+            if not (isVal i) then
+                Rec(step i, baseCase, recCase)
+            else raise No
       | _ => if (isVal e) then e else raise No
     end
 
 fun eval e = if isVal e then e else eval (step e)
+
+val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0)));
 
 val Zero = step Zero;
 val Succ(Zero) = step (Succ(Zero));
