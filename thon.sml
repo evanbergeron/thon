@@ -115,6 +115,18 @@ fun eval e = if isVal e then e else eval (step e)
 
 val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0)));
 
+val Succ(Succ(Rec(Zero, Zero, Succ(Succ(Var 0))))) =
+    step (Rec(Succ(Zero), Zero, Succ(Succ(Var 0))));
+
+val Zero = step (Rec(Zero, Zero, Succ(Var 0)));
+val Succ(Succ(Zero)) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Var 0)));
+val Succ(Succ(Succ(Succ(Zero)))) =
+    eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var 0))));
+
+val Succ(Succ(Succ(Succ(Zero)))) =
+    eval (Rec(App(Lam(Nat, Succ(Var 0)), Succ(Zero)),
+              Zero, Succ(Succ(Var 0))));
+
 val Zero = step Zero;
 val Succ(Zero) = step (Succ(Zero));
 val Lam(Nat, Zero) = step (Lam(Nat, Zero));
