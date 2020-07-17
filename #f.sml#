@@ -59,6 +59,9 @@ fun typsubst' src dst bindingDepth =
 fun typsubst src dst = typsubst' src dst 0
 
 
+fun typSubstInExp' t e bindingDepth = typSubstInExp' t e 0
+fun typSubstInExp t e = typSubstInExp' t e 0
+
 fun typecheck ctx typCtx e =
     case e
      of  Zero => Nat
@@ -141,21 +144,21 @@ fun step e =
             if not (isVal e') then (TypApp (t, step e'))
             else
                 let val TypAbs(e'') = e' in
-                    (* TODO Need to typsubst into every type in e''. *)
-                    raise Unimplemented
+                    typSubstInExp t e''
                 end
       | _ => if (isVal e) then e else raise No
     end
+
+
+val TypAbs(Zero) = step (TypAbs(Zero));
+val true = isVal (Lam(Nat, TypAbs(Zero)));
+val (TypAbs Zero) = step (App(Lam(Nat, TypAbs(Zero)), Zero));
 
 
 fun eval e = if isVal e then e else eval (step e)
 
 
 (******* Tests *******)
-
-val TypAbs(Zero) = step (TypAbs(Zero));
-val true = isVal (Lam(Nat, TypAbs(Zero)));
-val (TypAbs Zero) = step (App(Lam(Nat, TypAbs(Zero)), Zero));
 
 val Nat = typsubst Nat (TypVar 0); (* Tho this isn't actually a well-formed type *)
 val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar 0); (* Tho this isn't actually a well-formed type *)
