@@ -17,7 +17,7 @@ datatype Exp = Zero
              | App of Exp * Exp
              | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
              | TypAbs of Exp (* binds type variable *)
-             | TypApp of Exp
+             | TypApp of Typ * Exp
 
 
 (* Holds typing assertions we already know. Head of the list
@@ -47,6 +47,18 @@ fun istype typeCtx t =
       | All t' => istype (Cons(42, typeCtx)) t'
 
 
+fun typsubst' src dst bindingDepth =
+    case dst
+     of Nat => Nat
+      | TypVar n  => if n = bindingDepth then src else (TypVar n)
+      | Arr (t, t') => Arr((typsubst' src t bindingDepth),
+                           (typsubst' src t' bindingDepth))
+      | All t => All(typsubst' src t (bindingDepth + 1))
+
+
+fun typsubst src dst = typsubst' src dst 0
+
+
 fun typecheck ctx typCtx e =
     case e
      of  Zero => Nat
@@ -70,7 +82,12 @@ fun typecheck ctx typCtx e =
                 if t <> t2 then raise TypeMismatch else t
             end
        | TypAbs e => All(typecheck ctx (Cons(42, typCtx)) e)
-       | TypApp e => raise Unimplemented
+       | TypApp (appType, e) =>
+            if not (istype typCtx appType) then raise No else
+            let val All(t) = typecheck ctx typCtx e
+            in
+                typsubst appType t
+            end
 
 
 fun isVal e =
@@ -95,6 +112,7 @@ fun subst' src dst bindingDepth =
 
 (* TODO do the same thing for types *)
 fun subst src dst = subst' src dst 0
+
 
 
 fun step e =
@@ -129,6 +147,19 @@ fun eval e = if isVal e then e else eval (step e)
 
 
 (******* Tests *******)
+
+val Nat = typsubst Nat (TypVar 0); (* Tho this isn't actually a well-formed type *)
+val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar 0); (* Tho this isn't actually a well-formed type *)
+val false = istype Nil (TypVar 0);
+val All(Nat) = typsubst Nat (All(TypVar 1));
+val true = istype Nil (All(TypVar 0));
+val All(Arr(Nat, (All(Nat)))) = typsubst (All(Nat)) (All(Arr(Nat, TypVar 1)));
+
+val Nat = typecheck Nil Nil (TypApp(TypVar 0, Zero)) handle No => Nat;
+val All(Arr(TypVar 0, Nat)) = typecheck Nil Nil (TypAbs(Lam(TypVar 0, Zero)));
+val Arr(Arr(Nat, Nat), Nat) = typecheck Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 0, Zero)))));
+val Nat = typecheck Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 1, Zero))))) handle No => Nat;
+
 
 val All(Nat) = typecheck Nil Nil (TypAbs(Zero)); (* polymorphic zero *)
 (* polymorphic id function :) *)
