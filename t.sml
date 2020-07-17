@@ -66,7 +66,7 @@ fun subst' src dst bindingDepth =
        | Lam (t, f) => Lam(t, (subst' src f (bindingDepth+1)))
        | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
        | Rec (i, baseCase, recCase) =>
-            Rec(i,
+            Rec(subst' src i bindingDepth,
                 subst' src baseCase bindingDepth,
                 subst' src recCase (bindingDepth+1))
 
