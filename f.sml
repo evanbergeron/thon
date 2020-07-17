@@ -132,7 +132,7 @@ fun subst' src dst bindingDepth =
        | Lam (t, f) => Lam(t, (subst' src f (bindingDepth+1)))
        | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
        | Rec (i, baseCase, recCase) =>
-            Rec(i,
+            Rec(subst' src i bindingDepth,
                 subst' src baseCase bindingDepth,
                 subst' src recCase (bindingDepth+1))
        | TypAbs e => TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
@@ -332,3 +332,7 @@ val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero));
 
 val Succ Zero = eval (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)),
                           Lam(Nat, Succ(Var(0)))));
+val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var 0))));
+
+val multByThree = Lam(Nat, Rec(Var 0, Zero, Succ(Succ(Succ(Var 0)))));
+val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero))
