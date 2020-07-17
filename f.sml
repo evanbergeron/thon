@@ -106,9 +106,12 @@ fun subst' src dst bindingDepth =
        | Succ e2 => Succ (subst' src e2 bindingDepth)
        | Lam (t, f) => Lam(t, (subst' src f (bindingDepth+1)))
        | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
-       | Rec (i, baseCase, recCase) => raise Unimplemented
+       | Rec (i, baseCase, recCase) =>
+            Rec(i,
+                subst' src baseCase bindingDepth,
+                subst' src recCase (bindingDepth+1))
        | TypAbs e => TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
-       | TypApp e => raise Unimplemented
+       | TypApp (appType, e) => TypApp(appType, subst' src e bindingDepth)
 
 
 fun subst src dst = subst' src dst 0
