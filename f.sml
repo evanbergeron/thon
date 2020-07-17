@@ -58,6 +58,31 @@ fun typsubst' src dst bindingDepth =
 
 fun typsubst src dst = typsubst' src dst 0
 
+(* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
+(* might not need to track bindingdepth ourselves *)
+fun typSubstInExp' srcType dstExp bindingDepth =
+    case dstExp
+     of  Zero => Zero
+       | Var i => Var i
+       | Succ e2 => Succ (typSubstInExp' srcType e2 bindingDepth)
+       | Lam (argType, funcBody) =>
+            Lam((typsubst' srcType argType bindingDepth),
+                typSubstInExp' srcType funcBody bindingDepth)
+       | App (f, n) =>
+            App (typSubstInExp' srcType f bindingDepth,
+                 typSubstInExp' srcType n bindingDepth)
+       | Rec (i, baseCase, recCase) =>
+            Rec(typSubstInExp' srcType i bindingDepth,
+                typSubstInExp' srcType baseCase bindingDepth,
+                typSubstInExp' srcType recCase bindingDepth)
+       | TypAbs e => TypAbs(typSubstInExp' srcType e (bindingDepth+1)) (* binds type var *)
+       | TypApp (appType, e) =>
+            TypApp(typsubst' srcType appType bindingDepth,
+                   typSubstInExp' srcType e bindingDepth)
+
+
+fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
+
 
 fun typecheck ctx typCtx e =
     case e
@@ -144,8 +169,7 @@ fun step e =
             if not (isVal e') then (TypApp (t, step e'))
             else
                 let val TypAbs(e'') = e' in
-                    (* TODO Need to typsubst into every type in e''. *)
-                    raise Unimplemented
+                    typSubstInExp t e''
                 end
       | _ => if (isVal e) then e else raise No
     end
@@ -155,6 +179,17 @@ fun eval e = if isVal e then e else eval (step e)
 
 
 (******* Tests *******)
+
+val polymorphicIdFn = TypAbs(Lam(TypVar 0, Var 0));
+
+val Lam(Nat, Var 0) = step (TypApp(Nat, polymorphicIdFn));
+val Lam(Arr(Nat, Nat), Var 0) = step (TypApp(Arr(Nat, Nat), polymorphicIdFn));
+val TypAbs (Lam (TypVar 0, Var 0)) = step (TypApp(Nat, TypAbs(polymorphicIdFn)))
+val TypApp(Nat, TypAbs((Lam (TypVar 0, Var 0)))) = step (TypApp(Nat, TypApp(Nat, TypAbs(polymorphicIdFn))))
+val TypAbs(Lam(Arr(Nat, TypVar 0), Var 0)) = step (TypApp(Nat, TypAbs(TypAbs(Lam(Arr(TypVar 1, TypVar 0), Var 0)))));
+val Lam(Nat, Var 0) = eval (TypApp(Nat, TypApp(Nat, TypAbs(polymorphicIdFn))));
+
+val Succ Zero = eval (App(TypApp(Nat, polymorphicIdFn), Succ(Zero)));
 
 val TypAbs(Zero) = step (TypAbs(Zero));
 val true = isVal (Lam(Nat, TypAbs(Zero)));
