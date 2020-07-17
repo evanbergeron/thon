@@ -53,6 +53,7 @@ fun typecheck ctx typCtx e =
        | Var i => get ctx i
        | Succ e2 => (typecheck ctx typCtx e2)
        | Lam (argType, funcBody) =>
+            if not (istype typCtx argType) then raise No else
             Arr (argType, typecheck (Cons(argType, ctx)) typCtx funcBody)
        | App (f, n) =>
             let val Arr (d, c) = typecheck ctx typCtx f
@@ -68,7 +69,7 @@ fun typecheck ctx typCtx e =
             in
                 if t <> t2 then raise TypeMismatch else t
             end
-       | TypAbs e => raise Unimplemented
+       | TypAbs e => All(typecheck ctx (Cons(42, typCtx)) e)
        | TypApp e => raise Unimplemented
 
 
@@ -92,6 +93,7 @@ fun subst' src dst bindingDepth =
        | TypApp e => raise Unimplemented
 
 
+(* TODO do the same thing for types *)
 fun subst src dst = subst' src dst 0
 
 
@@ -127,6 +129,20 @@ fun eval e = if isVal e then e else eval (step e)
 
 
 (******* Tests *******)
+
+val All(Nat) = typecheck Nil Nil (TypAbs(Zero)); (* polymorphic zero *)
+(* polymorphic id function :) *)
+val All(Arr(TypVar 0, TypVar 0)) =
+    typecheck Nil Nil (TypAbs(Lam(TypVar 0, Var 0)));
+val Arr(Nat, All(Arr(TypVar 0, TypVar 0))) =
+    typecheck Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0))));
+val Arr(Nat, All(Arr(TypVar 0, TypVar 0))) =
+    typecheck Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0))));
+(* Nested type variables *)
+val All(All(Arr(TypVar 1,Nat))) =
+    typecheck Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Zero))))
+val All(All(Arr(TypVar 1, TypVar 1))) =
+    typecheck Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Var 0))))
 
 val true = istype Nil Nat;
 val false = istype Nil (TypVar 0); (* Unbound type variable *)
@@ -205,6 +221,8 @@ val Nat = typecheck Nil Nil (Rec(Lam(Nat, Zero), Lam(Nat, Succ(Zero)), Lam(Nat, 
 (* Ill-formed; base case type does not match rec case type. *)
 val Nat = (typecheck Nil Nil (Rec(Zero, Succ(Zero), Lam(Nat, Succ(Zero))))
           handle TypeMismatch => Nat);
+
+val Arr(Nat, Nat) = typecheck Nil Nil (Lam((TypVar 0), Zero)) handle No => Arr(Nat, Nat);
 
 val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0)));
 
