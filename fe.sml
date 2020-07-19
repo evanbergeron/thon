@@ -58,9 +58,26 @@ fun typsubst' src dst bindingDepth =
       | Arr (t, t') => Arr((typsubst' src t bindingDepth),
                            (typsubst' src t' bindingDepth))
       | All t => All(typsubst' src t (bindingDepth + 1))
+      | Some t => Some(typsubst' src t (bindingDepth + 1))
 
 
 fun typsubst src dst = typsubst' src dst 0
+
+
+(* Turns search to Var bindingDepth*)
+fun typAbstractOut' search t bindingDepth =
+    if t = search then (TypVar bindingDepth) else
+    case t
+     of Nat => Nat
+      | TypVar n  => TypVar n
+      | Arr (d, c) => Arr((typAbstractOut' search d bindingDepth),
+                           (typAbstractOut' search c bindingDepth))
+      | All t' => All(typAbstractOut' search t' (bindingDepth+1))
+      | Some t' => Some(typAbstractOut' search t' (bindingDepth+1))
+
+
+(* Abstracts search out *)
+fun typAbstractOut search t = typAbstractOut' search t 0
 
 (* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
 (* might not need to track bindingdepth ourselves *)
@@ -117,7 +134,14 @@ fun typecheck ctx typCtx e =
             in
                 typsubst appType t
             end
-       | Pack (t, e) => raise Unimplemented
+       | Pack (reprType, pkgImpl) =>
+            if not (istype Nil reprType) then raise TypeMismatch else
+            let val pkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
+            (* TOOD need to sub-out the reprType in pkgType I think idk *)
+            (* yah that's what hides reprType *)
+            (* reprType -> Var 0 in pkgType *)
+            in Some(typAbstractOut reprType pkgType) end
+
 
 
 fun isVal e =
@@ -185,6 +209,11 @@ fun eval e = if isVal e then e else eval (step e)
 
 (******* Tests *******)
 
+val Arr(TypVar 0, Nat)= typAbstractOut (Arr(Nat, Nat)) (Arr(Arr(Nat, Nat), Nat));
+val Some(Arr(TypVar 1, Nat)) = typAbstractOut (Arr(Nat, Nat)) (Some(Arr(Arr(Nat, Nat), Nat)));
+val All(Arr(TypVar 1, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(Arr(Nat, Nat), Nat)));
+val Some(All(Arr(TypVar 2, Nat))) = typAbstractOut (Arr(Nat, Nat)) (Some(All(Arr(Arr(Nat, Nat), Nat))));
+
 val polymorphicIdFn = TypAbs(Lam(TypVar 0, Var 0));
 
 val Lam(Nat, Var 0) = step (TypApp(Nat, polymorphicIdFn));
@@ -204,8 +233,11 @@ val Nat = typsubst Nat (TypVar 0); (* Tho this isn't actually a well-formed type
 val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar 0); (* Tho this isn't actually a well-formed type *)
 val false = istype Nil (TypVar 0);
 val All(Nat) = typsubst Nat (All(TypVar 1));
+val Some(Nat) = typsubst Nat (Some(TypVar 1));
 val true = istype Nil (All(TypVar 0));
+val true = istype Nil (Some(TypVar 0));
 val All(Arr(Nat, (All(Nat)))) = typsubst (All(Nat)) (All(Arr(Nat, TypVar 1)));
+val All(Arr(Nat, (Some(Nat)))) = typsubst (Some(Nat)) (All(Arr(Nat, TypVar 1)));
 
 val Nat = typecheck Nil Nil (TypApp(TypVar 0, Zero)) handle No => Nat;
 val All(Arr(TypVar 0, Nat)) = typecheck Nil Nil (TypAbs(Lam(TypVar 0, Zero)));
