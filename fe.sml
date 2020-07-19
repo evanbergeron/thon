@@ -136,14 +136,25 @@ fun typecheck ctx typCtx e =
             end
        | Pack (reprType, pkgImpl) =>
             if not (istype Nil reprType) then raise TypeMismatch else
+            (* pkgType : [reprType/TypVar 0](t') *)
             let val pkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
-            (* TOOD need to sub-out the reprType in pkgType I think idk *)
-            (* yah that's what hides reprType *)
-            (* reprType -> Var 0 in pkgType *)
+            (* Want Some(t') *)
             in Some(typAbstractOut reprType pkgType) end
+       | Open (pkg, dst) => raise Unimplemented
+        (*     (* binds BOTH a TypVar and a Exp Var *) *)
+        (*  let val Some(t) = typecheck ctx typCtx pkg  *)
+        (*      val resType = typecheck Cons(t, ctx) Cons(42, typCtx) *)
+        (* in *)
+        (*     if not (istype typCtx resType) then raise TypeMismatch else *)
+        (*     resType *)
+        (*  end *)
 
-(* TODO this is wrong, right? The codomain is going to be Nat no matter what.... *)
-val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil (Pack(Nat,Lam(Nat, Zero)));
+val e0 = Pack(Nat,Lam(Nat, Zero));
+(* Seems there are multiple valid typings of this expression. Up
+front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
+but the chapter on existential types in TAPL suggests otherwise. *)
+val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e0;
+(* val Arr(Nat, Nat) = typecheck Nil (Cons(42,Nil)) (Lam(Nat, Zero)); *)
 
 fun isVal e =
     case e of
