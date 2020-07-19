@@ -142,7 +142,8 @@ fun typecheck ctx typCtx e =
             (* reprType -> Var 0 in pkgType *)
             in Some(typAbstractOut reprType pkgType) end
 
-
+(* TODO this is wrong, right? The codomain is going to be Nat no matter what.... *)
+val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil (Pack(Nat,Lam(Nat, Zero)));
 
 fun isVal e =
     case e of
