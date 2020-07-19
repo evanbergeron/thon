@@ -141,19 +141,16 @@ fun typecheck ctx typCtx e =
             (* Want Some(t') *)
             in Some(typAbstractOut reprType pkgType) end
        | Open (pkg, dst) => raise Unimplemented
-        (*     (* binds BOTH a TypVar and a Exp Var *) *)
-        (*  let val Some(t) = typecheck ctx typCtx pkg  *)
-        (*      val resType = typecheck Cons(t, ctx) Cons(42, typCtx) *)
-        (* in *)
-        (*     if not (istype typCtx resType) then raise TypeMismatch else *)
-        (*     resType *)
-        (*  end *)
 
 val e0 = Pack(Nat,Lam(Nat, Zero));
+val e1 = Pack(Nat, Lam(Nat, Var 0));
+val e2 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0));
 (* Seems there are multiple valid typings of this expression. Up
 front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
 but the chapter on existential types in TAPL suggests otherwise. *)
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e0;
+val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e1;
+val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e2;
 (* val Arr(Nat, Nat) = typecheck Nil (Cons(42,Nil)) (Lam(Nat, Zero)); *)
 
 fun isVal e =
