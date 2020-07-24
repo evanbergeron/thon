@@ -54,7 +54,9 @@ fun istype typeCtx t =
 fun typsubst' src dst bindingDepth =
     case dst
      of Nat => Nat
-      | TypVar n  => if n = bindingDepth then src else (TypVar n)
+      | TypVar n  => if n = bindingDepth then src else
+                     if n > bindingDepth then TypVar (n-1) else
+                     dst
       | Arr (t, t') => Arr((typsubst' src t bindingDepth),
                            (typsubst' src t' bindingDepth))
       | All t => All(typsubst' src t (bindingDepth + 1))
