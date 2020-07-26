@@ -338,8 +338,11 @@ fun step e =
             if not (isVal pkg) then Open (step pkg, client) else
            (case pkg of
                 Pack(reprType', pkgImpl') =>
-                subst pkg (typSubstInExp reprType' client)
-            | _ => raise Unimplemented)
+                    subst pkg (typSubstInExp reprType' client)
+              | AnnotatedPack(reprType', pkgImpl', _) =>
+                    subst pkg (typSubstInExp reprType' client)
+              | _ => raise No
+           )
       | _ => if (isVal e) then e else raise No
     end
 
