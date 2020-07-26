@@ -61,7 +61,9 @@ fun isVal e =
 fun subst' src dst bindingDepth =
     case dst
      of  Zero => Zero
-       | Var n  => if n = bindingDepth then src else Var(n) (* ? *)
+       | Var n  => if n = bindingDepth then src else
+                   if n > bindingDepth then Var(n-1) else
+                   Var(n)
        | Succ e2 => Succ (subst' src e2 bindingDepth)
        | Lam (t, f) => Lam(t, (subst' src f (bindingDepth+1)))
        | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
@@ -115,12 +117,24 @@ val false = isVal (App(Lam(Nat, Zero), Zero));
 
 val Zero = subst Zero Zero;
 val Succ Zero = subst Zero (Succ Zero);
-val Succ Zero = subst (Succ Zero) (Var 0);
-val (Var 1) = subst (Succ Zero) (Var 1);
+val (Lam(Nat, Var 0)) = subst (Succ Zero) (Lam(Nat, Var 0));
+val (Var 0) = subst (Succ Zero) (Var 1);
 val Lam(Nat, Var 0) = subst (Succ Zero) (Lam(Nat, Var 0));
 val Lam(Nat, (Succ Zero)) = subst (Succ Zero) (Lam(Nat, Var 1));
 val App(Lam(Nat, Succ Zero), (Succ Zero)) =
     subst (Succ Zero) (App(Lam(Nat, Var 1), (Var 0)));
+
+val Lam(Nat, Zero) = subst Zero (Lam(Nat, Var 1));
+val Lam(Nat, Succ Zero) = subst (Succ Zero) (Lam(Nat, Var 1));
+val Lam(Nat, Lam(Nat, Succ Zero)) = subst (Succ Zero) (Lam(Nat, Lam(Nat, Var 2)));
+val Lam(Nat, Rec(Zero, Zero, Succ Zero)) = subst (Succ Zero) (Lam(Nat, Rec(Zero, Zero, Var 2)));
+
+val Lam(Nat, Rec(Zero, Var 0, Zero)) = subst Zero (Lam(Nat, Rec(Var 1, Var 0, Zero)));
+val Lam(Nat, Rec(Zero, Var 1, Zero)) = subst Zero (Lam(Nat, Rec(Var 1, Var 2, Zero)));
+val Rec(Zero, Zero, Zero) = step (App(Lam(Nat, Rec(Var 0, Var 0, Zero)), Zero));
+
+val Lam(Nat, Rec(Zero, Var 0, Zero)) =
+    step (App(Lam(Nat, Lam(Nat, Rec(Var 1, Var 0, Zero))), Zero));
 
 val Nat = get (Cons(Nat, Nil)) 0;
 val Arr(Nat, Nat) = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 1;
