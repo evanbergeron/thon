@@ -66,19 +66,26 @@ fun typsubst' src dst bindingDepth =
 fun typsubst src dst = typsubst' src dst 0
 
 
-(* Turns search to Var bindingDepth*)
+(* Turns search to Var bindingDepth
+ *
+ * DEVNOTE: assumes the caller will place the result underneath a type
+ * variable binding site.
+ *
+ * Remarkably similar to typSubst - might be able to dedup. This needs
+ * to track bindingDepth though and subst in TypVar of the appropriate
+ * depth.
+ *)
 fun typAbstractOut' search t bindingDepth =
     if t = search then (TypVar bindingDepth) else
     case t
      of Nat => Nat
-      | TypVar n  => TypVar n
+      | TypVar n  => TypVar (n+1)
       | Arr (d, c) => Arr((typAbstractOut' search d bindingDepth),
                            (typAbstractOut' search c bindingDepth))
       | All t' => All(typAbstractOut' search t' (bindingDepth+1))
       | Some t' => Some(typAbstractOut' search t' (bindingDepth+1))
 
 
-(* Abstracts search out *)
 fun typAbstractOut search t = typAbstractOut' search t 0
 
 (* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
@@ -137,23 +144,32 @@ fun typecheck ctx typCtx e =
                 typsubst appType t
             end
        | Pack (reprType, pkgImpl) =>
+
             if not (istype Nil reprType) then raise TypeMismatch else
             (* pkgType : [reprType/TypVar 0](t') *)
             let val pkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
             (* Want Some(t') *)
             in Some(typAbstractOut reprType pkgType) end
-       | Open (pkg, dst) => raise Unimplemented
+       | Open (pkg, client) => raise Unimplemented
 
-val e0 = Pack(Nat,Lam(Nat, Zero));
-val e1 = Pack(Nat, Lam(Nat, Var 0));
-val e2 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0));
 (* Seems there are multiple valid typings of this expression. Up
 front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
 but the chapter on existential types in TAPL suggests otherwise. *)
+val Arr(Nat, Nat) = typecheck Nil (Cons(42, Nil)) (Lam(Nat, Zero));
+val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat));
+
+val e0 = Pack(Nat, Lam(Nat, Zero));
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e0;
+val e1 = Pack(Nat, Lam(Nat, Var 0));
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e1;
+val e2 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0));
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e2;
-(* val Arr(Nat, Nat) = typecheck Nil (Cons(42,Nil)) (Lam(Nat, Zero)); *)
+
+
+val _ = typecheck Nil Nil (Open(e0, Var 0));
+
+(* cant hack typvar bound in open in result type *)
+(* val _ = typecheck Nil Nil (Open(e0, App(Var 0, Zero))); *)
 
 fun isVal e =
     case e of
@@ -222,10 +238,13 @@ fun eval e = if isVal e then e else eval (step e)
 
 (******* Tests *******)
 
+val All(TypVar 1) = typAbstractOut Nat (All(Nat));
+val TypVar 0 = typAbstractOut Nat Nat;
 val Arr(TypVar 0, Nat)= typAbstractOut (Arr(Nat, Nat)) (Arr(Arr(Nat, Nat), Nat));
 val Some(Arr(TypVar 1, Nat)) = typAbstractOut (Arr(Nat, Nat)) (Some(Arr(Arr(Nat, Nat), Nat)));
 val All(Arr(TypVar 1, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(Arr(Nat, Nat), Nat)));
 val Some(All(Arr(TypVar 2, Nat))) = typAbstractOut (Arr(Nat, Nat)) (Some(All(Arr(Arr(Nat, Nat), Nat))));
+
 
 val polymorphicIdFn = TypAbs(Lam(TypVar 0, Var 0));
 
