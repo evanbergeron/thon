@@ -1,4 +1,6 @@
 (* A system FE interpreter - System F with existential packages *)
+Control.Print.printDepth := 100;
+
 exception TypeMismatch
 exception No
 exception ClientTypeCannotEscapeClientScope
@@ -157,9 +159,16 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | TypApp (appType, e) =>
             TypApp(typsubst' srcType appType bindingDepth,
                    typSubstInExp' srcType e bindingDepth)
-       | Pack (reprType, pkgImpl) => raise Unimplemented
-       | AnnotatedPack(reprType, pkgImpl, pkgType) => raise Unimplemented
-       | Open (pkg, client) => raise Unimplemented
+       | Pack (reprType, pkgImpl) =>
+            Pack(typsubst' srcType reprType bindingDepth,
+                typSubstInExp' srcType pkgImpl bindingDepth)
+       | AnnotatedPack(reprType, pkgImpl, pkgType) =>
+            AnnotatedPack(typsubst' srcType reprType bindingDepth,
+                          typSubstInExp' srcType pkgImpl bindingDepth,
+                          typsubst' srcType pkgType bindingDepth)
+       | Open (pkg, client) =>
+            Open(typSubstInExp' srcType pkg bindingDepth,
+                 typSubstInExp' srcType client (bindingDepth+1))
 
 
 fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
@@ -246,23 +255,16 @@ val Arr(All (TypVar 1), TypVar 0) = typAbstractOut Nat (Arr(All Nat, Nat));
 val Some(Arr(All (TypVar 1), TypVar 0)) = typecheck Nil Nil e5
 
 val e6 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Zero));
-(* open e5 as (t, lam) in (lam()) *)
-(* Open(e5,  *)
-
-(* open e0 as (t, x) in x *)
-(* TODO *)
-(* val _ = typecheck Nil Nil (Open(e0, Var 0)); *)
-
-(* cant decrVarIdxs typvar bound in open in result type *)
-(* val _ = typecheck Nil Nil (Open(e0, App(Var 0, Zero))); *)
 
 fun isVal e =
     case e of
         Zero => true
       | Succ(n) => isVal n
       | Lam(_, _) => true
+      | Tuple(l, r) => (isVal l) andalso (isVal r)
       | TypAbs _  => true
       | Pack (reprType, pkgImpl) => isVal pkgImpl
+      | AnnotatedPack(_, pkgImpl, _) => isVal pkgImpl
       | _ => false
 
 
@@ -283,8 +285,11 @@ fun subst' src dst bindingDepth =
                 subst' src recCase (bindingDepth+1))
        | TypAbs e => TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
        | TypApp (appType, e) => TypApp(appType, subst' src e bindingDepth)
-       | Pack (reprType, pkgImpl) => raise Unimplemented
-       | Open (pkg, client) => raise Unimplemented
+       | Pack (reprType, pkgImpl) => Pack(reprType, subst' src pkgImpl bindingDepth)
+       | AnnotatedPack(reprType, pkgImpl, t) => AnnotatedPack(reprType,
+subst' src pkgImpl bindingDepth, t)
+       | Open (pkg, client) => Open(subst' src pkg bindingDepth, subst' src client (bindingDepth+1))
+       | Tuple (l, r) => Tuple (subst' src l bindingDepth, subst' src r bindingDepth)
 
 
 fun subst src dst = subst' src dst 0
@@ -331,16 +336,17 @@ fun step e =
             if not (isVal e) then raise No else
             e
       | AnnotatedPack(reprType, pkgImpl, pkgType) =>
-            if not (isVal pkgImpl) then Pack(reprType, step pkgImpl) else
+            if not (isVal pkgImpl) then AnnotatedPack(reprType, step pkgImpl, pkgType) else
             if not (isVal e) then raise No else
             e
       | Open (pkg, client) =>
             if not (isVal pkg) then Open (step pkg, client) else
+            (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 Pack(reprType', pkgImpl') =>
-                    subst pkg (typSubstInExp reprType' client)
+                    subst pkgImpl' (typSubstInExp reprType' client)
               | AnnotatedPack(reprType', pkgImpl', _) =>
-                    subst pkg (typSubstInExp reprType' client)
+                    subst pkgImpl' (typSubstInExp reprType' client)
               | _ => raise No
            )
       | _ => if (isVal e) then e else raise No
@@ -374,12 +380,21 @@ val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typecheck Nil Nil idid;
 val inoutpkg = AnnotatedPack(Nat, idid, Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat)));
 val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typecheck Nil Nil inoutpkg;
 val Nat = typecheck Nil Nil (Open(inoutpkg, App(Right(Var 0), App(Left(Var 0), Zero))));
+val true = isVal inoutpkg;
+(* Dynamics *)
+val App
+    (Right (Tuple (Lam (Nat,Var 0),Lam (Nat,Var 0))),
+     App (Left (Tuple (Lam (Nat,Var 0),Lam (Nat,Var 0))),Zero))
+    = step (Open(inoutpkg, App(Right(Var 0), App(Left(Var 0), Zero))));
+
+val Zero = eval (Open(inoutpkg, App(Right(Var 0), App(Left(Var 0), Zero))));
 
 val leftandback = Tuple(Lam(Nat, Tuple(Var 0, Zero)), Lam(Prod(Nat, Nat), Left (Var 0)));
 val Prod (Arr (Nat,Prod (Nat, Nat)),Arr (Prod (Nat, Nat),Nat)) = typecheck Nil Nil leftandback;
 val inoutpkg2 = AnnotatedPack(Prod(Nat, Nat), leftandback, Prod (Arr (Nat,TypVar 0),Arr (TypVar 0,Nat)));
 val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typecheck Nil Nil inoutpkg2;
 val Nat = typecheck Nil Nil (Open(inoutpkg2, App(Right(Var 0), App(Left(Var 0), Zero))));
+val Zero = eval (Open(inoutpkg2, App(Right(Var 0), App(Left(Var 0), Zero))));
 
 val double = Lam(Nat, Rec(Var 0, Zero, Succ (Succ (Var 0))));
 val Succ (Succ Zero) = eval (App(double, (Succ Zero)));
