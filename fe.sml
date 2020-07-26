@@ -169,42 +169,42 @@ fun typSubstInExp' srcType dstExp bindingDepth =
 fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
 
 
-fun typecheck ctx typCtx e =
+fun typeof ctx typCtx e =
     case e
      of  Zero => Nat
        | Var i => get ctx i
-       | Succ e2 => (typecheck ctx typCtx e2)
-       | Left e => let val Prod(l, r) = (typecheck ctx typCtx e) in l end
-       | Right e => let val Prod(l, r) = (typecheck ctx typCtx e) in r end
+       | Succ e2 => (typeof ctx typCtx e2)
+       | Left e => let val Prod(l, r) = (typeof ctx typCtx e) in l end
+       | Right e => let val Prod(l, r) = (typeof ctx typCtx e) in r end
        | Lam (argType, funcBody) =>
             if not (istype typCtx argType) then raise No else
-            Arr (argType, typecheck (Cons(argType, ctx)) typCtx funcBody)
+            Arr (argType, typeof (Cons(argType, ctx)) typCtx funcBody)
        | App (f, n) =>
-            let val Arr (d, c) = typecheck ctx typCtx f
-                val argType = typecheck ctx typCtx n
+            let val Arr (d, c) = typeof ctx typCtx f
+                val argType = typeof ctx typCtx n
             in
                 if d <> argType then raise TypeMismatch
                 else c
             end
-       | Tuple (l, r) => Prod(typecheck ctx typCtx l, typecheck ctx typCtx r)
+       | Tuple (l, r) => Prod(typeof ctx typCtx l, typeof ctx typCtx r)
        | Rec (i, baseCase, recCase) =>
-            let val Nat = typecheck ctx typCtx i
-                val t = typecheck ctx typCtx baseCase
-                val t2 = typecheck (Cons(t, ctx)) typCtx recCase
+            let val Nat = typeof ctx typCtx i
+                val t = typeof ctx typCtx baseCase
+                val t2 = typeof (Cons(t, ctx)) typCtx recCase
             in
                 if t <> t2 then raise TypeMismatch else t
             end
-       | TypAbs e => All(typecheck ctx (Cons(42, typCtx)) e)
+       | TypAbs e => All(typeof ctx (Cons(42, typCtx)) e)
        | TypApp (appType, e) =>
             if not (istype typCtx appType) then raise No else
-            let val All(t) = typecheck ctx typCtx e
+            let val All(t) = typeof ctx typCtx e
             in
                 typsubst appType t
             end
        | Pack (reprType, pkgImpl, pkgType) =>
             if not (istype Nil reprType) then raise TypeMismatch else
             (* pkgType : [reprType/TypVar 0](t') *)
-            let val deducedPkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
+            let val deducedPkgType = typeof ctx (Cons(42, typCtx)) pkgImpl
             in
                 if (typAbstractOut reprType deducedPkgType) <>
                    (typAbstractOut reprType pkgType) then
@@ -212,9 +212,9 @@ fun typecheck ctx typCtx e =
             Some(pkgType)
             end
        | Open (pkg, client) =>
-            let val Some(r) = typecheck ctx typCtx pkg
+            let val Some(r) = typeof ctx typCtx pkg
                 (* binds BOTH a TypVar and a Exp Var *)
-                val clientType = typecheck (Cons(r, ctx)) (Cons(42, typCtx)) client
+                val clientType = typeof (Cons(r, ctx)) (Cons(42, typCtx)) client
                 (* shift indices of free vars and typevars in clientType down by one *)
                 val resType = typdecrVarIdxs clientType
             in
@@ -222,14 +222,14 @@ fun typecheck ctx typCtx e =
                 resType
             end
 
-fun isVal e =
+fun isval e =
     case e of
         Zero => true
-      | Succ(n) => isVal n
+      | Succ(n) => isval n
       | Lam(_, _) => true
-      | Tuple(l, r) => (isVal l) andalso (isVal r)
+      | Tuple(l, r) => (isval l) andalso (isval r)
       | TypAbs _  => true
-      | Pack(_, pkgImpl, _) => isVal pkgImpl
+      | Pack(_, pkgImpl, _) => isval pkgImpl
       | _ => false
 
 
@@ -259,19 +259,19 @@ fun subst src dst = subst' src dst 0
 
 
 fun step e =
-    let val _ = typecheck Nil Nil e in
-    if isVal e then e else
+    let val _ = typeof Nil Nil e in
+    if isval e then e else
     case e of
-        Succ(n) => if not (isVal n) then Succ(step n) else e
-      | Left n  => if not (isVal n) then Left(step n) else
+        Succ(n) => if not (isval n) then Succ(step n) else e
+      | Left n  => if not (isval n) then Left(step n) else
                    let val Tuple(l, r) = n in l end
-      | Right n  => if not (isVal n) then Right(step n) else
+      | Right n  => if not (isval n) then Right(step n) else
                     let val Tuple(l, r) = n in r end
-      | Tuple(l, r) => if not (isVal l) then Tuple(step l, r) else
-                       if not (isVal r) then Tuple(l, step r) else
+      | Tuple(l, r) => if not (isval l) then Tuple(step l, r) else
+                       if not (isval r) then Tuple(l, step r) else
                        e
-      | App(f, n) => if not (isVal f) then App(step f, n)
-                     else (if not (isVal n) then App(f, step n)
+      | App(f, n) => if not (isval f) then App(step f, n)
+                     else (if not (isval n) then App(f, step n)
                            else let val Lam(t, f') = f
                            in
                                (* plug `n` into `f'` *)
@@ -284,33 +284,33 @@ fun step e =
             (* Doesn't evaluate recursive call if not required. *)
             subst (Rec(i, baseCase, recCase)) recCase
       | Rec (i, baseCase, recCase) =>
-            if not (isVal i) then
+            if not (isval i) then
                 Rec(step i, baseCase, recCase)
             else raise No
-      | TypAbs e' => raise No (* Already isVal *)
+      | TypAbs e' => raise No (* Already isval *)
       | TypApp (t, e') =>
-            if not (isVal e') then (TypApp (t, step e'))
+            if not (isval e') then (TypApp (t, step e'))
             else
                 let val TypAbs(e'') = e' in
                     typSubstInExp t e''
                 end
       | Pack(reprType, pkgImpl, pkgType) =>
-            if not (isVal pkgImpl) then Pack(reprType, step pkgImpl, pkgType) else
-            if not (isVal e) then raise No else
+            if not (isval pkgImpl) then Pack(reprType, step pkgImpl, pkgType) else
+            if not (isval e) then raise No else
             e
       | Open (pkg, client) =>
-            if not (isVal pkg) then Open (step pkg, client) else
+            if not (isval pkg) then Open (step pkg, client) else
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 Pack(reprType', pkgImpl', _) =>
                     subst pkgImpl' (typSubstInExp reprType' client)
               | _ => raise No
            )
-      | _ => if (isVal e) then e else raise No
+      | _ => if (isval e) then e else raise No
     end
 
 
-fun eval e = if isVal e then e else eval (step e)
+fun eval e = if isval e then e else eval (step e)
 
 
 (******* Tests *******)
@@ -321,45 +321,45 @@ front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
 but the chapter on existential types in TAPL suggests otherwise.
 
 That's why we require an explicit type annotation from the programmer. *)
-val Arr(Nat, Nat) = typecheck Nil (Cons(42, Nil)) (Lam(Nat, Zero));
+val Arr(Nat, Nat) = typeof Nil (Cons(42, Nil)) (Lam(Nat, Zero));
 val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat));
 val All(Arr(TypVar 0, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar 0, Nat)));
 
 val e0 = Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0));
-val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e0;
+val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil e0;
 val e1 = Pack(Nat, Lam(Nat, Var 0), Arr(TypVar 0, TypVar 0));
-val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e1;
+val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil e1;
 val e2 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0), Arr(TypVar 0, TypVar 0));
-val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e2;
+val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil e2;
 val e4 = Pack(All(Nat), Lam(All(Nat), Zero), Arr(TypVar 0, Nat));
-val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil e4
+val Some(Arr(TypVar 0, Nat)) = typeof Nil Nil e4
 
 val e5 = Pack(Nat, Lam(All(Nat), Zero), Arr(All (TypVar 1), TypVar 0));
-val Some(Arr(All (TypVar 1), TypVar 0)) = typecheck Nil Nil e5
+val Some(Arr(All (TypVar 1), TypVar 0)) = typeof Nil Nil e5
 
-val t5 = typecheck Nil Nil (Lam(All(Nat), Zero));
+val t5 = typeof Nil Nil (Lam(All(Nat), Zero));
 val (Arr(All Nat, Nat)) = t5;
 val Arr(All (TypVar 1), TypVar 0) = typAbstractOut Nat (Arr(All Nat, Nat));
 
 val f = Lam(Arr(Nat, Nat), Zero);
 val g = Lam (Nat,Succ (Var 0));
 val pkg = Pack(Arr(Nat, Nat), f, Arr(TypVar 0, Nat));
-val Some (Arr(TypVar 0, Nat)) = typecheck Nil Nil pkg;
+val Some (Arr(TypVar 0, Nat)) = typeof Nil Nil pkg;
 
-val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil (Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat)));
-val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil (Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0)));
-val Nat = typecheck Nil Nil (Pack(Nat, Lam(Nat, Zero), TypVar 0)) handle TypeMismatch => Nat;
+val Some(Arr(TypVar 0, Nat)) = typeof Nil Nil (Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat)));
+val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil (Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0)));
+val Nat = typeof Nil Nil (Pack(Nat, Lam(Nat, Zero), TypVar 0)) handle TypeMismatch => Nat;
 
 val zeroFnPkg = Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat));
 val zeroFnPkg2 = Pack(Nat, Lam(Nat, Zero), Arr(Nat, TypVar 0));
 
 (* Define identity package; can convert Nat to internal repr type and back. *)
 val idid = Tuple(Lam(Nat, Var 0), Lam(Nat, Var 0));
-val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typecheck Nil Nil idid;
+val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typeof Nil Nil idid;
 val inoutpkg = Pack(Nat, idid, Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat)));
-val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typecheck Nil Nil inoutpkg;
-val Nat = typecheck Nil Nil (Open(inoutpkg, App(Right(Var 0), App(Left(Var 0), Zero))));
-val true = isVal inoutpkg;
+val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typeof Nil Nil inoutpkg;
+val Nat = typeof Nil Nil (Open(inoutpkg, App(Right(Var 0), App(Left(Var 0), Zero))));
+val true = isval inoutpkg;
 (* Dynamics *)
 val App
     (Right (Tuple (Lam (Nat,Var 0),Lam (Nat,Var 0))),
@@ -369,10 +369,10 @@ val App
 val Zero = eval (Open(inoutpkg, App(Right(Var 0), App(Left(Var 0), Zero))));
 
 val leftandback = Tuple(Lam(Nat, Tuple(Var 0, Zero)), Lam(Prod(Nat, Nat), Left (Var 0)));
-val Prod (Arr (Nat,Prod (Nat, Nat)),Arr (Prod (Nat, Nat),Nat)) = typecheck Nil Nil leftandback;
+val Prod (Arr (Nat,Prod (Nat, Nat)),Arr (Prod (Nat, Nat),Nat)) = typeof Nil Nil leftandback;
 val inoutpkg2 = Pack(Prod(Nat, Nat), leftandback, Prod (Arr (Nat,TypVar 0),Arr (TypVar 0,Nat)));
-val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typecheck Nil Nil inoutpkg2;
-val Nat = typecheck Nil Nil (Open(inoutpkg2, App(Right(Var 0), App(Left(Var 0), Zero))));
+val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typeof Nil Nil inoutpkg2;
+val Nat = typeof Nil Nil (Open(inoutpkg2, App(Right(Var 0), App(Left(Var 0), Zero))));
 val Zero = eval (Open(inoutpkg2, App(Right(Var 0), App(Left(Var 0), Zero))));
 
 val double = Lam(Nat, Rec(Var 0, Zero, Succ (Succ (Var 0))));
@@ -398,7 +398,7 @@ val Lam(Nat, Var 0) = eval (TypApp(Nat, TypApp(Nat, TypAbs(polymorphicIdFn))));
 val Succ Zero = eval (App(TypApp(Nat, polymorphicIdFn), Succ(Zero)));
 
 val TypAbs(Zero) = step (TypAbs(Zero));
-val true = isVal (Lam(Nat, TypAbs(Zero)));
+val true = isval (Lam(Nat, TypAbs(Zero)));
 val (TypAbs Zero) = step (App(Lam(Nat, TypAbs(Zero)), Zero));
 
 val Nat = typsubst Nat (TypVar 0); (* Tho this isn't actually a well-formed type *)
@@ -412,25 +412,25 @@ val true = istype Nil (Some(TypVar 0));
 val All(Arr(Nat, (All(Nat)))) = typsubst (All(Nat)) (All(Arr(Nat, TypVar 1)));
 val All(Arr(Nat, (Some(Nat)))) = typsubst (Some(Nat)) (All(Arr(Nat, TypVar 1)));
 
-val Nat = typecheck Nil Nil (TypApp(TypVar 0, Zero)) handle No => Nat;
-val All(Arr(TypVar 0, Nat)) = typecheck Nil Nil (TypAbs(Lam(TypVar 0, Zero)));
-val Arr(Arr(Nat, Nat), Nat) = typecheck Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 0, Zero)))));
-val Nat = typecheck Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 1, Zero))))) handle No => Nat;
+val Nat = typeof Nil Nil (TypApp(TypVar 0, Zero)) handle No => Nat;
+val All(Arr(TypVar 0, Nat)) = typeof Nil Nil (TypAbs(Lam(TypVar 0, Zero)));
+val Arr(Arr(Nat, Nat), Nat) = typeof Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 0, Zero)))));
+val Nat = typeof Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 1, Zero))))) handle No => Nat;
 
 
-val All(Nat) = typecheck Nil Nil (TypAbs(Zero)); (* polymorphic zero *)
+val All(Nat) = typeof Nil Nil (TypAbs(Zero)); (* polymorphic zero *)
 (* polymorphic id function :) *)
 val All(Arr(TypVar 0, TypVar 0)) =
-    typecheck Nil Nil (TypAbs(Lam(TypVar 0, Var 0)));
+    typeof Nil Nil (TypAbs(Lam(TypVar 0, Var 0)));
 val Arr(Nat, All(Arr(TypVar 0, TypVar 0))) =
-    typecheck Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0))));
+    typeof Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0))));
 val Arr(Nat, All(Arr(TypVar 0, TypVar 0))) =
-    typecheck Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0))));
+    typeof Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0))));
 (* Nested type variables *)
 val All(All(Arr(TypVar 1,Nat))) =
-    typecheck Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Zero))))
+    typeof Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Zero))))
 val All(All(Arr(TypVar 1, TypVar 1))) =
-    typecheck Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Var 0))))
+    typeof Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Var 0))))
 
 val true = istype Nil Nat;
 val false = istype Nil (TypVar 0); (* Unbound type variable *)
@@ -446,12 +446,12 @@ val true = istype Nil (All(All(Arr(Nat, TypVar 1)))); (* Bound *)
 val 0 = len Nil;
 val 1 = len (Cons(1, Nil));
 
-val true = isVal Zero;
-val true = isVal (Succ(Zero));
-val true = isVal (Lam(Nat, Succ(Zero)));
-val true = isVal (Lam(Nat, Zero));
-val true = isVal (Lam(Nat, Succ(Var(0))));
-val false = isVal (App(Lam(Nat, Zero), Zero));
+val true = isval Zero;
+val true = isval (Succ(Zero));
+val true = isval (Lam(Nat, Succ(Zero)));
+val true = isval (Lam(Nat, Zero));
+val true = isval (Lam(Nat, Succ(Var(0))));
+val false = isval (App(Lam(Nat, Zero), Zero));
 
 val Zero = subst Zero Zero;
 val Succ Zero = subst Zero (Succ Zero);
@@ -475,51 +475,51 @@ val Nat = get (Cons(Nat, Nil)) 0;
 val Arr(Nat, Nat) = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 1;
 val Nat = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 0;
 
-val Nat = typecheck Nil Nil Zero;
-val Nat = typecheck Nil Nil (Succ (Zero));
+val Nat = typeof Nil Nil Zero;
+val Nat = typeof Nil Nil (Succ (Zero));
 
-val Nat = typecheck (Cons(Nat, Nil)) Nil (Var(0));
-val Arr(Nat, Nat) = typecheck (Cons(Arr(Nat, Nat), Nil)) Nil (Var(0));
-val Arr(Nat, Nat) = typecheck (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) Nil (Var(0));
-val Nat = typecheck (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) Nil (Var(1));
+val Nat = typeof (Cons(Nat, Nil)) Nil (Var(0));
+val Arr(Nat, Nat) = typeof (Cons(Arr(Nat, Nat), Nil)) Nil (Var(0));
+val Arr(Nat, Nat) = typeof (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) Nil (Var(0));
+val Nat = typeof (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) Nil (Var(1));
 
-val Arr(Nat, Nat) = typecheck Nil Nil (Lam(Nat, Zero));
-val Arr(Nat, Nat) = typecheck Nil Nil (Lam(Nat, Succ(Zero)));
+val Arr(Nat, Nat) = typeof Nil Nil (Lam(Nat, Zero));
+val Arr(Nat, Nat) = typeof Nil Nil (Lam(Nat, Succ(Zero)));
 
-val Nat = typecheck Nil Nil (App(Lam(Nat, Zero), Zero));
+val Nat = typeof Nil Nil (App(Lam(Nat, Zero), Zero));
 
-val Nat = typecheck Nil Nil (App(Lam(Nat, Succ(Zero)), Lam(Nat, Zero)))
+val Nat = typeof Nil Nil (App(Lam(Nat, Succ(Zero)), Lam(Nat, Zero)))
           handle TypeMismatch => Nat;
 
 val timesTwo = Rec(Succ(Zero), Zero, Succ(Succ(Var(0 (* prev *)))));
-val Nat = typecheck Nil Nil timesTwo;
+val Nat = typeof Nil Nil timesTwo;
 
 val Arr(Arr(Nat, Nat), Nat) =
-    typecheck Nil Nil (Lam(Arr(Nat, Nat), App(Var(0), Zero)));
+    typeof Nil Nil (Lam(Arr(Nat, Nat), App(Var(0), Zero)));
 
-val Arr(Nat, Nat) = typecheck Nil Nil (Rec(Zero,
+val Arr(Nat, Nat) = typeof Nil Nil (Rec(Zero,
                                        Lam(Nat, Succ(Zero)),
                                        Lam(Nat, Succ(Var(0)))));
 
-val Arr(Nat, Nat) = typecheck Nil Nil (Rec(Succ(Zero),
+val Arr(Nat, Nat) = typeof Nil Nil (Rec(Succ(Zero),
                                        Lam(Nat, Succ(Zero)),
                                        Lam(Nat, Succ(Var(0)))));
 
-val Arr(Nat, Nat) = typecheck (Cons(Nat, Nil)) Nil (Rec(Var(0),
+val Arr(Nat, Nat) = typeof (Cons(Nat, Nil)) Nil (Rec(Var(0),
                                        Lam(Nat, Succ(Zero)),
                                        Lam(Nat, Succ(Var(0)))));
 
 
-val Nat = typecheck Nil Nil (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)), Zero)) handle TypeMismatch => Nat;
+val Nat = typeof Nil Nil (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)), Zero)) handle TypeMismatch => Nat;
 
 (* Ill-formed; first param must be Nat. *)
-val Nat = typecheck Nil Nil (Rec(Lam(Nat, Zero), Lam(Nat, Succ(Zero)), Lam(Nat, Succ(Var(0))))) handle Bind => Nat;
+val Nat = typeof Nil Nil (Rec(Lam(Nat, Zero), Lam(Nat, Succ(Zero)), Lam(Nat, Succ(Var(0))))) handle Bind => Nat;
 
 (* Ill-formed; base case type does not match rec case type. *)
-val Nat = (typecheck Nil Nil (Rec(Zero, Succ(Zero), Lam(Nat, Succ(Zero))))
+val Nat = (typeof Nil Nil (Rec(Zero, Succ(Zero), Lam(Nat, Succ(Zero))))
           handle TypeMismatch => Nat);
 
-val Arr(Nat, Nat) = typecheck Nil Nil (Lam((TypVar 0), Zero)) handle No => Arr(Nat, Nat);
+val Arr(Nat, Nat) = typeof Nil Nil (Lam((TypVar 0), Zero)) handle No => Arr(Nat, Nat);
 
 val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0)));
 

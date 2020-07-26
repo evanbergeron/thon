@@ -27,33 +27,33 @@ fun get ctx i =
       | Cons (h, t) => if i = 0 then h else get t (i-1)
 
 
-fun typecheck ctx e =
+fun typeof ctx e =
     case e
      of  Zero => Nat
        | Var i => get ctx i
-       | Succ e2 => (typecheck ctx e2)
+       | Succ e2 => (typeof ctx e2)
        | Lam (argType, funcBody) =>
-            Arr (argType, typecheck (Cons(argType, ctx)) funcBody)
+            Arr (argType, typeof (Cons(argType, ctx)) funcBody)
        | App (f, n) =>
-            let val Arr (d, c) = typecheck ctx f
-                val argType = typecheck ctx n
+            let val Arr (d, c) = typeof ctx f
+                val argType = typeof ctx n
             in
                 if d <> argType then raise TypeMismatch
                 else c
             end
        | Rec (i, baseCase, recCase) =>
-            let val Nat = typecheck ctx i
-                val t = typecheck ctx baseCase
-                val t2 = typecheck (Cons(t, ctx)) recCase
+            let val Nat = typeof ctx i
+                val t = typeof ctx baseCase
+                val t2 = typeof (Cons(t, ctx)) recCase
             in
                 if t <> t2 then raise TypeMismatch else t
             end
 
 
-fun isVal e =
+fun isval e =
     case e of
         Zero => true
-      | Succ(n) => isVal n
+      | Succ(n) => isval n
       | Lam(_, _) => true
       | _ => false
 
@@ -77,12 +77,12 @@ fun subst src dst = subst' src dst 0
 
 
 fun step e =
-    let val _ = typecheck Nil e in
-    if isVal e then e else
+    let val _ = typeof Nil e in
+    if isval e then e else
     case e of
-        Succ(n) => if not (isVal n) then Succ(step n) else e
-      | App(f, n) => if not (isVal f) then App(step f, n)
-                     else (if not (isVal n) then App(f, step n)
+        Succ(n) => if not (isval n) then Succ(step n) else e
+      | App(f, n) => if not (isval f) then App(step f, n)
+                     else (if not (isval n) then App(f, step n)
                            else let val Lam(t, f') = f
                            in
                                (* plug `n` into `f'` *)
@@ -95,25 +95,25 @@ fun step e =
             (* Doesn't evaluate recursive call if not required. *)
             subst (Rec(i, baseCase, recCase)) recCase
       | Rec (i, baseCase, recCase) =>
-            if not (isVal i) then
+            if not (isval i) then
                 Rec(step i, baseCase, recCase)
             else raise No
-      | _ => if (isVal e) then e else raise No
+      | _ => if (isval e) then e else raise No
     end
 
 
-fun eval e = if isVal e then e else eval (step e)
+fun eval e = if isval e then e else eval (step e)
 
 
 (******* Tests *******)
 
 
-val true = isVal Zero;
-val true = isVal (Succ(Zero));
-val true = isVal (Lam(Nat, Succ(Zero)));
-val true = isVal (Lam(Nat, Zero));
-val true = isVal (Lam(Nat, Succ(Var(0))));
-val false = isVal (App(Lam(Nat, Zero), Zero));
+val true = isval Zero;
+val true = isval (Succ(Zero));
+val true = isval (Lam(Nat, Succ(Zero)));
+val true = isval (Lam(Nat, Zero));
+val true = isval (Lam(Nat, Succ(Var(0))));
+val false = isval (App(Lam(Nat, Zero), Zero));
 
 val Zero = subst Zero Zero;
 val Succ Zero = subst Zero (Succ Zero);
@@ -140,48 +140,48 @@ val Nat = get (Cons(Nat, Nil)) 0;
 val Arr(Nat, Nat) = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 1;
 val Nat = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 0;
 
-val Nat = typecheck Nil Zero;
-val Nat = typecheck Nil (Succ (Zero));
+val Nat = typeof Nil Zero;
+val Nat = typeof Nil (Succ (Zero));
 
-val Nat = typecheck (Cons(Nat, Nil)) (Var(0));
-val Arr(Nat, Nat) = typecheck (Cons(Arr(Nat, Nat), Nil)) (Var(0));
-val Arr(Nat, Nat) = typecheck (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) (Var(0));
-val Nat = typecheck (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) (Var(1));
+val Nat = typeof (Cons(Nat, Nil)) (Var(0));
+val Arr(Nat, Nat) = typeof (Cons(Arr(Nat, Nat), Nil)) (Var(0));
+val Arr(Nat, Nat) = typeof (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) (Var(0));
+val Nat = typeof (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) (Var(1));
 
-val Arr(Nat, Nat) = typecheck Nil (Lam(Nat, Zero));
-val Arr(Nat, Nat) = typecheck Nil (Lam(Nat, Succ(Zero)));
+val Arr(Nat, Nat) = typeof Nil (Lam(Nat, Zero));
+val Arr(Nat, Nat) = typeof Nil (Lam(Nat, Succ(Zero)));
 
-val Nat = typecheck Nil (App(Lam(Nat, Zero), Zero));
+val Nat = typeof Nil (App(Lam(Nat, Zero), Zero));
 
-val Nat = typecheck Nil (App(Lam(Nat, Succ(Zero)), Lam(Nat, Zero)))
+val Nat = typeof Nil (App(Lam(Nat, Succ(Zero)), Lam(Nat, Zero)))
           handle TypeMismatch => Nat;
 
 val timesTwo = Rec(Succ(Zero), Zero, Succ(Succ(Var(0 (* prev *)))));
-val Nat = typecheck Nil timesTwo;
+val Nat = typeof Nil timesTwo;
 
 val Arr(Arr(Nat, Nat), Nat) =
-    typecheck Nil (Lam(Arr(Nat, Nat), App(Var(0), Zero)));
+    typeof Nil (Lam(Arr(Nat, Nat), App(Var(0), Zero)));
 
-val Arr(Nat, Nat) = typecheck Nil (Rec(Zero,
+val Arr(Nat, Nat) = typeof Nil (Rec(Zero,
                                        Lam(Nat, Succ(Zero)),
                                        Lam(Nat, Succ(Var(0)))));
 
-val Arr(Nat, Nat) = typecheck Nil (Rec(Succ(Zero),
+val Arr(Nat, Nat) = typeof Nil (Rec(Succ(Zero),
                                        Lam(Nat, Succ(Zero)),
                                        Lam(Nat, Succ(Var(0)))));
 
-val Arr(Nat, Nat) = typecheck (Cons(Nat, Nil)) (Rec(Var(0),
+val Arr(Nat, Nat) = typeof (Cons(Nat, Nil)) (Rec(Var(0),
                                        Lam(Nat, Succ(Zero)),
                                        Lam(Nat, Succ(Var(0)))));
 
 
-val Nat = typecheck Nil (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)), Zero)) handle TypeMismatch => Nat;
+val Nat = typeof Nil (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)), Zero)) handle TypeMismatch => Nat;
 
 (* Ill-formed; first param must be Nat. *)
-val Nat = typecheck Nil (Rec(Lam(Nat, Zero), Lam(Nat, Succ(Zero)), Lam(Nat, Succ(Var(0))))) handle Bind => Nat;
+val Nat = typeof Nil (Rec(Lam(Nat, Zero), Lam(Nat, Succ(Zero)), Lam(Nat, Succ(Var(0))))) handle Bind => Nat;
 
 (* Ill-formed; base case type does not match rec case type. *)
-val Nat = (typecheck Nil (Rec(Zero, Succ(Zero), Lam(Nat, Succ(Zero))))
+val Nat = (typeof Nil (Rec(Zero, Succ(Zero), Lam(Nat, Succ(Zero))))
           handle TypeMismatch => Nat);
 
 val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0)));
