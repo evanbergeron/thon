@@ -1,6 +1,7 @@
 (* A system FE interpreter - System F with existential packages *)
 exception TypeMismatch
 exception No
+exception ClientTypeCannotEscapeClientScope
 exception Unimplemented
 
 datatype Typ = Nat
@@ -20,7 +21,10 @@ datatype Exp = Zero
              | TypAbs of Exp (* binds type variable *)
              | TypApp of Typ * Exp
              | Pack of Typ * Exp
+             | AnnotatedPack of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
              | Open of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
+
+
 
 
 (* Holds typing assertions we already know. Head of the list
@@ -88,6 +92,32 @@ fun typAbstractOut' search t bindingDepth =
 
 fun typAbstractOut search t = typAbstractOut' search t 0
 
+(* TODO Figure something better out... *)
+fun typdecrVarIdxs t =
+    case t of
+        Nat => Nat
+      | TypVar i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
+                    else TypVar (i -1)
+      | Arr(d, c) => Arr(typdecrVarIdxs d, typdecrVarIdxs c)
+      | All t' => All(typdecrVarIdxs t')
+      | Some t' => Some(typdecrVarIdxs t')
+
+fun decrVarIdxs e =
+    case e
+     of  Zero => Zero
+       | Var i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
+                  else Var (i - 1)
+       | Succ e2 => (Succ (decrVarIdxs e2))
+       | Lam (argType, funcBody) => Lam(typdecrVarIdxs argType, decrVarIdxs funcBody)
+       | App (f, n) => App(decrVarIdxs f, decrVarIdxs n)
+       | Rec (i, baseCase, recCase) =>
+            Rec(decrVarIdxs i, decrVarIdxs baseCase, decrVarIdxs recCase)
+       | TypAbs e => TypAbs (decrVarIdxs e)
+       | TypApp (appType, e) => TypApp(typdecrVarIdxs appType, decrVarIdxs e)
+       | Pack (reprType, pkgImpl) => Pack(typdecrVarIdxs reprType, decrVarIdxs pkgImpl)
+       | AnnotatedPack (reprType, pkgImpl, pkgType) => AnnotatedPack(typdecrVarIdxs reprType, decrVarIdxs pkgImpl, typdecrVarIdxs pkgType)
+       | Open (pkg, client) => Open(decrVarIdxs pkg, decrVarIdxs client)
+
 (* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
 (* might not need to track bindingdepth ourselves *)
 fun typSubstInExp' srcType dstExp bindingDepth =
@@ -110,6 +140,7 @@ fun typSubstInExp' srcType dstExp bindingDepth =
             TypApp(typsubst' srcType appType bindingDepth,
                    typSubstInExp' srcType e bindingDepth)
        | Pack (reprType, pkgImpl) => raise Unimplemented
+       | AnnotatedPack(reprType, pkgImpl, pkgType) => raise Unimplemented
        | Open (pkg, client) => raise Unimplemented
 
 
@@ -151,6 +182,16 @@ fun typecheck ctx typCtx e =
             let val pkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
             (* Want Some(t') *)
             in Some(typAbstractOut reprType pkgType) end
+       | AnnotatedPack (reprType, pkgImpl, pkgType) =>
+            if not (istype Nil reprType) then raise TypeMismatch else
+            (* pkgType : [reprType/TypVar 0](t') *)
+            let val deducedPkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
+            in
+                if (typAbstractOut reprType deducedPkgType) <>
+                   (typAbstractOut reprType pkgType) then
+                raise TypeMismatch else
+            Some(pkgType)
+            end
        | Open (pkg, client) =>
             let val Some(r) = typecheck ctx typCtx pkg
                 (* binds BOTH a TypVar and a Exp Var *)
@@ -158,7 +199,7 @@ fun typecheck ctx typCtx e =
                 (* shift indices of free vars and typevars in clientType down by one *)
             in
                 (* if not (istype typCtx clientType) then raise TypeMismatch else *)
-                clientType
+                typdecrVarIdxs clientType
             end
 
 (* Seems there are multiple valid typings of this expression. Up
@@ -183,9 +224,15 @@ val (Arr(All Nat, Nat)) = t5;
 val Arr(All (TypVar 1), TypVar 0) = typAbstractOut Nat (Arr(All Nat, Nat));
 val Some(Arr(All (TypVar 1), TypVar 0)) = typecheck Nil Nil e5
 
-val _ = typecheck Nil Nil (Open(e0, Var 0));
+val e6 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Zero));
+(* open e5 as (t, lam) in (lam()) *)
+(* Open(e5,  *)
 
-(* cant hack typvar bound in open in result type *)
+(* open e0 as (t, x) in x *)
+(* TODO *)
+(* val _ = typecheck Nil Nil (Open(e0, Var 0)); *)
+
+(* cant decrVarIdxs typvar bound in open in result type *)
 (* val _ = typecheck Nil Nil (Open(e0, App(Var 0, Zero))); *)
 
 fun isVal e =
@@ -257,6 +304,24 @@ fun eval e = if isVal e then e else eval (step e)
 
 (******* Tests *******)
 
+val f = Lam(Arr(Nat, Nat), Zero);
+val g = Lam (Nat,Succ (Var 0));
+val pkg = Pack(Arr(Nat, Nat), f);
+val Some (Arr(TypVar 0, Nat)) = typecheck Nil Nil pkg;
+
+val f2 = Lam(Nat, Lam(Nat, Succ (Var 0)));
+val pkg2 = Pack(Nat, f);
+(* val Some (Arr(TypVar 0, Nat)) = typecheck Nil Nil pkg2; *)
+
+val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil (AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat)));
+val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil (AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0)));
+val Nat = typecheck Nil Nil (AnnotatedPack(Nat, Lam(Nat, Zero), TypVar 0)) handle TypeMismatch => Nat;
+
+val zeroFnPkg = AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat));
+val zeroFnPkg2 = AnnotatedPack(Nat, Lam(Nat, Zero), Arr(Nat, TypVar 0));
+
+(* val _ = typecheck Nil Nil (Open(pkg, (App(Var 0, Zero)))); *)
+
 val All(TypVar 1) = typAbstractOut Nat (All(Nat));
 val TypVar 0 = typAbstractOut Nat Nat;
 val Arr(TypVar 0, Nat)= typAbstractOut (Arr(Nat, Nat)) (Arr(Arr(Nat, Nat), Nat));
@@ -285,6 +350,7 @@ val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar 0); (* Tho this isn't actua
 val false = istype Nil (TypVar 0);
 val All(Nat) = typsubst Nat (All(TypVar 1));
 val Some(Nat) = typsubst Nat (Some(TypVar 1));
+val Some(Some(TypVar 1)) = typsubst Nat (Some(Some(TypVar 1)));
 val true = istype Nil (All(TypVar 0));
 val true = istype Nil (Some(TypVar 0));
 val All(Arr(Nat, (All(Nat)))) = typsubst (All(Nat)) (All(Arr(Nat, TypVar 1)));
