@@ -7,6 +7,7 @@ exception Unimplemented
 datatype Typ = Nat
              | TypVar of int
              | Arr of Typ * Typ
+             | Prod of Typ * Typ
              | All of Typ (* binds *)
              | Some of Typ (* binds *)
 
@@ -23,6 +24,7 @@ datatype Exp = Zero
              | Pack of Typ * Exp
              | AnnotatedPack of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
              | Open of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
+             | Tuple of Exp * Exp
 
 
 
@@ -51,6 +53,7 @@ fun istype typeCtx t =
         Nat => true
       | TypVar i => i < (len typeCtx)
       | Arr(d, c) => (istype typeCtx d) andalso (istype typeCtx c)
+      | Prod(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
       | All t' => istype (Cons(42, typeCtx)) t'
       | Some t' => istype (Cons(42, typeCtx)) t'
 
@@ -63,6 +66,8 @@ fun typsubst' src dst bindingDepth =
                      dst
       | Arr (t, t') => Arr((typsubst' src t bindingDepth),
                            (typsubst' src t' bindingDepth))
+      | Prod (l, r) => Arr((typsubst' src l bindingDepth),
+                           (typsubst' src r bindingDepth))
       | All t => All(typsubst' src t (bindingDepth + 1))
       | Some t => Some(typsubst' src t (bindingDepth + 1))
 
@@ -86,6 +91,8 @@ fun typAbstractOut' search t bindingDepth =
       | TypVar n  => TypVar n
       | Arr (d, c) => Arr((typAbstractOut' search d bindingDepth),
                            (typAbstractOut' search c bindingDepth))
+      | Prod (l, r) => Prod((typAbstractOut' search l bindingDepth),
+                            (typAbstractOut' search r bindingDepth))
       | All t' => All(typAbstractOut' search t' (bindingDepth+1))
       | Some t' => Some(typAbstractOut' search t' (bindingDepth+1))
 
@@ -99,6 +106,7 @@ fun typdecrVarIdxs t =
       | TypVar i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                     else TypVar (i -1)
       | Arr(d, c) => Arr(typdecrVarIdxs d, typdecrVarIdxs c)
+      | Prod(l, r) => Arr(typdecrVarIdxs l, typdecrVarIdxs r)
       | All t' => All(typdecrVarIdxs t')
       | Some t' => Some(typdecrVarIdxs t')
 
@@ -110,6 +118,7 @@ fun decrVarIdxs e =
        | Succ e2 => (Succ (decrVarIdxs e2))
        | Lam (argType, funcBody) => Lam(typdecrVarIdxs argType, decrVarIdxs funcBody)
        | App (f, n) => App(decrVarIdxs f, decrVarIdxs n)
+       | Tuple (l, r) => Tuple(decrVarIdxs l, decrVarIdxs r)
        | Rec (i, baseCase, recCase) =>
             Rec(decrVarIdxs i, decrVarIdxs baseCase, decrVarIdxs recCase)
        | TypAbs e => TypAbs (decrVarIdxs e)
@@ -131,6 +140,9 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | App (f, n) =>
             App (typSubstInExp' srcType f bindingDepth,
                  typSubstInExp' srcType n bindingDepth)
+       | Tuple (l, r) =>
+            Tuple (typSubstInExp' srcType l bindingDepth,
+                   typSubstInExp' srcType r bindingDepth)
        | Rec (i, baseCase, recCase) =>
             Rec(typSubstInExp' srcType i bindingDepth,
                 typSubstInExp' srcType baseCase bindingDepth,
@@ -162,6 +174,7 @@ fun typecheck ctx typCtx e =
                 if d <> argType then raise TypeMismatch
                 else c
             end
+       | Tuple (l, r) => Prod(typecheck ctx typCtx l, typecheck ctx typCtx r)
        | Rec (i, baseCase, recCase) =>
             let val Nat = typecheck ctx typCtx i
                 val t = typecheck ctx typCtx baseCase
@@ -271,6 +284,9 @@ fun step e =
     if isVal e then e else
     case e of
         Succ(n) => if not (isVal n) then Succ(step n) else e
+      | Tuple(l, r) => if not (isVal l) then Tuple(step l, r) else
+                       if not (isVal r) then Tuple(l, step r) else
+                       e
       | App(f, n) => if not (isVal f) then App(step f, n)
                      else (if not (isVal n) then App(f, step n)
                            else let val Lam(t, f') = f
@@ -319,6 +335,11 @@ val Nat = typecheck Nil Nil (AnnotatedPack(Nat, Lam(Nat, Zero), TypVar 0)) handl
 
 val zeroFnPkg = AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat));
 val zeroFnPkg2 = AnnotatedPack(Nat, Lam(Nat, Zero), Arr(Nat, TypVar 0));
+
+val pkg3 = AnnotatedPack(Nat, Lam(Nat, Lam(Nat, Var 0)), Arr(Nat, Arr(TypVar 0, Nat)));
+val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typecheck Nil Nil (Tuple(Lam(Nat, Var 0), Lam(Nat, Var 0)));
+(* Open(pkg3, Zero) *)
+(*                         Open(pkg3, App(App(Var 0, Zero), Zero *)
 
 (* val _ = typecheck Nil Nil (Open(pkg, (App(Var 0, Zero)))); *)
 
