@@ -262,6 +262,7 @@ fun isVal e =
       | Succ(n) => isVal n
       | Lam(_, _) => true
       | TypAbs _  => true
+      | Pack (reprType, pkgImpl) => isVal pkgImpl
       | _ => false
 
 
@@ -325,6 +326,20 @@ fun step e =
                 let val TypAbs(e'') = e' in
                     typSubstInExp t e''
                 end
+      | Pack (reprType, pkgImpl) =>
+            if not (isVal pkgImpl) then Pack(reprType, step pkgImpl) else
+            if not (isVal e) then raise No else
+            e
+      | AnnotatedPack(reprType, pkgImpl, pkgType) =>
+            if not (isVal pkgImpl) then Pack(reprType, step pkgImpl) else
+            if not (isVal e) then raise No else
+            e
+      | Open (pkg, client) =>
+            if not (isVal pkg) then Open (step pkg, client) else
+           (case pkg of
+                Pack(reprType', pkgImpl') =>
+                subst pkg (typSubstInExp reprType' client)
+            | _ => raise Unimplemented)
       | _ => if (isVal e) then e else raise No
     end
 
