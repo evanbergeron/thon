@@ -16,7 +16,7 @@ Some examples:
 - Lam(Nat, Var 0) is the identity function on the natural numbers.
 - Lam(Nat, Lam(Nat, Var 0)) is a function that returns the identity
   function on the natural numbers.
-- TypAbs(Lam(TypVar 0, Var 0)) is the polymorphic identity function
+- TypAbs(Lam(TypVar 0, Var 0)) is the polymorphic identity function.
 - Succ Zero is the natural number 1.
 - Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Succ(Var 0)))) is a recursive
   value. It recurses to depth two (Succ(Succ(Zero))). It returns Zero
