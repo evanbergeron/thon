@@ -150,7 +150,15 @@ fun typecheck ctx typCtx e =
             let val pkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
             (* Want Some(t') *)
             in Some(typAbstractOut reprType pkgType) end
-       | Open (pkg, client) => raise Unimplemented
+       | Open (pkg, client) =>
+            let val Some(r) = typecheck ctx typCtx pkg
+                (* binds BOTH a TypVar and a Exp Var *)
+                val clientType = typecheck (Cons(r, ctx)) (Cons(42, typCtx)) client
+                (* shift indices of free vars and typevars in clientType down by one *)
+            in
+                (* if not (istype typCtx clientType) then raise TypeMismatch else *)
+                clientType
+            end
 
 (* Seems there are multiple valid typings of this expression. Up
 front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
