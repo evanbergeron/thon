@@ -109,6 +109,8 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | TypApp (appType, e) =>
             TypApp(typsubst' srcType appType bindingDepth,
                    typSubstInExp' srcType e bindingDepth)
+       | Pack (reprType, pkgImpl) => raise Unimplemented
+       | Open (pkg, client) => raise Unimplemented
 
 
 fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
@@ -210,6 +212,8 @@ fun subst' src dst bindingDepth =
                 subst' src recCase (bindingDepth+1))
        | TypAbs e => TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
        | TypApp (appType, e) => TypApp(appType, subst' src e bindingDepth)
+       | Pack (reprType, pkgImpl) => raise Unimplemented
+       | Open (pkg, client) => raise Unimplemented
 
 
 fun subst src dst = subst' src dst 0
