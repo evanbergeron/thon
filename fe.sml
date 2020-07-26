@@ -31,8 +31,6 @@ datatype Exp = Zero
              | Tuple of Exp * Exp
 
 
-
-
 (* Holds typing assertions we already know. Head of the list
  * represents the type of the variable most recently seen. (The
  * "lowest" scope variable). *)
@@ -103,6 +101,7 @@ fun typAbstractOut' search t bindingDepth =
 
 fun typAbstractOut search t = typAbstractOut' search t 0
 
+
 (* TODO Figure something better out... *)
 fun typdecrVarIdxs t =
     case t of
@@ -113,6 +112,7 @@ fun typdecrVarIdxs t =
       | Prod(l, r) => Arr(typdecrVarIdxs l, typdecrVarIdxs r)
       | All t' => All(typdecrVarIdxs t')
       | Some t' => Some(typdecrVarIdxs t')
+
 
 fun decrVarIdxs e =
     case e
@@ -132,6 +132,7 @@ fun decrVarIdxs e =
        | Pack (reprType, pkgImpl) => Pack(typdecrVarIdxs reprType, decrVarIdxs pkgImpl)
        | AnnotatedPack (reprType, pkgImpl, pkgType) => AnnotatedPack(typdecrVarIdxs reprType, decrVarIdxs pkgImpl, typdecrVarIdxs pkgType)
        | Open (pkg, client) => Open(decrVarIdxs pkg, decrVarIdxs client)
+
 
 (* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
 (* might not need to track bindingdepth ourselves *)
@@ -231,30 +232,6 @@ fun typecheck ctx typCtx e =
                 (* if not (istype typCtx clientType) then raise TypeMismatch else *)
                 typdecrVarIdxs clientType
             end
-
-(* Seems there are multiple valid typings of this expression. Up
-front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
-but the chapter on existential types in TAPL suggests otherwise. *)
-val Arr(Nat, Nat) = typecheck Nil (Cons(42, Nil)) (Lam(Nat, Zero));
-val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat));
-val All(Arr(TypVar 0, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar 0, Nat)));
-
-val e0 = Pack(Nat, Lam(Nat, Zero));
-val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e0;
-val e1 = Pack(Nat, Lam(Nat, Var 0));
-val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e1;
-val e2 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0));
-val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e2;
-val e4 = Pack(All(Nat), Lam(All(Nat), Zero));
-val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil e4
-
-val e5 = Pack(Nat, Lam(All(Nat), Zero));
-val t5 = typecheck Nil Nil (Lam(All(Nat), Zero));
-val (Arr(All Nat, Nat)) = t5;
-val Arr(All (TypVar 1), TypVar 0) = typAbstractOut Nat (Arr(All Nat, Nat));
-val Some(Arr(All (TypVar 1), TypVar 0)) = typecheck Nil Nil e5
-
-val e6 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Zero));
 
 fun isVal e =
     case e of
@@ -358,14 +335,34 @@ fun eval e = if isVal e then e else eval (step e)
 
 (******* Tests *******)
 
+
+(* Seems there are multiple valid typings of this expression. Up
+front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
+but the chapter on existential types in TAPL suggests otherwise. *)
+val Arr(Nat, Nat) = typecheck Nil (Cons(42, Nil)) (Lam(Nat, Zero));
+val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat));
+val All(Arr(TypVar 0, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar 0, Nat)));
+
+val e0 = AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0));
+val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e0;
+val e1 = AnnotatedPack(Nat, Lam(Nat, Var 0), Arr(TypVar 0, TypVar 0));
+val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e1;
+val e2 = AnnotatedPack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0), Arr(TypVar 0, TypVar 0));
+val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e2;
+val e4 = AnnotatedPack(All(Nat), Lam(All(Nat), Zero), Arr(TypVar 0, Nat));
+val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil e4
+
+val e5 = AnnotatedPack(Nat, Lam(All(Nat), Zero), Arr(All (TypVar 1), TypVar 0));
+val Some(Arr(All (TypVar 1), TypVar 0)) = typecheck Nil Nil e5
+
+val t5 = typecheck Nil Nil (Lam(All(Nat), Zero));
+val (Arr(All Nat, Nat)) = t5;
+val Arr(All (TypVar 1), TypVar 0) = typAbstractOut Nat (Arr(All Nat, Nat));
+
 val f = Lam(Arr(Nat, Nat), Zero);
 val g = Lam (Nat,Succ (Var 0));
-val pkg = Pack(Arr(Nat, Nat), f);
+val pkg = AnnotatedPack(Arr(Nat, Nat), f, Arr(TypVar 0, Nat));
 val Some (Arr(TypVar 0, Nat)) = typecheck Nil Nil pkg;
-
-val f2 = Lam(Nat, Lam(Nat, Succ (Var 0)));
-val pkg2 = Pack(Nat, f);
-(* val Some (Arr(TypVar 0, Nat)) = typecheck Nil Nil pkg2; *)
 
 val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil (AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat)));
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil (AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0)));
