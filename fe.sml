@@ -350,8 +350,12 @@ val Nat = typecheck Nil Nil (AnnotatedPack(Nat, Lam(Nat, Zero), TypVar 0)) handl
 val zeroFnPkg = AnnotatedPack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat));
 val zeroFnPkg2 = AnnotatedPack(Nat, Lam(Nat, Zero), Arr(Nat, TypVar 0));
 
-val pkg3 = AnnotatedPack(Nat, Lam(Nat, Lam(Nat, Var 0)), Arr(Nat, Arr(TypVar 0, Nat)));
-val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typecheck Nil Nil (Tuple(Lam(Nat, Var 0), Lam(Nat, Var 0)));
+val idid = Tuple(Lam(Nat, Var 0), Lam(Nat, Var 0));
+val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typecheck Nil Nil idid;
+val inoutpkg = AnnotatedPack(Nat, idid, Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat)));
+val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typecheck Nil Nil inoutpkg;
+val Nat = typecheck Nil Nil (Open(inoutpkg, App(Right(Var 0), App(Left(Var 0), Zero))));
+
 (* Open(pkg3, Zero) *)
 (*                         Open(pkg3, App(App(Var 0, Zero), Zero *)
 
