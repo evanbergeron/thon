@@ -79,7 +79,7 @@ fun typAbstractOut' search t bindingDepth =
     if t = search then (TypVar bindingDepth) else
     case t
      of Nat => Nat
-      | TypVar n  => TypVar (n+1)
+      | TypVar n  => TypVar n
       | Arr (d, c) => Arr((typAbstractOut' search d bindingDepth),
                            (typAbstractOut' search c bindingDepth))
       | All t' => All(typAbstractOut' search t' (bindingDepth+1))
@@ -144,7 +144,6 @@ fun typecheck ctx typCtx e =
                 typsubst appType t
             end
        | Pack (reprType, pkgImpl) =>
-
             if not (istype Nil reprType) then raise TypeMismatch else
             (* pkgType : [reprType/TypVar 0](t') *)
             let val pkgType = typecheck ctx (Cons(42, typCtx)) pkgImpl
@@ -165,6 +164,7 @@ front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
 but the chapter on existential types in TAPL suggests otherwise. *)
 val Arr(Nat, Nat) = typecheck Nil (Cons(42, Nil)) (Lam(Nat, Zero));
 val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat));
+val All(Arr(TypVar 0, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar 0, Nat)));
 
 val e0 = Pack(Nat, Lam(Nat, Zero));
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e0;
@@ -172,7 +172,14 @@ val e1 = Pack(Nat, Lam(Nat, Var 0));
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e1;
 val e2 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0));
 val Some(Arr(TypVar 0, TypVar 0)) = typecheck Nil Nil e2;
+val e4 = Pack(All(Nat), Lam(All(Nat), Zero));
+val Some(Arr(TypVar 0, Nat)) = typecheck Nil Nil e4
 
+val e5 = Pack(Nat, Lam(All(Nat), Zero));
+val t5 = typecheck Nil Nil (Lam(All(Nat), Zero));
+val (Arr(All Nat, Nat)) = t5;
+val Arr(All (TypVar 1), TypVar 0) = typAbstractOut Nat (Arr(All Nat, Nat));
+val Some(Arr(All (TypVar 1), TypVar 0)) = typecheck Nil Nil e5
 
 val _ = typecheck Nil Nil (Open(e0, Var 0));
 
