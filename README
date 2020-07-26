@@ -1,6 +1,6 @@
-Interpreters for two (very) small programming languages. There are no
-parsers, so if you want to play with it, you'll need to load the code
-in a sml repl somewhere.
+Interpreters for three (very) small programming languages. There are
+no parsers, so if you want to play with it, you'll need to load the
+code in a sml repl somewhere.
 
 Neither of these languages are Turing complete. All programs in both
 languages halt.
@@ -10,6 +10,8 @@ languages halt.
 
 * f.sml expands on t.sml by introducing variable types (parametric
   polymorphism).
+
+* fe.sml expands on f.sml with existential packages.
 
 Some examples:
 
