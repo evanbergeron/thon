@@ -16,6 +16,8 @@ datatype Idx = int
 datatype Exp = Zero
              | Var of int (* idx into ctx *)
              | Succ of Exp
+             | Left of Exp
+             | Right of Exp
              | Lam of Typ (*argType*) * Exp (*funcBody*)
              | App of Exp * Exp
              | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
@@ -116,6 +118,8 @@ fun decrVarIdxs e =
        | Var i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                   else Var (i - 1)
        | Succ e2 => (Succ (decrVarIdxs e2))
+       | Left e => (Left (decrVarIdxs e))
+       | Right e => (Right (decrVarIdxs e))
        | Lam (argType, funcBody) => Lam(typdecrVarIdxs argType, decrVarIdxs funcBody)
        | App (f, n) => App(decrVarIdxs f, decrVarIdxs n)
        | Tuple (l, r) => Tuple(decrVarIdxs l, decrVarIdxs r)
@@ -134,6 +138,8 @@ fun typSubstInExp' srcType dstExp bindingDepth =
      of  Zero => Zero
        | Var i => Var i
        | Succ e2 => Succ (typSubstInExp' srcType e2 bindingDepth)
+       | Left e => Left (typSubstInExp' srcType e bindingDepth)
+       | Right e => Right (typSubstInExp' srcType e bindingDepth)
        | Lam (argType, funcBody) =>
             Lam((typsubst' srcType argType bindingDepth),
                 typSubstInExp' srcType funcBody bindingDepth)
@@ -164,6 +170,8 @@ fun typecheck ctx typCtx e =
      of  Zero => Nat
        | Var i => get ctx i
        | Succ e2 => (typecheck ctx typCtx e2)
+       | Left e => let val Prod(l, r) = (typecheck ctx typCtx e) in l end
+       | Right e => let val Prod(l, r) = (typecheck ctx typCtx e) in r end
        | Lam (argType, funcBody) =>
             if not (istype typCtx argType) then raise No else
             Arr (argType, typecheck (Cons(argType, ctx)) typCtx funcBody)
@@ -264,6 +272,8 @@ fun subst' src dst bindingDepth =
                    if n > bindingDepth then Var(n-1) else
                    Var(n)
        | Succ e2 => Succ (subst' src e2 bindingDepth)
+       | Left e => Left (subst' src e bindingDepth)
+       | Right e => Right (subst' src e bindingDepth)
        | Lam (t, f) => Lam(t, (subst' src f (bindingDepth+1)))
        | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
        | Rec (i, baseCase, recCase) =>
@@ -284,6 +294,10 @@ fun step e =
     if isVal e then e else
     case e of
         Succ(n) => if not (isVal n) then Succ(step n) else e
+      | Left n  => if not (isVal n) then Left(step n) else
+                   let val Tuple(l, r) = n in l end
+      | Right n  => if not (isVal n) then Right(step n) else
+                    let val Tuple(l, r) = n in r end
       | Tuple(l, r) => if not (isVal l) then Tuple(step l, r) else
                        if not (isVal r) then Tuple(l, step r) else
                        e
