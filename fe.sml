@@ -133,7 +133,6 @@ fun decrVarIdxs e =
 
 
 (* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
-(* might not need to track bindingdepth ourselves *)
 fun typSubstInExp' srcType dstExp bindingDepth =
     case dstExp
      of  Zero => Zero
@@ -217,9 +216,10 @@ fun typecheck ctx typCtx e =
                 (* binds BOTH a TypVar and a Exp Var *)
                 val clientType = typecheck (Cons(r, ctx)) (Cons(42, typCtx)) client
                 (* shift indices of free vars and typevars in clientType down by one *)
+                val resType = typdecrVarIdxs clientType
             in
-                (* if not (istype typCtx clientType) then raise TypeMismatch else *)
-                typdecrVarIdxs clientType
+                if not (istype typCtx resType) then raise TypeMismatch else
+                resType
             end
 
 fun isVal e =
@@ -318,7 +318,9 @@ fun eval e = if isVal e then e else eval (step e)
 
 (* Seems there are multiple valid typings of this expression. Up
 front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
-but the chapter on existential types in TAPL suggests otherwise. *)
+but the chapter on existential types in TAPL suggests otherwise.
+
+That's why we require an explicit type annotation from the programmer. *)
 val Arr(Nat, Nat) = typecheck Nil (Cons(42, Nil)) (Lam(Nat, Zero));
 val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat));
 val All(Arr(TypVar 0, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar 0, Nat)));
