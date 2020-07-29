@@ -27,13 +27,15 @@ datatype Exp = Zero
              | Pack of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
              | Open of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
              | Tuple of Exp * Exp
-             | Case of Exp (* l *) * Exp (* r *)
              (* Elimination forms for terms of Prod type *)
              | ProdLeft of Exp
              | ProdRight of Exp
              (* Elimination forms for terms of Plus type *)
              | PlusLeft of Typ * Exp
              | PlusRight of Typ * Exp
+             | Case of Exp (* thing being cased on*) *
+                       Exp (* Left binds term var *) *
+                       Exp (* Right binds term var *)
 
 
 (* Holds typing assertions we already know. Head of the list
@@ -194,6 +196,16 @@ fun typeof ctx typCtx e =
                                 else
                                     Plus(l, r)
                             end
+       | Case (e, l, r) => let val Plus(lt, rt) = typeof ctx typCtx e 
+                               (* both bind a term var *)
+                               val typeOfLeftBranch = typeof (Cons(lt, ctx)) typCtx l
+                               val typeOfRightBranch= typeof (Cons(rt, ctx)) typCtx r
+                           in
+                               if typeOfLeftBranch <> typeOfRightBranch then 
+                                   raise IllTyped
+                               else
+                                   typeOfLeftBranch
+                               end
 
        | Lam (argType, funcBody) =>
             if not (istype typCtx argType) then raise IllTyped else
