@@ -39,3 +39,6 @@ Happily, we get three!
 See chapters 9, 16, and 17 of Bob Harper's "Practical Foundations for
 Programming Languages" for more. Also Pierce's Types and Programming
 Langauges.
+
+*
+sudo apt install sml ml-yaxx ml-lex ml-lpt
