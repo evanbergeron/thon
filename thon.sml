@@ -291,12 +291,11 @@ fun typeof ctx typCtx e =
             in
                 (* deduced *)
                 (* (typAbstractOut (TyRec(t)) t) *)
-                   typAbstractOut (TyRec(t)) (TyRec(deduced))
-                (* if (typAbstractOut (TyRec(t)) t) <> *)
-                (*    (typAbstractOut (TyRec(t)) (TyRec(deduced))) then *)
-                (*     raise IllTyped *)
-                (* else *)
-                (*     TyRec(t) *)
+                   (* typAbstractOut (TyRec(t)) (TyRec(deduced)) *)
+                if (typAbstractOut (TyRec(t)) t) <>
+                   (typAbstractOut (TyRec(t)) (TyRec(deduced))) then
+                    raise IllTyped
+                else t
             end
        | Unfold(e') =>
             let val TyRec(t) = typeof ctx typCtx e' in
