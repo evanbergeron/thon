@@ -305,6 +305,7 @@ fun typeof ctx typCtx e =
 fun isval e =
     case e of
         Zero => true
+      | TmUnit => true
       | Succ(n) => isval n
       | Lam(_, _) => true
       | Tuple(l, r) => (isval l) andalso (isval r)
@@ -431,10 +432,15 @@ val nilNatList = Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, TypVar 0)), TmUnit)
 val deducedNatlist = typeof Nil Nil nilNatList;
 val true = (natlist = deducedNatlist);
 
+val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
+(* alias for bool *)
+val Nat = typeof Nil Nil (App(isnil, nilNatList));
+(* isnil (nilNatList) is true. *)
+val Succ Zero = eval (App(isnil, nilNatList));
+
 (* I think this... *)
 (* val emptyNatlist = Fold(natlist, PlusLeft(Plus(Unit, Arr(Nat, Nat)), TmUnit); *)
 
-(* val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero)); *)
 
 (* val (Arr(natlist, Nat)) = typeof Nil Nil isnil; *)
 (* Fold(nlbody, TmUnit) *)
