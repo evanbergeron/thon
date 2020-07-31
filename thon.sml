@@ -14,6 +14,7 @@ datatype Typ = Nat
              | Prod of Typ * Typ
              | Plus of Typ * Typ (* sum type *)
              | TyRec of Typ (* binds *)
+             | Unit (* nullary sum *)
 
 datatype Idx = int
 
@@ -39,6 +40,7 @@ datatype Exp = Zero
                        Exp (* Right binds term var *)
              | Fold of Typ (*binds*) * Exp
              | Unfold of Exp
+             | TmUnit
 
 (* Holds typing assertions we already know. Head of the list
  * represents the type of the variable most recently seen. (The
@@ -62,6 +64,7 @@ fun len ctx = len' 0 ctx
 fun istype typeCtx t =
     case t of
         Nat => true
+      | Unit => true
       | TypVar i => i < (len typeCtx)
       | Arr(d, c) => (istype typeCtx d) andalso (istype typeCtx c)
       | Prod(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
@@ -74,6 +77,7 @@ fun istype typeCtx t =
 fun typsubst' src dst bindingDepth =
     case dst
      of Nat => Nat
+      | Unit => Unit
       | TypVar n  => if n = bindingDepth then src else
                      if n > bindingDepth then TypVar (n-1) else
                      dst
@@ -104,6 +108,7 @@ fun typAbstractOut' search t bindingDepth =
     if t = search then (TypVar bindingDepth) else
     case t
      of Nat => Nat
+      | Unit => Unit
       | TypVar n  => TypVar n
       | Arr(d, c) => Arr((typAbstractOut' search d bindingDepth),
                           (typAbstractOut' search c bindingDepth))
@@ -123,6 +128,7 @@ fun typAbstractOut search t = typAbstractOut' search t 0
 fun typdecrVarIdxs t =
     case t of
         Nat => Nat
+      | Unit => Unit
       | TypVar i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                     else TypVar (i -1)
       | Arr(d, c) => Arr(typdecrVarIdxs d, typdecrVarIdxs c)
@@ -200,6 +206,7 @@ fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
 fun typeof ctx typCtx e =
     case e
      of  Zero => Nat
+       | TmUnit => Unit
        | Var i => get ctx i
        | Succ e2 => (typeof ctx typCtx e2)
        | ProdLeft e => let val Prod(l, r) = (typeof ctx typCtx e) in l end
@@ -216,12 +223,12 @@ fun typeof ctx typCtx e =
                                 else
                                     Plus(l, r)
                             end
-       | Case (e, l, r) => let val Plus(lt, rt) = typeof ctx typCtx e 
+       | Case (c, l, r) => let val Plus(lt, rt) = typeof ctx typCtx c
                                (* both bind a term var *)
                                val typeOfLeftBranch = typeof (Cons(lt, ctx)) typCtx l
                                val typeOfRightBranch= typeof (Cons(rt, ctx)) typCtx r
                            in
-                               if typeOfLeftBranch <> typeOfRightBranch then 
+                               if typeOfLeftBranch <> typeOfRightBranch then
                                    raise IllTyped
                                else
                                    typeOfLeftBranch
@@ -400,7 +407,8 @@ fun eval e = if isval e then e else eval (step e)
 
 (******* Tests *******)
 
-val natlist = TyRec(Plus(Nat, Arr(Nat, TypVar 0)));
+val natlist : Typ = TyRec(Plus(Unit, Arr(Nat, TypVar 0)));
+val nlbody : Typ = TyRec(Plus(Unit, Arr(Nat, natlist)));
 
 val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
 val (Arr(natlist, Nat)) = typeof Nil Nil isnil;
