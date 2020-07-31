@@ -1,4 +1,4 @@
-Interpreters for three (very) small programming languages. There are
+Interpreters for four (very) small programming languages. There are
 no parsers, so if you want to play with it, you'll need to load the
 code in a sml repl somewhere.
 
@@ -11,7 +11,10 @@ languages halt.
 * f.sml expands on t.sml by introducing variable types (parametric
   polymorphism).
 
-* fe.sml expands on f.sml with existential packages.
+* fe.sml expands on f.sml with existential packages and binary product
+  types.
+
+* thon.sml expands on fe.sml with recursive types and binary sum types.
 
 Some examples:
 
