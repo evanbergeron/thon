@@ -142,6 +142,7 @@ fun typdecrVarIdxs t =
 fun decrVarIdxs e =
     case e
      of  Zero => Zero
+       | TmUnit => TmUnit
        | Var i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                   else Var (i - 1)
        | Succ e2 => (Succ (decrVarIdxs e2))
@@ -159,6 +160,8 @@ fun decrVarIdxs e =
        | TypApp (appType, e) => TypApp(typdecrVarIdxs appType, decrVarIdxs e)
        | Pack (reprType, pkgImpl, pkgType) => Pack(typdecrVarIdxs reprType, decrVarIdxs pkgImpl, typdecrVarIdxs pkgType)
        | Open (pkg, client) => Open(decrVarIdxs pkg, decrVarIdxs client)
+       | Fold(t, e') => Fold(typdecrVarIdxs t, decrVarIdxs e')
+       | Unfold(e') => Unfold(decrVarIdxs e')
 
 
 (* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
@@ -166,6 +169,7 @@ fun typSubstInExp' srcType dstExp bindingDepth =
     case dstExp
      of  Zero => Zero
        | Var i => Var i
+       | TmUnit => TmUnit
        | Succ e2 => Succ (typSubstInExp' srcType e2 bindingDepth)
        | ProdLeft e => ProdLeft (typSubstInExp' srcType e bindingDepth)
        | ProdRight e => ProdRight (typSubstInExp' srcType e bindingDepth)
@@ -198,6 +202,9 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | Open (pkg, client) =>
             Open(typSubstInExp' srcType pkg bindingDepth,
                  typSubstInExp' srcType client (bindingDepth+1))
+       | Fold(t, e') => Fold(typsubst' srcType t bindingDepth,
+                             typSubstInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
+       | Unfold(e') => Unfold(typSubstInExp' srcType e' bindingDepth)
 
 
 fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
@@ -279,14 +286,17 @@ fun typeof ctx typCtx e =
                 if not (istype typCtx resType) then raise IllTyped else
                 resType
             end
-       | Fold(t, e') =>
+       | Fold(t, e') (* binds a typ var *) =>
             let val deduced = typeof ctx (Cons(42, typCtx)) e'
             in
-                if (typAbstractOut (TyRec(t)) t) <>
-                   (typAbstractOut (TyRec(t)) deduced) then
-                    raise IllTyped
-                else
-                    TyRec(t)
+                (* deduced *)
+                (* (typAbstractOut (TyRec(t)) t) *)
+                   typAbstractOut (TyRec(t)) (TyRec(deduced))
+                (* if (typAbstractOut (TyRec(t)) t) <> *)
+                (*    (typAbstractOut (TyRec(t)) (TyRec(deduced))) then *)
+                (*     raise IllTyped *)
+                (* else *)
+                (*     TyRec(t) *)
             end
        | Unfold(e') =>
             let val TyRec(t) = typeof ctx typCtx e' in
@@ -303,12 +313,14 @@ fun isval e =
       | Pack(_, pkgImpl, _) => isval pkgImpl
       | PlusLeft(_, e') => isval e'
       | PlusRight(_, e') => isval e'
+      | Fold(t, e') => isval e'
       | _ => false
 
 
 fun subst' src dst bindingDepth =
     case dst
      of  Zero => Zero
+       | TmUnit => TmUnit
        | Var n  => if n = bindingDepth then src else
                    if n > bindingDepth then Var(n-1) else
                    Var(n)
@@ -331,6 +343,8 @@ fun subst' src dst bindingDepth =
        | Pack(reprType, pkgImpl, t) => Pack(reprType, subst' src pkgImpl bindingDepth, t)
        | Open (pkg, client) => Open(subst' src pkg bindingDepth, subst' src client (bindingDepth+1))
        | Tuple (l, r) => Tuple (subst' src l bindingDepth, subst' src r bindingDepth)
+       | Fold(t, e') => Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
+       | Unfold(e') => Unfold(subst' src e' (bindingDepth))
 
 
 fun subst src dst = subst' src dst 0
@@ -398,6 +412,10 @@ fun step e =
                | PlusRight(_, e) => subst e r
                | _ => raise IllTyped
         )
+      | Fold (t, e') => if not (isval e') then Fold(t, step e')
+                        else (let val true = isval e in e end)
+      | Unfold e' => if not (isval e') then Unfold (step e')
+                     else (let val Fold(t, e'') = e' in e'' end)
       | _ => if (isval e) then e else raise No
     end
 
@@ -407,11 +425,21 @@ fun eval e = if isval e then e else eval (step e)
 
 (******* Tests *******)
 
-val natlist : Typ = TyRec(Plus(Unit, Arr(Nat, TypVar 0)));
-val nlbody : Typ = TyRec(Plus(Unit, Arr(Nat, natlist)));
+val natlist : Typ = TyRec(Plus(Unit, Prod(Nat, TypVar 0)));
+val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
 
-val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
-val (Arr(natlist, Nat)) = typeof Nil Nil isnil;
+val nilNatList = Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, TypVar 0)), TmUnit));
+val deducedNatlist = typeof Nil Nil nilNatList;
+val true = (natlist = deducedNatlist);
+
+(* I think this... *)
+(* val emptyNatlist = Fold(natlist, PlusLeft(Plus(Unit, Arr(Nat, Nat)), TmUnit); *)
+
+(* val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero)); *)
+
+(* val (Arr(natlist, Nat)) = typeof Nil Nil isnil; *)
+(* Fold(nlbody, TmUnit) *)
+(* App(isnil, Fold(natlist, TmUnit)); *)
 
 val Plus(Nat, Nat) = typeof Nil Nil (PlusLeft (Plus(Nat, Nat), Zero));
 val Plus(Nat, Prod(Nat, Nat)) = typeof Nil Nil (PlusLeft (Plus(Nat, Prod(Nat, Nat)), Zero));
