@@ -13,6 +13,7 @@ datatype Typ = Nat
              | Some of Typ (* binds *)
              | Prod of Typ * Typ
              | Plus of Typ * Typ (* sum type *)
+             | TyRec of Typ (* binds *)
 
 datatype Idx = int
 
@@ -36,7 +37,8 @@ datatype Exp = Zero
              | Case of Exp (* thing being cased on*) *
                        Exp (* Left binds term var *) *
                        Exp (* Right binds term var *)
-
+             | Fold of Typ (*binds*) * Exp
+             | Unfold of Exp
 
 (* Holds typing assertions we already know. Head of the list
  * represents the type of the variable most recently seen. (The
@@ -66,6 +68,7 @@ fun istype typeCtx t =
       | Plus(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
       | All t' => istype (Cons(42, typeCtx)) t'
       | Some t' => istype (Cons(42, typeCtx)) t'
+      | TyRec t' => istype (Cons(42, typeCtx)) t'
 
 
 fun typsubst' src dst bindingDepth =
@@ -82,6 +85,7 @@ fun typsubst' src dst bindingDepth =
                            (typsubst' src r bindingDepth))
       | All t => All(typsubst' src t (bindingDepth + 1))
       | Some t => Some(typsubst' src t (bindingDepth + 1))
+      | TyRec t => TyRec(typsubst' src t (bindingDepth + 1))
 
 
 fun typsubst src dst = typsubst' src dst 0
@@ -109,6 +113,7 @@ fun typAbstractOut' search t bindingDepth =
                            (typAbstractOut' search r bindingDepth))
       | All t' => All(typAbstractOut' search t' (bindingDepth+1))
       | Some t' => Some(typAbstractOut' search t' (bindingDepth+1))
+      | TyRec t' => TyRec(typAbstractOut' search t' (bindingDepth+1))
 
 
 fun typAbstractOut search t = typAbstractOut' search t 0
@@ -125,6 +130,7 @@ fun typdecrVarIdxs t =
       | Plus(l, r) => Plus(typdecrVarIdxs l, typdecrVarIdxs r)
       | All t' => All(typdecrVarIdxs t')
       | Some t' => Some(typdecrVarIdxs t')
+      | TyRec t' => TyRec(typdecrVarIdxs t')
 
 
 fun decrVarIdxs e =
@@ -252,8 +258,9 @@ fun typeof ctx typCtx e =
             in
                 if (typAbstractOut reprType deducedPkgType) <>
                    (typAbstractOut reprType pkgType) then
-                raise IllTyped else
-            Some(pkgType)
+                    raise IllTyped
+                else
+                    Some(pkgType)
             end
        | Open (pkg, client) =>
             let val Some(r) = typeof ctx typCtx pkg
@@ -264,6 +271,19 @@ fun typeof ctx typCtx e =
             in
                 if not (istype typCtx resType) then raise IllTyped else
                 resType
+            end
+       | Fold(t, e') =>
+            let val deduced = typeof ctx (Cons(42, typCtx)) e'
+            in
+                if (typAbstractOut (TyRec(t)) t) <>
+                   (typAbstractOut (TyRec(t)) deduced) then
+                    raise IllTyped
+                else
+                    TyRec(t)
+            end
+       | Unfold(e') =>
+            let val TyRec(t) = typeof ctx typCtx e' in
+                typsubst (TyRec(t)) t
             end
 
 fun isval e =
@@ -379,6 +399,11 @@ fun eval e = if isval e then e else eval (step e)
 
 
 (******* Tests *******)
+
+val natlist = TyRec(Plus(Nat, Arr(Nat, TypVar 0)));
+
+val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
+val (Arr(natlist, Nat)) = typeof Nil Nil isnil;
 
 val Plus(Nat, Nat) = typeof Nil Nil (PlusLeft (Plus(Nat, Nat), Zero));
 val Plus(Nat, Prod(Nat, Nat)) = typeof Nil Nil (PlusLeft (Plus(Nat, Prod(Nat, Nat)), Zero));
