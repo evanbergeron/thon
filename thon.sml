@@ -206,7 +206,6 @@ fun typeof ctx typCtx e =
                                else
                                    typeOfLeftBranch
                                end
-
        | Lam (argType, funcBody) =>
             if not (istype typCtx argType) then raise IllTyped else
             Arr (argType, typeof (Cons(argType, ctx)) typCtx funcBody)
@@ -261,6 +260,8 @@ fun isval e =
       | Tuple(l, r) => (isval l) andalso (isval r)
       | TypAbs _  => true
       | Pack(_, pkgImpl, _) => isval pkgImpl
+      | PlusLeft(_, e') => isval e'
+      | PlusRight(_, e') => isval e'
       | _ => false
 
 
@@ -337,6 +338,20 @@ fun step e =
                     subst pkgImpl' (typSubstInExp reprType' client)
               | _ => raise No
            )
+      | PlusLeft (t, e') =>
+            if not (isval e) then PlusLeft(t, step e')
+            else e
+      | PlusRight (t, e') =>
+            if not (isval e) then PlusRight(t, step e')
+            else e
+      | Case (casee, l, r) =>
+        if not (isval casee) then Case(step casee, l, r)
+        else (
+            case casee of
+                 PlusLeft(_, e) => subst e l
+               | PlusRight(_, e) => subst e r
+                                          | _ => raise IllTyped
+        )
       | _ => if (isval e) then e else raise No
     end
 
@@ -345,6 +360,11 @@ fun eval e = if isval e then e else eval (step e)
 
 
 (******* Tests *******)
+
+val Plus(Nat, Nat) = typeof Nil Nil (PlusLeft (Plus(Nat, Nat), Zero));
+val Plus(Nat, Prod(Nat, Nat)) = typeof Nil Nil (PlusLeft (Plus(Nat, Prod(Nat, Nat)), Zero));
+val Zero = step (Case(PlusLeft (Plus(Nat, Nat), Zero), Var 0, Succ(Var 0)));
+val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), Var 0, Succ(Var 0)));
 
 
 (* Seems there are multiple valid typings of this expression. Up
