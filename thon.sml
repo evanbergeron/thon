@@ -63,6 +63,7 @@ fun istype typeCtx t =
       | TypVar i => i < (len typeCtx)
       | Arr(d, c) => (istype typeCtx d) andalso (istype typeCtx c)
       | Prod(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
+      | Plus(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
       | All t' => istype (Cons(42, typeCtx)) t'
       | Some t' => istype (Cons(42, typeCtx)) t'
 
@@ -73,9 +74,11 @@ fun typsubst' src dst bindingDepth =
       | TypVar n  => if n = bindingDepth then src else
                      if n > bindingDepth then TypVar (n-1) else
                      dst
-      | Arr (t, t') => Arr((typsubst' src t bindingDepth),
-                           (typsubst' src t' bindingDepth))
-      | Prod (l, r) => Arr((typsubst' src l bindingDepth),
+      | Arr(t, t') => Arr((typsubst' src t bindingDepth),
+                          (typsubst' src t' bindingDepth))
+      | Prod(l, r) => Prod((typsubst' src l bindingDepth),
+                           (typsubst' src r bindingDepth))
+      | Plus(l, r) => Plus((typsubst' src l bindingDepth),
                            (typsubst' src r bindingDepth))
       | All t => All(typsubst' src t (bindingDepth + 1))
       | Some t => Some(typsubst' src t (bindingDepth + 1))
@@ -98,10 +101,12 @@ fun typAbstractOut' search t bindingDepth =
     case t
      of Nat => Nat
       | TypVar n  => TypVar n
-      | Arr (d, c) => Arr((typAbstractOut' search d bindingDepth),
-                           (typAbstractOut' search c bindingDepth))
-      | Prod (l, r) => Prod((typAbstractOut' search l bindingDepth),
-                            (typAbstractOut' search r bindingDepth))
+      | Arr(d, c) => Arr((typAbstractOut' search d bindingDepth),
+                          (typAbstractOut' search c bindingDepth))
+      | Prod(l, r) => Prod((typAbstractOut' search l bindingDepth),
+                           (typAbstractOut' search r bindingDepth))
+      | Plus(l, r) => Plus((typAbstractOut' search l bindingDepth),
+                           (typAbstractOut' search r bindingDepth))
       | All t' => All(typAbstractOut' search t' (bindingDepth+1))
       | Some t' => Some(typAbstractOut' search t' (bindingDepth+1))
 
@@ -116,7 +121,8 @@ fun typdecrVarIdxs t =
       | TypVar i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                     else TypVar (i -1)
       | Arr(d, c) => Arr(typdecrVarIdxs d, typdecrVarIdxs c)
-      | Prod(l, r) => Arr(typdecrVarIdxs l, typdecrVarIdxs r)
+      | Prod(l, r) => Prod(typdecrVarIdxs l, typdecrVarIdxs r)
+      | Plus(l, r) => Plus(typdecrVarIdxs l, typdecrVarIdxs r)
       | All t' => All(typdecrVarIdxs t')
       | Some t' => Some(typdecrVarIdxs t')
 
@@ -129,6 +135,9 @@ fun decrVarIdxs e =
        | Succ e2 => (Succ (decrVarIdxs e2))
        | ProdLeft e => (ProdLeft (decrVarIdxs e))
        | ProdRight e => (ProdRight (decrVarIdxs e))
+       | PlusLeft(t, e) => (PlusLeft (t, decrVarIdxs e))
+       | PlusRight(t, e) => (PlusRight (t, decrVarIdxs e))
+       | Case(c, l, r) => (Case(decrVarIdxs c, decrVarIdxs l, decrVarIdxs r))
        | Lam (argType, funcBody) => Lam(typdecrVarIdxs argType, decrVarIdxs funcBody)
        | App (f, n) => App(decrVarIdxs f, decrVarIdxs n)
        | Tuple (l, r) => Tuple(decrVarIdxs l, decrVarIdxs r)
@@ -148,6 +157,11 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | Succ e2 => Succ (typSubstInExp' srcType e2 bindingDepth)
        | ProdLeft e => ProdLeft (typSubstInExp' srcType e bindingDepth)
        | ProdRight e => ProdRight (typSubstInExp' srcType e bindingDepth)
+       | PlusLeft (t, e) => PlusLeft (t, typSubstInExp' srcType e bindingDepth)
+       | PlusRight (t, e) => PlusRight (t, typSubstInExp' srcType e bindingDepth)
+       | Case(c, l, r) => Case(typSubstInExp' srcType c bindingDepth,
+                               typSubstInExp' srcType l bindingDepth,
+                               typSubstInExp' srcType r bindingDepth)
        | Lam (argType, funcBody) =>
             Lam((typsubst' srcType argType bindingDepth),
                 typSubstInExp' srcType funcBody bindingDepth)
@@ -274,6 +288,11 @@ fun subst' src dst bindingDepth =
        | Succ e2 => Succ (subst' src e2 bindingDepth)
        | ProdLeft e => ProdLeft (subst' src e bindingDepth)
        | ProdRight e => ProdRight (subst' src e bindingDepth)
+       | PlusLeft (t, e) => PlusLeft (t, subst' src e bindingDepth)
+       | PlusRight (t, e) => PlusRight (t, subst' src e bindingDepth)
+       | Case(c, l, r) => Case(subst' src c bindingDepth,
+                               subst' src l (bindingDepth+1),
+                               subst' src r (bindingDepth+1))
        | Lam (t, f) => Lam(t, (subst' src f (bindingDepth+1)))
        | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
        | Rec (i, baseCase, recCase) =>
@@ -344,13 +363,13 @@ fun step e =
       | PlusRight (t, e') =>
             if not (isval e) then PlusRight(t, step e')
             else e
-      | Case (casee, l, r) =>
-        if not (isval casee) then Case(step casee, l, r)
+      | Case (c, l, r) =>
+        if not (isval c) then Case(step c, l, r)
         else (
-            case casee of
+            case c of
                  PlusLeft(_, e) => subst e l
                | PlusRight(_, e) => subst e r
-                                          | _ => raise IllTyped
+               | _ => raise IllTyped
         )
       | _ => if (isval e) then e else raise No
     end
