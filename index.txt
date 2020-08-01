@@ -1,0 +1,47 @@
+Interpreters for four (very) small programming languages. There are
+no parsers, so if you want to play with it, you'll need to load the
+code in a sml repl somewhere.
+
+Neither of these languages are Turing complete. All programs in both
+languages halt.
+
+* t.sml implements System T, the simply type lambda calculus with
+  primitive recursion (i.e. bounded recursion).
+
+* f.sml expands on t.sml by introducing variable types (parametric
+  polymorphism).
+
+* fe.sml expands on f.sml with existential packages and binary product
+  types.
+
+* thon.sml expands on fe.sml with recursive types and binary sum types.
+
+Some examples:
+
+- Lam(Nat, Var 0) is the identity function on the natural numbers.
+- Lam(Nat, Lam(Nat, Var 0)) is a function that returns the identity
+  function on the natural numbers.
+- TypAbs(Lam(TypVar 0, Var 0)) is the polymorphic identity function.
+- Succ Zero is the natural number 1.
+- Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Succ(Var 0)))) is a recursive
+  value. It recurses to depth two (Succ(Succ(Zero))). It returns Zero
+  at the base case. Each recursive step adds three to the value of the
+  previous recursion. So it computes 3 times the depth it recurses.
+
+So let's load that into a lambda function:
+
+    val multByThree = Lam(Nat, Rec(Var 0, Zero, Succ(Succ(Succ(Var 0)))));
+
+And call it on the number one:
+
+    eval (App(multByThree, Succ Zero));
+    val it = Succ (Succ (Succ Zero)) : Exp
+
+Happily, we get three!
+
+See chapters 9, 16, and 17 of Bob Harper's "Practical Foundations for
+Programming Languages" for more. Also Pierce's Types and Programming
+Langauges.
+
+*
+sudo apt install sml ml-yaxx ml-lex ml-lpt
