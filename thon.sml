@@ -434,19 +434,32 @@ val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
 val nilNatList =
     Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
 
+val singletonList =
+    Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Tuple(Zero,
+    Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit)))));
+
+val TyRec (Plus (Unit,Prod (Nat,TypVar 0))) = typeof Nil Nil singletonList;
+
+val natlistCons =
+    Lam(Prod(Nat, natlist),
+    Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Tuple(ProdLeft(Var 0),
+    ProdRight(Var 0)))));
+
+val Arr (Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0)))),
+         TyRec (Plus (Unit,Prod (Nat,TypVar 0)))) : Typ =
+    typeof Nil Nil natlistCons;
+
+val deducedSingleListAppResType = typeof Nil Nil (App(natlistCons, Tuple(Zero, nilNatList)));
+val true = (deducedSingleListAppResType = natlist);
+
 val deducedNatlist = typeof Nil Nil nilNatList;
 val true = (natlist = deducedNatlist);
 
 val Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))) : Typ =
     typeof Nil Nil (Unfold(nilNatList));
 
-(* ok let's build the natlist containing Zero manually, confirm it is of type natlist, then build Cons from that *)
-
-(* TODO TODO TODO This is wrong I think. This type variable is unbound...? Really it should be wrapped in a Rec.... *)
 val PlusLeft
     (Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))),TmUnit) : Exp = eval (Unfold(nilNatList));
-
-(* PlusRight(Plus (Unit,Prod (Nat,TypVar 0)), Tuple(Zero, nilNatList)) *)
 
 (* isnil : nlbody..... ? -> Nat (*True or False*) *)
 val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
@@ -459,8 +472,7 @@ val natlistConstype = Arr(Prod(Nat, natlist), natlist);
 
 (* PlusRight(natlist, (Zero, nilNatList)) *)
 
-(* Lam(Prod(Nat, natlist), PlusRight(natlist, (ProdLeft(Var 0), ProdRight(Var 0)))) *)
-(* val natlistCons = Lam(Lam(Prodnatlist, Fold(natlist, Tuple(Var 1, Var 0)))); *)
+(* val natlistCons = Lam(Prod(Nat, natlist), Fold(natlist, Tuple(Var 1, Var 0))); *)
 
 (* Defines a type of natural number queues. Can wrap in an existential type, also. *)
 val natQueueType = Prod(
