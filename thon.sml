@@ -442,8 +442,7 @@ val TyRec (Plus (Unit,Prod (Nat,TypVar 0))) = typeof Nil Nil singletonList;
 
 val natlistCons =
     Lam(Prod(Nat, natlist),
-    Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Tuple(ProdLeft(Var 0),
-    ProdRight(Var 0)))));
+        Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Var 0)));
 
 val Arr (Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0)))),
          TyRec (Plus (Unit,Prod (Nat,TypVar 0)))) : Typ =
