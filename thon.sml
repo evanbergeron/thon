@@ -286,13 +286,14 @@ fun typeof ctx typCtx e =
                 if not (istype typCtx resType) then raise IllTyped else
                 resType
             end
-       | Fold(t, e') (* binds a typ var *) =>
+       | Fold(TyRec(t) (*declared type*), e'(* binds a typ var *)) =>
             let val deduced = typeof ctx (Cons(42, typCtx)) e'
+                val absDeduced = typAbstractOut (TyRec(t)) (TyRec(deduced))
+                val absT = typAbstractOut (TyRec(t)) (TyRec(t))
             in
-                if (typAbstractOut (TyRec(t)) t) <>
-                   (typAbstractOut (TyRec(t)) (TyRec(deduced))) then
-                    raise IllTyped
-                else t
+                (* deduced *)
+                if absDeduced <> absT then raise IllTyped
+                else TyRec(t)
             end
        | Unfold(e') =>
             let val TyRec(t) = typeof ctx typCtx e' in
@@ -428,19 +429,28 @@ val natlist : Typ = TyRec(Plus(Unit, Prod(Nat, TypVar 0)));
 val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
 
 (* empty : natlist *)
-val nilNatList = Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, TypVar 0)), TmUnit));
+
+(* We're projecting.... against a sum type... needs to be a plus. *)
+(* Why does this need to be nlbody, not natlist? *)
+val nilNatList =
+    Fold(nlbody, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
+
 val deducedNatlist = typeof Nil Nil nilNatList;
-val true = (natlist = deducedNatlist);
+val true = (nlbody = deducedNatlist);
+
+val Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))) : Typ =
+    typeof Nil Nil (Unfold(nilNatList));
 
 (* ok let's build the natlist containing Zero manually, confirm it is of type natlist, then build Cons from that *)
 
 (* TODO TODO TODO This is wrong I think. This type variable is unbound...? Really it should be wrapped in a Rec.... *)
-val PlusLeft (Plus (Unit,Prod (Nat,TypVar 0)),TmUnit) : Exp = eval (Unfold(nilNatList));
+val PlusLeft
+    (Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))),TmUnit) : Exp = eval (Unfold(nilNatList));
 
 (* PlusRight(Plus (Unit,Prod (Nat,TypVar 0)), Tuple(Zero, nilNatList)) *)
 
-(* isnil : natlist -> Nat (*True or False*) *)
-val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
+(* isnil : nlbody..... ? -> Nat (*True or False*) *)
+val isnil = Lam(nlbody, Case(Unfold(Var 0), Succ Zero, Zero));
 val Nat = typeof Nil Nil (App(isnil, nilNatList));
 (* isnil nilNatList == 1. *)
 val Succ Zero = eval (App(isnil, nilNatList));
