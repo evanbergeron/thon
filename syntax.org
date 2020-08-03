@@ -1,0 +1,21 @@
+|------------+-------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
+| sml        | fun foo a =       | a : int      | if then else | datatype a Some =                                | module shit      | let a = | async stuff   | records      |   |
+|------------+-------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
+| haskell    | foo a = or \ a -> | a :: Integer | if then else | data Maybe a = None \  Some a or type (no ctors) | class Eq a where | a =     |               |              |   |
+| ocaml      | let               |              |              |                                                  |                  |         |               |              |   |
+| coq        | fun foo =>        |              |              |                                                  |                  |         |               |              |   |
+| elm        |                   |              |              |                                                  |                  |         |               |              |   |
+| purescript | let or \          |              |              |                                                  |                  |         |               |              |   |
+| alice      |                   |              |              |                                                  |                  |         | spawn or lazy |              |   |
+| idris      | foo a =           |              |              | similar to haskell                               |                  |         |               | record where |   |
+| f#         | let foo a =       |              |              | type Maybe = None                                | Some of          |         |               | async        |   |
+|------------+-------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
+
+so tldr is basic stuff should look like haskell or idris.
+english language keywords over symbols
+\ as lambda
+: for typing
+case of
+no let or var or val or fun
+probs skip `of` for datatype definitions
+also list comphrensions cause list comphrensions are great.
