@@ -289,9 +289,6 @@ fun typeof ctx typCtx e =
        | Fold(t, e') (* binds a typ var *) =>
             let val deduced = typeof ctx (Cons(42, typCtx)) e'
             in
-                (* deduced *)
-                (* (typAbstractOut (TyRec(t)) t) *)
-                   (* typAbstractOut (TyRec(t)) (TyRec(deduced)) *)
                 if (typAbstractOut (TyRec(t)) t) <>
                    (typAbstractOut (TyRec(t)) (TyRec(deduced))) then
                     raise IllTyped
@@ -425,26 +422,44 @@ fun eval e = if isval e then e else eval (step e)
 
 (******* Tests *******)
 
+(* data Natlist = None | Some(Nat, Natlist) *)
 val natlist : Typ = TyRec(Plus(Unit, Prod(Nat, TypVar 0)));
+(* Unfolded Natlist type *)
 val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
 
+(* empty : natlist *)
 val nilNatList = Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, TypVar 0)), TmUnit));
 val deducedNatlist = typeof Nil Nil nilNatList;
 val true = (natlist = deducedNatlist);
 
+(* ok let's build the natlist containing Zero manually, confirm it is of type natlist, then build Cons from that *)
+
+(* TODO TODO TODO This is wrong I think. This type variable is unbound...? Really it should be wrapped in a Rec.... *)
+val PlusLeft (Plus (Unit,Prod (Nat,TypVar 0)),TmUnit) : Exp = eval (Unfold(nilNatList));
+
+(* PlusRight(Plus (Unit,Prod (Nat,TypVar 0)), Tuple(Zero, nilNatList)) *)
+
+(* isnil : natlist -> Nat (*True or False*) *)
 val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
-(* alias for bool *)
 val Nat = typeof Nil Nil (App(isnil, nilNatList));
-(* isnil (nilNatList) is true. *)
+(* isnil nilNatList == 1. *)
 val Succ Zero = eval (App(isnil, nilNatList));
 
-(* I think this... *)
-(* val emptyNatlist = Fold(natlist, PlusLeft(Plus(Unit, Arr(Nat, Nat)), TmUnit); *)
+(* natlistConsType*)
+val natlistConstype = Arr(Prod(Nat, natlist), natlist);
 
+(* PlusRight(natlist, (Zero, nilNatList)) *)
 
-(* val (Arr(natlist, Nat)) = typeof Nil Nil isnil; *)
-(* Fold(nlbody, TmUnit) *)
-(* App(isnil, Fold(natlist, TmUnit)); *)
+(* Lam(Prod(Nat, natlist), PlusRight(natlist, (ProdLeft(Var 0), ProdRight(Var 0)))) *)
+(* val natlistCons = Lam(Lam(Prodnatlist, Fold(natlist, Tuple(Var 1, Var 0)))); *)
+
+(* Defines a type of natural number queues. Can wrap in an existential type, also. *)
+val natQueueType = Prod(
+    (* empty queue *) natlist,
+    Prod((* insert *) (Arr(Prod(Nat, natlist), natlist)),
+        (* remove*) Arr(natlist, (Plus((*None*) Unit, (*Some(Nat, natlist)*)Prod(Nat, natlist))))
+    )
+);
 
 val Plus(Nat, Nat) = typeof Nil Nil (PlusLeft (Plus(Nat, Nat), Zero));
 val Plus(Nat, Prod(Nat, Nat)) = typeof Nil Nil (PlusLeft (Plus(Nat, Prod(Nat, Nat)), Zero));
