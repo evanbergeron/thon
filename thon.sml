@@ -288,11 +288,10 @@ fun typeof ctx typCtx e =
             end
        | Fold(TyRec(t) (*declared type*), e'(* binds a typ var *)) =>
             let val deduced = typeof ctx (Cons(42, typCtx)) e'
-                val absDeduced = typAbstractOut (TyRec(t)) (TyRec(deduced))
+                val absDeduced = TyRec(typAbstractOut (TyRec(t)) (deduced))
                 val absT = typAbstractOut (TyRec(t)) (TyRec(t))
             in
-                (* deduced *)
-                if absDeduced <> absT then raise IllTyped
+                if absDeduced <> TyRec(t) then raise IllTyped
                 else TyRec(t)
             end
        | Unfold(e') =>
@@ -433,10 +432,10 @@ val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
 (* We're projecting.... against a sum type... needs to be a plus. *)
 (* Why does this need to be nlbody, not natlist? *)
 val nilNatList =
-    Fold(nlbody, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
+    Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
 
 val deducedNatlist = typeof Nil Nil nilNatList;
-val true = (nlbody = deducedNatlist);
+val true = (natlist = deducedNatlist);
 
 val Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))) : Typ =
     typeof Nil Nil (Unfold(nilNatList));
@@ -450,7 +449,7 @@ val PlusLeft
 (* PlusRight(Plus (Unit,Prod (Nat,TypVar 0)), Tuple(Zero, nilNatList)) *)
 
 (* isnil : nlbody..... ? -> Nat (*True or False*) *)
-val isnil = Lam(nlbody, Case(Unfold(Var 0), Succ Zero, Zero));
+val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero));
 val Nat = typeof Nil Nil (App(isnil, nilNatList));
 (* isnil nilNatList == 1. *)
 val Succ Zero = eval (App(isnil, nilNatList));
