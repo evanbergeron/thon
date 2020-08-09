@@ -45,6 +45,7 @@ datatype Exp = Zero
              | Unfold of Exp
              | TmUnit
 
+
 (* Holds typing assertions we already know. Head of the list
  * represents the type of the variable most recently seen. (The
  * "lowest" scope variable). *)
@@ -483,7 +484,13 @@ val TyRec (Plus (Unit,Prod (Nat,TypVar 0))) = typeof Nil Nil singletonList;
 
 val natlistCons =
     Lam(Prod(Nat, natlist),
-        Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Var 0)));
+        Fold(natlist,
+             PlusRight(
+                 Plus(Unit, Prod(Nat, natlist)),
+                 Var 0
+             )
+            )
+       );
 
 val Arr (Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0)))),
          TyRec (Plus (Unit,Prod (Nat,TypVar 0)))) : Typ =
@@ -528,11 +535,11 @@ val Zero = step (Case(PlusLeft (Plus(Nat, Nat), Zero), Var 0, Succ(Var 0)));
 val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), Var 0, Succ(Var 0)));
 
 
-(* Seems there are multiple valid typings of this expression. Up
-front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing,
-but the chapter on existential types in TAPL suggests otherwise.
+(* Seems there are multiple valid typings of this expression. Up *)
+(* front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing, *)
+(* but the chapter on existential types in TAPL suggests otherwise. *)
 
-That's why we require an explicit type annotation from the programmer. *)
+(* That's why we require an explicit type annotation from the programmer. *)
 val Arr(Nat, Nat) = typeof Nil (Cons(42, Nil)) (Lam(Nat, Zero));
 val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat));
 val All(Arr(TypVar 0, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar 0, Nat)));
