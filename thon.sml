@@ -1,5 +1,8 @@
 (* A system FE interpreter - System F with existential packages *)
-Control.Print.printDepth := 100;
+structure Thon : sig
+                   val parse : unit -> unit
+                 end =
+struct
 
 exception IllTyped
 exception No
@@ -420,6 +423,44 @@ fun step e =
 fun eval e = if isval e then e else eval (step e)
 
 
+(* Lexing and parsing *)
+
+structure ThonLrVals = ThonLrValsFun(structure Token = LrParser.Token)
+structure ThonLex = ThonLexFun(structure Tokens = ThonLrVals.Tokens)
+structure ThonParser =
+    Join(structure LrParser = LrParser
+            structure ParserData = ThonLrVals.ParserData
+            structure Lex = ThonLex)
+
+fun invoke lexstream =
+    let fun print_error (s,i:int,_) =
+    TextIO.output(TextIO.stdOut,
+                    "Error, line " ^ (Int.toString i) ^ ", " ^ s ^ "\n")
+    in ThonParser.parse(0,lexstream,print_error,())
+    end
+
+fun parse () =
+    let val lexer = ThonParser.makeLexer (fn _ =>
+                                            (case TextIO.inputLine TextIO.stdIn
+                                                of SOME s => s
+                                                | _ => ""))
+        val dummyEOF = ThonLrVals.Tokens.EOF(0,0)
+        val dummySEMI = ThonLrVals.Tokens.SEMI(0,0)
+        fun loop lexer =
+            let val (result,lexer) = invoke lexer
+                val (nextToken,lexer) = ThonParser.Stream.get lexer
+                val _ = case result
+                            of SOME r =>
+                                TextIO.output(TextIO.stdOut,
+                                    "result = " ^ (Int.toString r) ^ "\n")
+                            | NONE => ()
+            in if ThonParser.sameToken(nextToken,dummyEOF) then ()
+                else loop lexer
+            end
+    in loop lexer
+    end
+
+
 (******* Tests *******)
 
 (* data Natlist = None | Some(Nat, Natlist) *)
@@ -726,3 +767,5 @@ val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ
 
 val multByThree = Lam(Nat, Rec(Var 0, Zero, Succ(Succ(Succ(Var 0)))));
 val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero))
+
+end (* structure Thon *)
