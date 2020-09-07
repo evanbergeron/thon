@@ -2,7 +2,8 @@ Interpreters for four (very) small programming languages. There are
 no parsers, so if you want to play with it, you'll need to load the
 code in a sml repl somewhere.
 
-- CM.make "thon.cm";
+- CM.make "path/to/thon.cm";
+- Thon.parse "path/to/some/file.thon";
 
 Neither of these languages are Turing complete. All programs in both
 languages halt.
