@@ -39,4 +39,6 @@ exp:
     LPAREN exp RPAREN (exp)
   | ZERO (A.Zero)
   | SUCC exp (A.Succ exp)
-  | LAM ID COLON typ SARROW exp (A.Lam (typ, exp))
+  (* eventually would rather this be LAM ID COLON typ SARROW exp but
+   * not until we manage to turn names into binding site indexes *)
+  | LAM typ SARROW exp (A.Lam (typ, exp))
