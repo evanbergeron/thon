@@ -1,6 +1,7 @@
 (* A system FE interpreter - System F with existential packages *)
 structure Thon : sig
-                   val parse : unit -> Ast.Exp
+                   val parse : string -> Ast.Exp
+                   val test : unit -> unit
                  end =
 struct
 
@@ -423,8 +424,8 @@ fun step e =
 
 fun eval e = if isval e then e else eval (step e)
 
-fun parse () = 
-    let val ast : A.Exp = Parse.parse ()
+fun parse filename =
+    let val ast : A.Exp = Parse.parse filename
     in
         ast
     end
@@ -432,6 +433,8 @@ fun parse () =
 
 (******* Tests *******)
 
+fun test() =
+    let
 (* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, A.TypVar 0)));
 (* Unfolded Natlist type *)
@@ -448,7 +451,7 @@ val singletonList =
     A.Fold(natlist, A.PlusRight(A.Plus(A.Unit, A.Prod(A.Nat, natlist)), A.Tuple(A.Zero,
     A.Fold(natlist, A.PlusLeft(A.Plus(A.Unit, A.Prod(A.Nat, natlist)), A.TmUnit)))));
 
-val A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))) = typeof Nil Nil singletonList;
+(* val A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))) = .Atypeof Nil Nil singletonList; *)
 
 (* val natlistCons = *)
 (*     Lam(Prod(Nat, natlist), *)
@@ -742,5 +745,8 @@ val A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))) = typeof Nil Nil singlet
 
 (* val multByThree = Lam(Nat, Rec(Var 0, Zero, Succ(Succ(Succ(Var 0))))); *)
 (* val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero)) *)
+in
+()
+end
 
 end (* structure Thon *)
