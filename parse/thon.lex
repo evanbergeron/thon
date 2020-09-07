@@ -1,3 +1,4 @@
+structure A = Ast
 structure Tokens = Tokens
 
 type pos = int
@@ -12,21 +13,12 @@ fun error (e,l : int,_) = TextIO.output (TextIO.stdOut, String.concat[
       ])
 
 %%
-%header (functor ThonLexFun(structure Tokens: Thon_TOKENS));
+%header (functor ThonLexFn(structure Tokens: Thon_TOKENS));
 alpha=[A-Za-z];
 digit=[0-9];
 ws = [\ \t];
 %%
 \n       => (pos := (!pos) + 1; lex());
 {ws}+    => (lex());
-{digit}+ => (Tokens.NUM (valOf (Int.fromString yytext), !pos, !pos));
-
-"+"      => (Tokens.PLUS(!pos,!pos));
-"*"      => (Tokens.TIMES(!pos,!pos));
-";"      => (Tokens.SEMI(!pos,!pos));
-"-"      => (Tokens.SUB(!pos,!pos));
 "Z"      => (Tokens.ZERO(!pos,!pos));
-"^"      => (Tokens.CARAT(!pos,!pos));
-"/"      => (Tokens.DIV(!pos,!pos));
-"."      => (error ("ignoring bad character "^yytext,!pos,!pos);
-             lex());
+"S"      => (Tokens.SUCC(!pos,!pos));

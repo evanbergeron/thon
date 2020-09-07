@@ -1,0 +1,32 @@
+structure A = Ast
+
+%%
+%header (functor ThonLrValsFn (structure Token : TOKEN))
+
+%eop EOF
+
+%term
+   EOF
+ | ZERO
+ | SUCC
+ | LPAREN | RPAREN
+                                     
+%nonterm
+   exp of A.Exp
+
+%verbose
+%pos int
+%start exp
+%eop EOF
+
+%name Thon
+
+%right SUCC
+%left ZERO LPAREN
+
+%%
+
+exp:
+    LPAREN exp RPAREN (exp)
+  | ZERO (A.Zero) 
+  | SUCC exp (A.Succ exp) 

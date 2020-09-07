@@ -1,0 +1,2 @@
+Skeleton 5
+d4f3ä¢Ast"d"Int"d"TextIO"ad"A"gp1ÿaã¢PARSE"h0ad"Parse"jh3aä¢ThonLrVals"jh1aä¢Token"gp2ä¢LrParser"ÿgp1e"ThonLrValsFn"aä¢ThonLex"jh1aä¢Tokens"gp2ÿ;ÿ‚gp1e"ThonLexFn"ad"ThonParse"jh3aä¢ParserData"gp2ÿ;ÿ‚7ad"Lex"gp1ÿ8aÿgp1ÿgp1e"Join"gp1ÿ$
