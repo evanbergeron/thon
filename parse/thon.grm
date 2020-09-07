@@ -34,6 +34,8 @@ structure A = Ast
 
 typ:
     NAT (A.Nat)
+  | typ SARROW typ (A.Arr(typ1, typ2))
+  | LPAREN typ RPAREN (typ)
 
 exp:
     LPAREN exp RPAREN (exp)

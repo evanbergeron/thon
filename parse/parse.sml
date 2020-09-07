@@ -28,7 +28,7 @@ struct
       fun parseerror (s, p1, p2) = TextIO.output(TextIO.stdOut, "Parsing error\n")
       val lexer0 = LrParser.Stream.streamify
                        (ThonLex.makeLexer (fn _ => TextIO.input instream))
-      val (absyn, _) = ThonParse.parse(0, lexer0, parseerror, ())
+      val (absyn, _) = ThonParse.parse(100, lexer0, parseerror, ())
       in absyn end
 
 end

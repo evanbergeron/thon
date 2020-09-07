@@ -27,3 +27,5 @@ ws = [\ \t];
 "nat"     => (Tokens.NAT(!pos,!pos));
 ":"      => (Tokens.COLON(!pos,!pos));
 {alpha}  => (Tokens.ID(yytext,!pos,!pos));
+"("      => (Tokens.LPAREN(!pos,!pos));
+")"      => (Tokens.RPAREN(!pos,!pos));
