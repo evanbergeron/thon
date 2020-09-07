@@ -18,7 +18,7 @@ struct
       let fun print_error (s,i:int,_) =
               TextIO.output(TextIO.stdOut,
                             "Error, line " ^ (Int.toString i) ^ ", " ^ s ^ "\n")
-       in ThonParse.parse(0,lexstream,print_error,())
+       in ThonParse.parse(15,lexstream,print_error,())
       end
 
   fun parse filename = let

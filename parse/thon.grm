@@ -10,9 +10,15 @@ structure A = Ast
  | ZERO
  | SUCC
  | LPAREN | RPAREN
-                                     
+ | LAM
+ | SARROW
+ | ID of string
+ | COLON
+ | NAT
+
 %nonterm
    exp of A.Exp
+ | typ of A.Typ
 
 %verbose
 %pos int
@@ -26,7 +32,11 @@ structure A = Ast
 
 %%
 
+typ:
+    NAT (A.Nat)
+
 exp:
     LPAREN exp RPAREN (exp)
-  | ZERO (A.Zero) 
-  | SUCC exp (A.Succ exp) 
+  | ZERO (A.Zero)
+  | SUCC exp (A.Succ exp)
+  | LAM ID COLON typ SARROW exp (A.Lam (typ, exp))
