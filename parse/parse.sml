@@ -25,7 +25,8 @@ struct
       val instream = TextIO.openIn filename
       val lexer = ThonParse.makeLexer (fn _ => (case TextIO.inputLine TextIO.stdIn
                                                   of SOME s => s | _ => ""))
-      fun parseerror (s, p1, p2) = TextIO.output(TextIO.stdOut, "Parsing error\n")
+      fun parseerror (s, i, p2) = TextIO.output(TextIO.stdOut,
+                            "Error, line " ^ (Int.toString i) ^ ", " ^ s ^ "\n")
       val lexer0 = LrParser.Stream.streamify
                        (ThonLex.makeLexer (fn _ => TextIO.input instream))
       val (absyn, _) = ThonParse.parse(100, lexer0, parseerror, ())

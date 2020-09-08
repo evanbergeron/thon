@@ -12,35 +12,48 @@ structure A = Ast
  | LPAREN | RPAREN
  | LAM
  | SARROW
- | ID of string
  | COLON
  | NAT
+ | APP
+ | IDX of int
+ | GO
 
 %nonterm
    exp of A.Exp
  | typ of A.Typ
+ | program of A.Exp
 
 %verbose
 %pos int
-%start exp
+%start exp (* i think likely this should be program, but I really dont like that hack *)
 %eop EOF
 
 %name Thon
 
-%right SUCC
-%left ZERO LPAREN
+(* Each rule is then assigned the precedence of its rightmost terminal *)
+(* If the rule has the higher precedence, the reduction is chosen. *)
+
+(* The precedence grows down *)
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX
+%right SARROW
+%nonassoc APP GO (* Deliberately last *)
 
 %%
 
-typ:
-    NAT (A.Nat)
-  | typ SARROW typ (A.Arr(typ1, typ2))
-  | LPAREN typ RPAREN (typ)
+(* program: *)
+(*     GO exp (exp) *)
 
 exp:
     LPAREN exp RPAREN (exp)
+  | exp exp %prec APP (A.App(exp1, exp2))
+  | IDX (A.Var IDX)
   | ZERO (A.Zero)
   | SUCC exp (A.Succ exp)
   (* eventually would rather this be LAM ID COLON typ SARROW exp but
    * not until we manage to turn names into binding site indexes *)
   | LAM typ SARROW exp (A.Lam (typ, exp))
+
+typ:
+    NAT (A.Nat)
+  | typ SARROW typ (A.Arr(typ1, typ2))
+  | LPAREN typ RPAREN (typ)
