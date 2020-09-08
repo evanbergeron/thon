@@ -2,6 +2,7 @@
 structure Thon : sig
                    val parse : string -> Ast.Exp
                    val test : unit -> unit
+                   val eval : A.Exp -> A.Exp
                  end =
 struct
 
@@ -10,41 +11,7 @@ exception No
 exception ClientTypeCannotEscapeClientScope
 exception Unimplemented
 
-datatype Typ = Nat
-             | TypVar of int
-             | Arr of Typ * Typ
-             | All of Typ (* binds *)
-             | Some of Typ (* binds *)
-             | Prod of Typ * Typ
-             | Plus of Typ * Typ (* sum type *)
-             | TyRec of Typ (* binds *)
-             | Unit (* nullary sum *)
-
 datatype Idx = int
-
-datatype Exp = Zero
-             | Var of int (* idx into ctx *)
-             | Succ of Exp
-             | Lam of Typ (*argType*) * Exp (*funcBody*)
-             | App of Exp * Exp
-             | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
-             | TypAbs of Exp (* binds type variable *)
-             | TypApp of Typ * Exp
-             | Pack of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
-             | Open of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
-             | Tuple of Exp * Exp
-             (* Elimination forms for terms of Prod type *)
-             | ProdLeft of Exp
-             | ProdRight of Exp
-             (* Elimination forms for terms of Plus type *)
-             | PlusLeft of Typ * Exp
-             | PlusRight of Typ * Exp
-             | Case of Exp (* thing being cased on*) *
-                       Exp (* Left binds term var *) *
-                       Exp (* Right binds term var *)
-             | Fold of Typ (*binds*) * Exp
-             | Unfold of Exp
-             | TmUnit
 
 
 (* Holds typing assertions we already know. Head of the list
@@ -68,148 +35,148 @@ fun len ctx = len' 0 ctx
 
 fun istype typeCtx t =
     case t of
-        Nat => true
-      | Unit => true
-      | TypVar i => i < (len typeCtx)
-      | Arr(d, c) => (istype typeCtx d) andalso (istype typeCtx c)
-      | Prod(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
-      | Plus(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
-      | All t' => istype (Cons(42, typeCtx)) t'
-      | Some t' => istype (Cons(42, typeCtx)) t'
-      | TyRec t' => istype (Cons(42, typeCtx)) t'
+        A.Nat => true
+      | A.Unit => true
+      | A.TypVar i => i < (len typeCtx)
+      | A.Arr(d, c) => (istype typeCtx d) andalso (istype typeCtx c)
+      | A.Prod(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
+      | A.Plus(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
+      | A.All t' => istype (Cons(42, typeCtx)) t'
+      | A.Some t' => istype (Cons(42, typeCtx)) t'
+      | A.TyRec t' => istype (Cons(42, typeCtx)) t'
 
 
 fun typsubst' src dst bindingDepth =
     case dst
-     of Nat => Nat
-      | Unit => Unit
-      | TypVar n  => if n = bindingDepth then src else
-                     if n > bindingDepth then TypVar (n-1) else
+     of A.Nat => A.Nat
+      | A.Unit => A.Unit
+      | A.TypVar n  => if n = bindingDepth then src else
+                     if n > bindingDepth then A.TypVar (n-1) else
                      dst
-      | Arr(t, t') => Arr((typsubst' src t bindingDepth),
+      | A.Arr(t, t') => A.Arr((typsubst' src t bindingDepth),
                           (typsubst' src t' bindingDepth))
-      | Prod(l, r) => Prod((typsubst' src l bindingDepth),
+      | A.Prod(l, r) => A.Prod((typsubst' src l bindingDepth),
                            (typsubst' src r bindingDepth))
-      | Plus(l, r) => Plus((typsubst' src l bindingDepth),
+      | A.Plus(l, r) => A.Plus((typsubst' src l bindingDepth),
                            (typsubst' src r bindingDepth))
-      | All t => All(typsubst' src t (bindingDepth + 1))
-      | Some t => Some(typsubst' src t (bindingDepth + 1))
-      | TyRec t => TyRec(typsubst' src t (bindingDepth + 1))
+      | A.All t => A.All(typsubst' src t (bindingDepth + 1))
+      | A.Some t => A.Some(typsubst' src t (bindingDepth + 1))
+      | A.TyRec t => A.TyRec(typsubst' src t (bindingDepth + 1))
 
 
 fun typsubst src dst = typsubst' src dst 0
 
 
-(* Turns search to Var bindingDepth
+(* Turns search to A.Var bindingDepth
  *
  * DEVNOTE: assumes the caller will place the result underneath a type
  * variable binding site.
  *
  * Remarkably similar to typSubst - might be able to dedup. This needs
- * to track bindingDepth though and subst in TypVar of the appropriate
+ * to track bindingDepth though and subst in A.TypVar of the appropriate
  * depth.
  *)
 fun typAbstractOut' search t bindingDepth =
-    if t = search then (TypVar bindingDepth) else
+    if t = search then (A.TypVar bindingDepth) else
     case t
-     of Nat => Nat
-      | Unit => Unit
-      | TypVar n  => TypVar n
-      | Arr(d, c) => Arr((typAbstractOut' search d bindingDepth),
+     of A.Nat => A.Nat
+      | A.Unit => A.Unit
+      | A.TypVar n  => A.TypVar n
+      | A.Arr(d, c) => A.Arr((typAbstractOut' search d bindingDepth),
                           (typAbstractOut' search c bindingDepth))
-      | Prod(l, r) => Prod((typAbstractOut' search l bindingDepth),
+      | A.Prod(l, r) => A.Prod((typAbstractOut' search l bindingDepth),
                            (typAbstractOut' search r bindingDepth))
-      | Plus(l, r) => Plus((typAbstractOut' search l bindingDepth),
+      | A.Plus(l, r) => A.Plus((typAbstractOut' search l bindingDepth),
                            (typAbstractOut' search r bindingDepth))
-      | All t' => All(typAbstractOut' search t' (bindingDepth+1))
-      | Some t' => Some(typAbstractOut' search t' (bindingDepth+1))
-      | TyRec t' => TyRec(typAbstractOut' search t' (bindingDepth+1))
+      | A.All t' => A.All(typAbstractOut' search t' (bindingDepth+1))
+      | A.Some t' => A.Some(typAbstractOut' search t' (bindingDepth+1))
+      | A.TyRec t' => A.TyRec(typAbstractOut' search t' (bindingDepth+1))
 
 
 fun typAbstractOut search t = typAbstractOut' search t 0
 
 
 (* TODO Figure something better out... *)
-fun typdecrVarIdxs t =
+fun typtypDecrVarIdxs t =
     case t of
-        Nat => Nat
-      | Unit => Unit
-      | TypVar i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
-                    else TypVar (i -1)
-      | Arr(d, c) => Arr(typdecrVarIdxs d, typdecrVarIdxs c)
-      | Prod(l, r) => Prod(typdecrVarIdxs l, typdecrVarIdxs r)
-      | Plus(l, r) => Plus(typdecrVarIdxs l, typdecrVarIdxs r)
-      | All t' => All(typdecrVarIdxs t')
-      | Some t' => Some(typdecrVarIdxs t')
-      | TyRec t' => TyRec(typdecrVarIdxs t')
+        A.Nat => A.Nat
+      | A.Unit => A.Unit
+      | A.TypVar i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
+                    else A.TypVar (i -1)
+      | A.Arr(d, c) => A.Arr(typtypDecrVarIdxs d, typtypDecrVarIdxs c)
+      | A.Prod(l, r) => A.Prod(typtypDecrVarIdxs l, typtypDecrVarIdxs r)
+      | A.Plus(l, r) => A.Plus(typtypDecrVarIdxs l, typtypDecrVarIdxs r)
+      | A.All t' => A.All(typtypDecrVarIdxs t')
+      | A.Some t' => A.Some(typtypDecrVarIdxs t')
+      | A.TyRec t' => A.TyRec(typtypDecrVarIdxs t')
 
 
-fun decrVarIdxs e =
+fun typDecrVarIdxs e =
     case e
-     of  Zero => Zero
-       | TmUnit => TmUnit
-       | Var i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
-                  else Var (i - 1)
-       | Succ e2 => (Succ (decrVarIdxs e2))
-       | ProdLeft e => (ProdLeft (decrVarIdxs e))
-       | ProdRight e => (ProdRight (decrVarIdxs e))
-       | PlusLeft(t, e) => (PlusLeft (t, decrVarIdxs e))
-       | PlusRight(t, e) => (PlusRight (t, decrVarIdxs e))
-       | Case(c, l, r) => (Case(decrVarIdxs c, decrVarIdxs l, decrVarIdxs r))
-       | Lam (argType, funcBody) => Lam(typdecrVarIdxs argType, decrVarIdxs funcBody)
-       | App (f, n) => App(decrVarIdxs f, decrVarIdxs n)
-       | Tuple (l, r) => Tuple(decrVarIdxs l, decrVarIdxs r)
-       | Rec (i, baseCase, recCase) =>
-            Rec(decrVarIdxs i, decrVarIdxs baseCase, decrVarIdxs recCase)
-       | TypAbs e => TypAbs (decrVarIdxs e)
-       | TypApp (appType, e) => TypApp(typdecrVarIdxs appType, decrVarIdxs e)
-       | Pack (reprType, pkgImpl, pkgType) => Pack(typdecrVarIdxs reprType, decrVarIdxs pkgImpl, typdecrVarIdxs pkgType)
-       | Open (pkg, client) => Open(decrVarIdxs pkg, decrVarIdxs client)
-       | Fold(t, e') => Fold(typdecrVarIdxs t, decrVarIdxs e')
-       | Unfold(e') => Unfold(decrVarIdxs e')
+     of  A.Zero => A.Zero
+       | A.TmUnit => A.TmUnit
+       | A.Var i => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
+                  else A.Var (i - 1)
+       | A.Succ e2 => (A.Succ (typDecrVarIdxs e2))
+       | A.ProdLeft e => (A.ProdLeft (typDecrVarIdxs e))
+       | A.ProdRight e => (A.ProdRight (typDecrVarIdxs e))
+       | A.PlusLeft(t, e) => (A.PlusLeft (t, typDecrVarIdxs e))
+       | A.PlusRight(t, e) => (A.PlusRight (t, typDecrVarIdxs e))
+       | A.Case(c, l, r) => (A.Case(typDecrVarIdxs c, typDecrVarIdxs l, typDecrVarIdxs r))
+       | A.Lam (argType, funcBody) => A.Lam(typtypDecrVarIdxs argType, typDecrVarIdxs funcBody)
+       | A.App (f, n) => A.App(typDecrVarIdxs f, typDecrVarIdxs n)
+       | A.Tuple (l, r) => A.Tuple(typDecrVarIdxs l, typDecrVarIdxs r)
+       | A.Rec (i, baseCase, recCase) =>
+            A.Rec(typDecrVarIdxs i, typDecrVarIdxs baseCase, typDecrVarIdxs recCase)
+       | A.TypAbs e => A.TypAbs (typDecrVarIdxs e)
+       | A.TypApp (appType, e) => A.TypApp(typtypDecrVarIdxs appType, typDecrVarIdxs e)
+       | A.Pack (reprType, pkgImpl, pkgType) => A.Pack(typtypDecrVarIdxs reprType, typDecrVarIdxs pkgImpl, typtypDecrVarIdxs pkgType)
+       | A.Open (pkg, client) => A.Open(typDecrVarIdxs pkg, typDecrVarIdxs client)
+       | A.Fold(t, e') => A.Fold(typtypDecrVarIdxs t, typDecrVarIdxs e')
+       | A.Unfold(e') => A.Unfold(typDecrVarIdxs e')
 
 
-(* Just substitute the srcType in everywhere you see a TypVar bindingDepth *)
+(* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
 fun typSubstInExp' srcType dstExp bindingDepth =
     case dstExp
-     of  Zero => Zero
-       | Var i => Var i
-       | TmUnit => TmUnit
-       | Succ e2 => Succ (typSubstInExp' srcType e2 bindingDepth)
-       | ProdLeft e => ProdLeft (typSubstInExp' srcType e bindingDepth)
-       | ProdRight e => ProdRight (typSubstInExp' srcType e bindingDepth)
-       | PlusLeft (t, e) => PlusLeft (t, typSubstInExp' srcType e bindingDepth)
-       | PlusRight (t, e) => PlusRight (t, typSubstInExp' srcType e bindingDepth)
-       | Case(c, l, r) => Case(typSubstInExp' srcType c bindingDepth,
+     of  A.Zero => A.Zero
+       | A.Var i => A.Var i
+       | A.TmUnit => A.TmUnit
+       | A.Succ e2 => A.Succ (typSubstInExp' srcType e2 bindingDepth)
+       | A.ProdLeft e => A.ProdLeft (typSubstInExp' srcType e bindingDepth)
+       | A.ProdRight e => A.ProdRight (typSubstInExp' srcType e bindingDepth)
+       | A.PlusLeft (t, e) => A.PlusLeft (t, typSubstInExp' srcType e bindingDepth)
+       | A.PlusRight (t, e) => A.PlusRight (t, typSubstInExp' srcType e bindingDepth)
+       | A.Case(c, l, r) => A.Case(typSubstInExp' srcType c bindingDepth,
                                typSubstInExp' srcType l bindingDepth,
                                typSubstInExp' srcType r bindingDepth)
-       | Lam (argType, funcBody) =>
-            Lam((typsubst' srcType argType bindingDepth),
+       | A.Lam (argType, funcBody) =>
+            A.Lam((typsubst' srcType argType bindingDepth),
                 typSubstInExp' srcType funcBody bindingDepth)
-       | App (f, n) =>
-            App (typSubstInExp' srcType f bindingDepth,
+       | A.App (f, n) =>
+            A.App (typSubstInExp' srcType f bindingDepth,
                  typSubstInExp' srcType n bindingDepth)
-       | Tuple (l, r) =>
-            Tuple (typSubstInExp' srcType l bindingDepth,
+       | A.Tuple (l, r) =>
+            A.Tuple (typSubstInExp' srcType l bindingDepth,
                    typSubstInExp' srcType r bindingDepth)
-       | Rec (i, baseCase, recCase) =>
-            Rec(typSubstInExp' srcType i bindingDepth,
+       | A.Rec (i, baseCase, recCase) =>
+            A.Rec(typSubstInExp' srcType i bindingDepth,
                 typSubstInExp' srcType baseCase bindingDepth,
                 typSubstInExp' srcType recCase bindingDepth)
-       | TypAbs e => TypAbs(typSubstInExp' srcType e (bindingDepth+1)) (* binds type var *)
-       | TypApp (appType, e) =>
-            TypApp(typsubst' srcType appType bindingDepth,
+       | A.TypAbs e => A.TypAbs(typSubstInExp' srcType e (bindingDepth+1)) (* binds type var *)
+       | A.TypApp (appType, e) =>
+            A.TypApp(typsubst' srcType appType bindingDepth,
                    typSubstInExp' srcType e bindingDepth)
-       | Pack(reprType, pkgImpl, pkgType) =>
-            Pack(typsubst' srcType reprType bindingDepth,
+       | A.Pack(reprType, pkgImpl, pkgType) =>
+            A.Pack(typsubst' srcType reprType bindingDepth,
                  typSubstInExp' srcType pkgImpl bindingDepth,
                  typsubst' srcType pkgType bindingDepth)
-       | Open (pkg, client) =>
-            Open(typSubstInExp' srcType pkg bindingDepth,
+       | A.Open (pkg, client) =>
+            A.Open(typSubstInExp' srcType pkg bindingDepth,
                  typSubstInExp' srcType client (bindingDepth+1))
-       | Fold(t, e') => Fold(typsubst' srcType t bindingDepth,
+       | A.Fold(t, e') => A.Fold(typsubst' srcType t bindingDepth,
                              typSubstInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
-       | Unfold(e') => Unfold(typSubstInExp' srcType e' bindingDepth)
+       | A.Unfold(e') => A.Unfold(typSubstInExp' srcType e' bindingDepth)
 
 
 fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
@@ -217,25 +184,25 @@ fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
 
 fun typeof ctx typCtx e =
     case e
-     of  Zero => Nat
-       | TmUnit => Unit
-       | Var i => get ctx i
-       | Succ e2 => (typeof ctx typCtx e2)
-       | ProdLeft e => let val Prod(l, r) = (typeof ctx typCtx e) in l end
-       | ProdRight e => let val Prod(l, r) = (typeof ctx typCtx e) in r end
-       | PlusLeft (t, e) => let val Plus(l, r) = t in
+     of  A.Zero => A.Nat
+       | A.TmUnit => A.Unit
+       | A.Var i => get ctx i
+       | A.Succ e2 => (typeof ctx typCtx e2)
+       | A.ProdLeft e => let val A.Prod(l, r) = (typeof ctx typCtx e) in l end
+       | A.ProdRight e => let val A.Prod(l, r) = (typeof ctx typCtx e) in r end
+       | A.PlusLeft (t, e) => let val A.Plus(l, r) = t in
                                 if l <> typeof ctx typCtx e then
                                     raise IllTyped
                                 else
-                                    Plus(l, r)
+                                    A.Plus(l, r)
                             end
-       | PlusRight (t, e) => let val Plus(l, r) = t in
+       | A.PlusRight (t, e) => let val A.Plus(l, r) = t in
                                 if r <> typeof ctx typCtx e then
                                     raise IllTyped
                                 else
-                                    Plus(l, r)
+                                    A.Plus(l, r)
                             end
-       | Case (c, l, r) => let val Plus(lt, rt) = typeof ctx typCtx c
+       | A.Case (c, l, r) => let val A.Plus(lt, rt) = typeof ctx typCtx c
                                (* both bind a term var *)
                                val typeOfLeftBranch = typeof (Cons(lt, ctx)) typCtx l
                                val typeOfRightBranch= typeof (Cons(rt, ctx)) typCtx r
@@ -245,108 +212,108 @@ fun typeof ctx typCtx e =
                                else
                                    typeOfLeftBranch
                                end
-       | Lam (argType, funcBody) =>
+       | A.Lam (argType, funcBody) =>
             if not (istype typCtx argType) then raise IllTyped else
-            Arr (argType, typeof (Cons(argType, ctx)) typCtx funcBody)
-       | App (f, n) =>
-            let val Arr (d, c) = typeof ctx typCtx f
+            A.Arr (argType, typeof (Cons(argType, ctx)) typCtx funcBody)
+       | A.App (f, n) =>
+            let val A.Arr (d, c) = typeof ctx typCtx f
                 val argType = typeof ctx typCtx n
             in
                 if d <> argType then raise IllTyped
                 else c
             end
-       | Tuple (l, r) => Prod(typeof ctx typCtx l, typeof ctx typCtx r)
-       | Rec (i, baseCase, recCase) =>
-            let val Nat = typeof ctx typCtx i
+       | A.Tuple (l, r) => A.Prod(typeof ctx typCtx l, typeof ctx typCtx r)
+       | A.Rec (i, baseCase, recCase) =>
+            let val A.Nat = typeof ctx typCtx i
                 val t = typeof ctx typCtx baseCase
                 val t2 = typeof (Cons(t, ctx)) typCtx recCase
             in
                 if t <> t2 then raise IllTyped else t
             end
-       | TypAbs e => All(typeof ctx (Cons(42, typCtx)) e)
-       | TypApp (appType, e) =>
+       | A.TypAbs e => A.All(typeof ctx (Cons(42, typCtx)) e)
+       | A.TypApp (appType, e) =>
             if not (istype typCtx appType) then raise IllTyped else
-            let val All(t) = typeof ctx typCtx e
+            let val A.All(t) = typeof ctx typCtx e
             in
                 typsubst appType t
             end
-       | Pack (reprType, pkgImpl, pkgType) =>
+       | A.Pack (reprType, pkgImpl, pkgType) =>
             if not (istype Nil reprType) then raise IllTyped else
-            (* pkgType : [reprType/TypVar 0](t') *)
+            (* pkgType : [reprType/A.TypVar 0](t') *)
             let val deducedPkgType = typeof ctx (Cons(42, typCtx)) pkgImpl
             in
                 if (typAbstractOut reprType deducedPkgType) <>
                    (typAbstractOut reprType pkgType) then
                     raise IllTyped
                 else
-                    Some(pkgType)
+                    A.Some(pkgType)
             end
-       | Open (pkg, client) =>
-            let val Some(r) = typeof ctx typCtx pkg
-                (* binds BOTH a TypVar and a Exp Var *)
+       | A.Open (pkg, client) =>
+            let val A.Some(r) = typeof ctx typCtx pkg
+                (* binds BOTH a A.TypVar and a Exp A.Var *)
                 val clientType = typeof (Cons(r, ctx)) (Cons(42, typCtx)) client
                 (* shift indices of free vars and typevars in clientType down by one *)
-                val resType = typdecrVarIdxs clientType
+                val resType = typtypDecrVarIdxs clientType
             in
                 if not (istype typCtx resType) then raise IllTyped else
                 resType
             end
-       | Fold(TyRec(t) (*declared type*), e'(* binds a typ var *)) =>
+       | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) =>
             let val deduced = typeof ctx (Cons(42, typCtx)) e'
-                val absDeduced = TyRec(typAbstractOut (TyRec(t)) (deduced))
-                val absT = typAbstractOut (TyRec(t)) (TyRec(t))
+                val absDeduced = A.TyRec(typAbstractOut (A.TyRec(t)) (deduced))
+                val absT = typAbstractOut (A.TyRec(t)) (A.TyRec(t))
             in
-                if absDeduced <> TyRec(t) then raise IllTyped
-                else TyRec(t)
+                if absDeduced <> A.TyRec(t) then raise IllTyped
+                else A.TyRec(t)
             end
-       | Unfold(e') =>
-            let val TyRec(t) = typeof ctx typCtx e' in
-                typsubst (TyRec(t)) t
+       | A.Unfold(e') =>
+            let val A.TyRec(t) = typeof ctx typCtx e' in
+                typsubst (A.TyRec(t)) t
             end
 
 fun isval e =
     case e of
-        Zero => true
-      | TmUnit => true
-      | Succ(n) => isval n
-      | Lam(_, _) => true
-      | Tuple(l, r) => (isval l) andalso (isval r)
-      | TypAbs _  => true
-      | Pack(_, pkgImpl, _) => isval pkgImpl
-      | PlusLeft(_, e') => isval e'
-      | PlusRight(_, e') => isval e'
-      | Fold(t, e') => isval e'
+        A.Zero => true
+      | A.TmUnit => true
+      | A.Succ(n) => isval n
+      | A.Lam(_, _) => true
+      | A.Tuple(l, r) => (isval l) andalso (isval r)
+      | A.TypAbs _  => true
+      | A.Pack(_, pkgImpl, _) => isval pkgImpl
+      | A.PlusLeft(_, e') => isval e'
+      | A.PlusRight(_, e') => isval e'
+      | A.Fold(t, e') => isval e'
       | _ => false
 
 
 fun subst' src dst bindingDepth =
     case dst
-     of  Zero => Zero
-       | TmUnit => TmUnit
-       | Var n  => if n = bindingDepth then src else
-                   if n > bindingDepth then Var(n-1) else
-                   Var(n)
-       | Succ e2 => Succ (subst' src e2 bindingDepth)
-       | ProdLeft e => ProdLeft (subst' src e bindingDepth)
-       | ProdRight e => ProdRight (subst' src e bindingDepth)
-       | PlusLeft (t, e) => PlusLeft (t, subst' src e bindingDepth)
-       | PlusRight (t, e) => PlusRight (t, subst' src e bindingDepth)
-       | Case(c, l, r) => Case(subst' src c bindingDepth,
+     of  A.Zero => A.Zero
+       | A.TmUnit => A.TmUnit
+       | A.Var n  => if n = bindingDepth then src else
+                   if n > bindingDepth then A.Var(n-1) else
+                   A.Var(n)
+       | A.Succ e2 => A.Succ (subst' src e2 bindingDepth)
+       | A.ProdLeft e => A.ProdLeft (subst' src e bindingDepth)
+       | A.ProdRight e => A.ProdRight (subst' src e bindingDepth)
+       | A.PlusLeft (t, e) => A.PlusLeft (t, subst' src e bindingDepth)
+       | A.PlusRight (t, e) => A.PlusRight (t, subst' src e bindingDepth)
+       | A.Case(c, l, r) => A.Case(subst' src c bindingDepth,
                                subst' src l (bindingDepth+1),
                                subst' src r (bindingDepth+1))
-       | Lam (t, f) => Lam(t, (subst' src f (bindingDepth+1)))
-       | App (f, n) => App((subst' src f bindingDepth), (subst' src n bindingDepth))
-       | Rec (i, baseCase, recCase) =>
-            Rec(subst' src i bindingDepth,
+       | A.Lam (t, f) => A.Lam(t, (subst' src f (bindingDepth+1)))
+       | A.App (f, n) => A.App((subst' src f bindingDepth), (subst' src n bindingDepth))
+       | A.Rec (i, baseCase, recCase) =>
+            A.Rec(subst' src i bindingDepth,
                 subst' src baseCase bindingDepth,
                 subst' src recCase (bindingDepth+1))
-       | TypAbs e => TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
-       | TypApp (appType, e) => TypApp(appType, subst' src e bindingDepth)
-       | Pack(reprType, pkgImpl, t) => Pack(reprType, subst' src pkgImpl bindingDepth, t)
-       | Open (pkg, client) => Open(subst' src pkg bindingDepth, subst' src client (bindingDepth+1))
-       | Tuple (l, r) => Tuple (subst' src l bindingDepth, subst' src r bindingDepth)
-       | Fold(t, e') => Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
-       | Unfold(e') => Unfold(subst' src e' (bindingDepth))
+       | A.TypAbs e => A.TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
+       | A.TypApp (appType, e) => A.TypApp(appType, subst' src e bindingDepth)
+       | A.Pack(reprType, pkgImpl, t) => A.Pack(reprType, subst' src pkgImpl bindingDepth, t)
+       | A.Open (pkg, client) => A.Open(subst' src pkg bindingDepth, subst' src client (bindingDepth+1))
+       | A.Tuple (l, r) => A.Tuple (subst' src l bindingDepth, subst' src r bindingDepth)
+       | A.Fold(t, e') => A.Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
+       | A.Unfold(e') => A.Unfold(subst' src e' (bindingDepth))
 
 
 fun subst src dst = subst' src dst 0
@@ -356,68 +323,68 @@ fun step e =
     let val _ = typeof Nil Nil e in
     if isval e then e else
     case e of
-        Succ(n) => if not (isval n) then Succ(step n) else e
-      | ProdLeft n  => if not (isval n) then ProdLeft(step n) else
-                   let val Tuple(l, r) = n in l end
-      | ProdRight n  => if not (isval n) then ProdRight(step n) else
-                    let val Tuple(l, r) = n in r end
-      | Tuple(l, r) => if not (isval l) then Tuple(step l, r) else
-                       if not (isval r) then Tuple(l, step r) else
+        A.Succ(n) => if not (isval n) then A.Succ(step n) else e
+      | A.ProdLeft n  => if not (isval n) then A.ProdLeft(step n) else
+                   let val A.Tuple(l, r) = n in l end
+      | A.ProdRight n  => if not (isval n) then A.ProdRight(step n) else
+                    let val A.Tuple(l, r) = n in r end
+      | A.Tuple(l, r) => if not (isval l) then A.Tuple(step l, r) else
+                       if not (isval r) then A.Tuple(l, step r) else
                        e
-      | App(f, n) => if not (isval f) then App(step f, n)
-                     else (if not (isval n) then App(f, step n)
-                           else let val Lam(t, f') = f
+      | A.App(f, n) => if not (isval f) then A.App(step f, n)
+                     else (if not (isval n) then A.App(f, step n)
+                           else let val A.Lam(t, f') = f
                            in
                                (* plug `n` into `f'` *)
                                subst n f'
                            end
                           )
-      | Var x => Var x
-      | Rec (Zero, baseCase, recCase) => baseCase
-      | Rec (Succ(i), baseCase, recCase) =>
+      | A.Var x => A.Var x
+      | A.Rec (A.Zero, baseCase, recCase) => baseCase
+      | A.Rec (A.Succ(i), baseCase, recCase) =>
             (* Doesn't evaluate recursive call if not required. *)
-            subst (Rec(i, baseCase, recCase)) recCase
-      | Rec (i, baseCase, recCase) =>
+            subst (A.Rec(i, baseCase, recCase)) recCase
+      | A.Rec (i, baseCase, recCase) =>
             if not (isval i) then
-                Rec(step i, baseCase, recCase)
+                A.Rec(step i, baseCase, recCase)
             else raise No
-      | TypAbs e' => raise No (* Already isval *)
-      | TypApp (t, e') =>
-            if not (isval e') then (TypApp (t, step e'))
+      | A.TypAbs e' => raise No (* Already isval *)
+      | A.TypApp (t, e') =>
+            if not (isval e') then (A.TypApp (t, step e'))
             else
-                let val TypAbs(e'') = e' in
+                let val A.TypAbs(e'') = e' in
                     typSubstInExp t e''
                 end
-      | Pack(reprType, pkgImpl, pkgType) =>
-            if not (isval pkgImpl) then Pack(reprType, step pkgImpl, pkgType) else
+      | A.Pack(reprType, pkgImpl, pkgType) =>
+            if not (isval pkgImpl) then A.Pack(reprType, step pkgImpl, pkgType) else
             if not (isval e) then raise No else
             e
-      | Open (pkg, client) =>
-            if not (isval pkg) then Open (step pkg, client) else
+      | A.Open (pkg, client) =>
+            if not (isval pkg) then A.Open (step pkg, client) else
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
-                Pack(reprType', pkgImpl', _) =>
+                A.Pack(reprType', pkgImpl', _) =>
                     subst pkgImpl' (typSubstInExp reprType' client)
               | _ => raise No
            )
-      | PlusLeft (t, e') =>
-            if not (isval e) then PlusLeft(t, step e')
+      | A.PlusLeft (t, e') =>
+            if not (isval e) then A.PlusLeft(t, step e')
             else e
-      | PlusRight (t, e') =>
-            if not (isval e) then PlusRight(t, step e')
+      | A.PlusRight (t, e') =>
+            if not (isval e) then A.PlusRight(t, step e')
             else e
-      | Case (c, l, r) =>
-        if not (isval c) then Case(step c, l, r)
+      | A.Case (c, l, r) =>
+        if not (isval c) then A.Case(step c, l, r)
         else (
             case c of
-                 PlusLeft(_, e) => subst e l
-               | PlusRight(_, e) => subst e r
+                 A.PlusLeft(_, e) => subst e l
+               | A.PlusRight(_, e) => subst e r
                | _ => raise IllTyped
         )
-      | Fold (t, e') => if not (isval e') then Fold(t, step e')
+      | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')
                         else (let val true = isval e in e end)
-      | Unfold e' => if not (isval e') then Unfold (step e')
-                     else (let val Fold(t, e'') = e' in e'' end)
+      | A.Unfold e' => if not (isval e') then A.Unfold (step e')
+                     else (let val A.Fold(t, e'') = e' in e'' end)
       | _ => if (isval e) then e else raise No
     end
 
@@ -435,9 +402,9 @@ fun parse filename =
 
 fun test() =
     let
-(* Data Natlist = None | Some(Nat, Natlist) *)
+(* Data A.Natlist = None | A.Some(A.Nat, A.Natlist) *)
 val natlist : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, A.TypVar 0)));
-(* Unfolded Natlist type *)
+(* A.Unfolded A.Natlist type *)
 val nlbody : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, natlist)));
 
 (* (* empty : natlist *) *)
@@ -454,297 +421,297 @@ val singletonList =
 (* val A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))) = .Atypeof Nil Nil singletonList; *)
 
 (* val natlistCons = *)
-(*     Lam(Prod(Nat, natlist), *)
-(*         Fold(natlist, *)
-(*              PlusRight( *)
-(*                  Plus(Unit, Prod(Nat, natlist)), *)
-(*                  Var 0 *)
+(*     A.Lam(A.Prod(A.Nat, natlist), *)
+(*         A.Fold(natlist, *)
+(*              A.PlusRight( *)
+(*                  A.Plus(A.Unit, A.Prod(A.Nat, natlist)), *)
+(*                  A.Var 0 *)
 (*              ) *)
 (*             ) *)
 (*        ); *)
 
-(* val Arr (Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0)))), *)
-(*          TyRec (Plus (Unit,Prod (Nat,TypVar 0)))) : Typ = *)
+(* val A.Arr (A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))), *)
+(*          A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))) : Typ = *)
 (*     typeof Nil Nil natlistCons; *)
 
-(* val deducedSingleListAppResType = typeof Nil Nil (App(natlistCons, Tuple(Zero, nilNatList))); *)
-(* val true = (deducedSingleListAppResType = natlist); *)
+(* val deducedSingleListA.AppResType = typeof Nil Nil (A.App(natlistCons, A.Tuple(A.Zero, nilA.NatList))); *)
+(* val true = (deducedSingleListA.AppResType = natlist); *)
 
-(* val deducedNatlist = typeof Nil Nil nilNatList; *)
-(* val true = (natlist = deducedNatlist); *)
+(* val deducedA.Natlist = typeof Nil Nil nilA.NatList; *)
+(* val true = (natlist = deducedA.Natlist); *)
 
-(* val Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))) : Typ = *)
-(*     typeof Nil Nil (Unfold(nilNatList)); *)
+(* val A.Plus (A.Unit,A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))))) : Typ = *)
+(*     typeof Nil Nil (A.Unfold(nilA.NatList)); *)
 
-(* val PlusLeft *)
-(*     (Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))),TmUnit) : Exp = eval (Unfold(nilNatList)); *)
+(* val A.PlusLeft *)
+(*     (A.Plus (A.Unit,A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))))),A.TmUnit) : Exp = eval (A.Unfold(nilA.NatList)); *)
 
-(* (* isnil : nlbody..... ? -> Nat (*True or False*) *) *)
-(* val isnil = Lam(natlist, Case(Unfold(Var 0), Succ Zero, Zero)); *)
-(* val Nat = typeof Nil Nil (App(isnil, nilNatList)); *)
-(* (* isnil nilNatList == 1. *) *)
-(* val Succ Zero = eval (App(isnil, nilNatList)); *)
+(* (* isnil : nlbody..... ? -> A.Nat (*True or False*) *) *)
+(* val isnil = A.Lam(natlist, A.Case(A.Unfold(A.Var 0), A.Succ A.Zero, A.Zero)); *)
+(* val A.Nat = typeof Nil Nil (A.App(isnil, nilA.NatList)); *)
+(* (* isnil nilA.NatList == 1. *) *)
+(* val A.Succ A.Zero = eval (A.App(isnil, nilA.NatList)); *)
 
 (* (* natlistConsType*) *)
-(* val natlistConstype = Arr(Prod(Nat, natlist), natlist); *)
+(* val natlistConstype = A.Arr(A.Prod(A.Nat, natlist), natlist); *)
 
-(* (* PlusRight(natlist, (Zero, nilNatList)) *) *)
+(* (* A.PlusRight(natlist, (A.Zero, nilA.NatList)) *) *)
 
-(* (* val natlistCons = Lam(Prod(Nat, natlist), Fold(natlist, Tuple(Var 1, Var 0))); *) *)
+(* (* val natlistCons = A.Lam(A.Prod(A.Nat, natlist), A.Fold(natlist, A.Tuple(A.Var 1, A.Var 0))); *) *)
 
 (* (* Defines a type of natural number queues. Can wrap in an existential type, also. *) *)
-(* val natQueueType = Prod( *)
+(* val natQueueType = A.Prod( *)
 (*     (* empty queue *) natlist, *)
-(*     Prod((* insert *) (Arr(Prod(Nat, natlist), natlist)), *)
-(*         (* remove*) Arr(natlist, (Plus((*None*) Unit, (*Some(Nat, natlist)*)Prod(Nat, natlist)))) *)
+(*     A.Prod((* insert *) (A.Arr(A.Prod(A.Nat, natlist), natlist)), *)
+(*         (* remove*) A.Arr(natlist, (A.Plus((*None*) A.Unit, (*A.Some(A.Nat, natlist)*)A.Prod(A.Nat, natlist)))) *)
 (*     ) *)
 (* ); *)
 
-(* val Plus(Nat, Nat) = typeof Nil Nil (PlusLeft (Plus(Nat, Nat), Zero)); *)
-(* val Plus(Nat, Prod(Nat, Nat)) = typeof Nil Nil (PlusLeft (Plus(Nat, Prod(Nat, Nat)), Zero)); *)
-(* val Zero = step (Case(PlusLeft (Plus(Nat, Nat), Zero), Var 0, Succ(Var 0))); *)
-(* val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), Var 0, Succ(Var 0))); *)
+(* val A.Plus(A.Nat, A.Nat) = typeof Nil Nil (A.PlusLeft (A.Plus(A.Nat, A.Nat), A.Zero)); *)
+(* val A.Plus(A.Nat, A.Prod(A.Nat, A.Nat)) = typeof Nil Nil (A.PlusLeft (A.Plus(A.Nat, A.Prod(A.Nat, A.Nat)), A.Zero)); *)
+(* val A.Zero = step (A.Case(A.PlusLeft (A.Plus(A.Nat, A.Nat), A.Zero), A.Var 0, A.Succ(A.Var 0))); *)
+(* val (A.Succ A.Zero) = step (A.Case(A.PlusRight (A.Plus(A.Nat, A.Nat), A.Zero), A.Var 0, A.Succ(A.Var 0))); *)
 
 
 (* (* Seems there are multiple valid typings of this expression. Up *) *)
-(* (* front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing, *) *)
+(* (* front, I thought A.Some(A.Arr(A.TypVar 0, A.Nat)) is the only correct typing, *) *)
 (* (* but the chapter on existential types in TAPL suggests otherwise. *) *)
 
 (* (* That's why we require an explicit type annotation from the programmer. *) *)
-(* val Arr(Nat, Nat) = typeof Nil (Cons(42, Nil)) (Lam(Nat, Zero)); *)
-(* val Arr(TypVar 0, TypVar 0) = typAbstractOut Nat (Arr(Nat, Nat)); *)
-(* val All(Arr(TypVar 0, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar 0, Nat))); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof Nil (Cons(42, Nil)) (A.Lam(A.Nat, A.Zero)); *)
+(* val A.Arr(A.TypVar 0, A.TypVar 0) = typAbstractOut A.Nat (A.Arr(A.Nat, A.Nat)); *)
+(* val A.All(A.Arr(A.TypVar 0, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.All(A.Arr(A.TypVar 0, A.Nat))); *)
 
-(* val e0 = Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0)); *)
-(* val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil e0; *)
-(* val e1 = Pack(Nat, Lam(Nat, Var 0), Arr(TypVar 0, TypVar 0)); *)
-(* val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil e1; *)
-(* val e2 = Pack(Arr(Nat, Nat), Lam(Arr(Nat, Nat), Var 0), Arr(TypVar 0, TypVar 0)); *)
-(* val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil e2; *)
-(* val e4 = Pack(All(Nat), Lam(All(Nat), Zero), Arr(TypVar 0, Nat)); *)
-(* val Some(Arr(TypVar 0, Nat)) = typeof Nil Nil e4 *)
+(* val e0 = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.TypVar 0)); *)
+(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e0; *)
+(* val e1 = A.Pack(A.Nat, A.Lam(A.Nat, A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0)); *)
+(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e1; *)
+(* val e2 = A.Pack(A.Arr(A.Nat, A.Nat), A.Lam(A.Arr(A.Nat, A.Nat), A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0)); *)
+(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e2; *)
+(* val e4 = A.Pack(A.All(A.Nat), A.Lam(A.All(A.Nat), A.Zero), A.Arr(A.TypVar 0, A.Nat)); *)
+(* val A.Some(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil e4 *)
 
-(* val e5 = Pack(Nat, Lam(All(Nat), Zero), Arr(All (TypVar 1), TypVar 0)); *)
-(* val Some(Arr(All (TypVar 1), TypVar 0)) = typeof Nil Nil e5 *)
+(* val e5 = A.Pack(A.Nat, A.Lam(A.All(A.Nat), A.Zero), A.Arr(A.All (A.TypVar 1), A.TypVar 0)); *)
+(* val A.Some(A.Arr(A.All (A.TypVar 1), A.TypVar 0)) = typeof Nil Nil e5 *)
 
-(* val t5 = typeof Nil Nil (Lam(All(Nat), Zero)); *)
-(* val (Arr(All Nat, Nat)) = t5; *)
-(* val Arr(All (TypVar 1), TypVar 0) = typAbstractOut Nat (Arr(All Nat, Nat)); *)
+(* val t5 = typeof Nil Nil (A.Lam(A.All(A.Nat), A.Zero)); *)
+(* val (A.Arr(A.All A.Nat, A.Nat)) = t5; *)
+(* val A.Arr(A.All (A.TypVar 1), A.TypVar 0) = typAbstractOut A.Nat (A.Arr(A.All A.Nat, A.Nat)); *)
 
-(* val f = Lam(Arr(Nat, Nat), Zero); *)
-(* val g = Lam (Nat,Succ (Var 0)); *)
-(* val pkg = Pack(Arr(Nat, Nat), f, Arr(TypVar 0, Nat)); *)
-(* val Some (Arr(TypVar 0, Nat)) = typeof Nil Nil pkg; *)
+(* val f = A.Lam(A.Arr(A.Nat, A.Nat), A.Zero); *)
+(* val g = A.Lam (A.Nat,A.Succ (A.Var 0)); *)
+(* val pkg = A.Pack(A.Arr(A.Nat, A.Nat), f, A.Arr(A.TypVar 0, A.Nat)); *)
+(* val A.Some (A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil pkg; *)
 
-(* val Some(Arr(TypVar 0, Nat)) = typeof Nil Nil (Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat))); *)
-(* val Some(Arr(TypVar 0, TypVar 0)) = typeof Nil Nil (Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0))); *)
-(* val Nat = typeof Nil Nil (Pack(Nat, Lam(Nat, Zero), TypVar 0)) handle IllTyped => Nat; *)
+(* val A.Some(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.Nat))); *)
+(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.TypVar 0))); *)
+(* val A.Nat = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.TypVar 0)) handle IllTyped => A.Nat; *)
 
-(* val zeroFnPkg = Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, Nat)); *)
-(* val zeroFnPkg2 = Pack(Nat, Lam(Nat, Zero), Arr(Nat, TypVar 0)); *)
+(* val zeroFnPkg = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.Nat)); *)
+(* val zeroFnPkg2 = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.Nat, A.TypVar 0)); *)
 
-(* (* Define identity package; can convert Nat to internal repr type and back. *) *)
-(* val idid = Tuple(Lam(Nat, Var 0), Lam(Nat, Var 0)); *)
-(* val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typeof Nil Nil idid; *)
-(* val inoutpkg = Pack(Nat, idid, Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))); *)
-(* val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typeof Nil Nil inoutpkg; *)
-(* val Nat = typeof Nil Nil (Open(inoutpkg, App(ProdRight(Var 0), App(ProdLeft(Var 0), Zero)))); *)
+(* (* Define identity package; can convert A.Nat to internal repr type and back. *) *)
+(* val idid = A.Tuple(A.Lam(A.Nat, A.Var 0), A.Lam(A.Nat, A.Var 0)); *)
+(* val A.Prod(A.Arr(A.Nat, A.Nat), A.Arr(A.Nat, A.Nat)) = typeof Nil Nil idid; *)
+(* val inoutpkg = A.Pack(A.Nat, idid, A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))); *)
+(* val A.Some(A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))) = typeof Nil Nil inoutpkg; *)
+(* val A.Nat = typeof Nil Nil (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
 (* val true = isval inoutpkg; *)
 (* (* Dynamics *) *)
-(* val App *)
-(*     (ProdRight (Tuple (Lam (Nat,Var 0),Lam (Nat,Var 0))), *)
-(*      App (ProdLeft (Tuple (Lam (Nat,Var 0),Lam (Nat,Var 0))),Zero)) *)
-(*     = step (Open(inoutpkg, App(ProdRight(Var 0), App(ProdLeft(Var 0), Zero)))); *)
+(* val A.App *)
+(*     (A.ProdRight (A.Tuple (A.Lam (A.Nat,A.Var 0),A.Lam (A.Nat,A.Var 0))), *)
+(*      A.App (A.ProdLeft (A.Tuple (A.Lam (A.Nat,A.Var 0),A.Lam (A.Nat,A.Var 0))),A.Zero)) *)
+(*     = step (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
 
-(* val Zero = eval (Open(inoutpkg, App(ProdRight(Var 0), App(ProdLeft(Var 0), Zero)))); *)
+(* val A.Zero = eval (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
 
-(* val leftandback = Tuple(Lam(Nat, Tuple(Var 0, Zero)), Lam(Prod(Nat, Nat), ProdLeft (Var 0))); *)
-(* val Prod (Arr (Nat,Prod (Nat, Nat)),Arr (Prod (Nat, Nat),Nat)) = typeof Nil Nil leftandback; *)
-(* val inoutpkg2 = Pack(Prod(Nat, Nat), leftandback, Prod (Arr (Nat,TypVar 0),Arr (TypVar 0,Nat))); *)
-(* val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typeof Nil Nil inoutpkg2; *)
-(* val Nat = typeof Nil Nil (Open(inoutpkg2, App(ProdRight(Var 0), App(ProdLeft(Var 0), Zero)))); *)
-(* val Zero = eval (Open(inoutpkg2, App(ProdRight(Var 0), App(ProdLeft(Var 0), Zero)))); *)
+(* val leftandback = A.Tuple(A.Lam(A.Nat, A.Tuple(A.Var 0, A.Zero)), A.Lam(A.Prod(A.Nat, A.Nat), A.ProdLeft (A.Var 0))); *)
+(* val A.Prod (A.Arr (A.Nat,A.Prod (A.Nat, A.Nat)),A.Arr (A.Prod (A.Nat, A.Nat),A.Nat)) = typeof Nil Nil leftandback; *)
+(* val inoutpkg2 = A.Pack(A.Prod(A.Nat, A.Nat), leftandback, A.Prod (A.Arr (A.Nat,A.TypVar 0),A.Arr (A.TypVar 0,A.Nat))); *)
+(* val A.Some(A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))) = typeof Nil Nil inoutpkg2; *)
+(* val A.Nat = typeof Nil Nil (A.Open(inoutpkg2, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
+(* val A.Zero = eval (A.Open(inoutpkg2, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
 
-(* val double = Lam(Nat, Rec(Var 0, Zero, Succ (Succ (Var 0)))); *)
-(* val Succ (Succ Zero) = eval (App(double, (Succ Zero))); *)
+(* val double = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ (A.Succ (A.Var 0)))); *)
+(* val A.Succ (A.Succ A.Zero) = eval (A.App(double, (A.Succ A.Zero))); *)
 
-(* val All(TypVar 1) = typAbstractOut Nat (All(Nat)); *)
-(* val TypVar 0 = typAbstractOut Nat Nat; *)
-(* val Arr(TypVar 0, Nat)= typAbstractOut (Arr(Nat, Nat)) (Arr(Arr(Nat, Nat), Nat)); *)
-(* val Some(Arr(TypVar 1, Nat)) = typAbstractOut (Arr(Nat, Nat)) (Some(Arr(Arr(Nat, Nat), Nat))); *)
-(* val All(Arr(TypVar 1, Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(Arr(Nat, Nat), Nat))); *)
-(* val Some(All(Arr(TypVar 2, Nat))) = typAbstractOut (Arr(Nat, Nat)) (Some(All(Arr(Arr(Nat, Nat), Nat)))); *)
-
-
-(* val polymorphicIdFn = TypAbs(Lam(TypVar 0, Var 0)); *)
-
-(* val Lam(Nat, Var 0) = step (TypApp(Nat, polymorphicIdFn)); *)
-(* val Lam(Arr(Nat, Nat), Var 0) = step (TypApp(Arr(Nat, Nat), polymorphicIdFn)); *)
-(* val TypAbs (Lam (TypVar 0, Var 0)) = step (TypApp(Nat, TypAbs(polymorphicIdFn))) *)
-(* val TypApp(Nat, TypAbs((Lam (TypVar 0, Var 0)))) = step (TypApp(Nat, TypApp(Nat, TypAbs(polymorphicIdFn)))) *)
-(* val TypAbs(Lam(Arr(Nat, TypVar 0), Var 0)) = step (TypApp(Nat, TypAbs(TypAbs(Lam(Arr(TypVar 1, TypVar 0), Var 0))))); *)
-(* val Lam(Nat, Var 0) = eval (TypApp(Nat, TypApp(Nat, TypAbs(polymorphicIdFn)))); *)
-
-(* val Succ Zero = eval (App(TypApp(Nat, polymorphicIdFn), Succ(Zero))); *)
-
-(* val TypAbs(Zero) = step (TypAbs(Zero)); *)
-(* val true = isval (Lam(Nat, TypAbs(Zero))); *)
-(* val (TypAbs Zero) = step (App(Lam(Nat, TypAbs(Zero)), Zero)); *)
-
-(* val Nat = typsubst Nat (TypVar 0); (* Tho this isn't actually a well-formed type *) *)
-(* val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar 0); (* Tho this isn't actually a well-formed type *) *)
-(* val false = istype Nil (TypVar 0); *)
-(* val All(Nat) = typsubst Nat (All(TypVar 1)); *)
-(* val Some(Nat) = typsubst Nat (Some(TypVar 1)); *)
-(* val Some(Some(TypVar 1)) = typsubst Nat (Some(Some(TypVar 1))); *)
-(* val true = istype Nil (All(TypVar 0)); *)
-(* val true = istype Nil (Some(TypVar 0)); *)
-(* val All(Arr(Nat, (All(Nat)))) = typsubst (All(Nat)) (All(Arr(Nat, TypVar 1))); *)
-(* val All(Arr(Nat, (Some(Nat)))) = typsubst (Some(Nat)) (All(Arr(Nat, TypVar 1))); *)
-
-(* val Nat = typeof Nil Nil (TypApp(TypVar 0, Zero)) handle IllTyped => Nat; *)
-(* val All(Arr(TypVar 0, Nat)) = typeof Nil Nil (TypAbs(Lam(TypVar 0, Zero))); *)
-(* val Arr(Arr(Nat, Nat), Nat) = typeof Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 0, Zero))))); *)
-(* val Nat = typeof Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam(TypVar 1, Zero))))) handle IllTyped => Nat; *)
+(* val A.All(A.TypVar 1) = typAbstractOut A.Nat (A.All(A.Nat)); *)
+(* val A.TypVar 0 = typAbstractOut A.Nat A.Nat; *)
+(* val A.Arr(A.TypVar 0, A.Nat)= typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Arr(A.Arr(A.Nat, A.Nat), A.Nat)); *)
+(* val A.Some(A.Arr(A.TypVar 1, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Some(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat))); *)
+(* val A.All(A.Arr(A.TypVar 1, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.All(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat))); *)
+(* val A.Some(A.All(A.Arr(A.TypVar 2, A.Nat))) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Some(A.All(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat)))); *)
 
 
-(* val All(Nat) = typeof Nil Nil (TypAbs(Zero)); (* polymorphic zero *) *)
+(* val polymorphicIdFn = A.TypAbs(A.Lam(A.TypVar 0, A.Var 0)); *)
+
+(* val A.Lam(A.Nat, A.Var 0) = step (A.TypApp(A.Nat, polymorphicIdFn)); *)
+(* val A.Lam(A.Arr(A.Nat, A.Nat), A.Var 0) = step (A.TypApp(A.Arr(A.Nat, A.Nat), polymorphicIdFn)); *)
+(* val A.TypAbs (A.Lam (A.TypVar 0, A.Var 0)) = step (A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn))) *)
+(* val A.TypApp(A.Nat, A.TypAbs((A.Lam (A.TypVar 0, A.Var 0)))) = step (A.TypApp(A.Nat, A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn)))) *)
+(* val A.TypAbs(A.Lam(A.Arr(A.Nat, A.TypVar 0), A.Var 0)) = step (A.TypApp(A.Nat, A.TypAbs(A.TypAbs(A.Lam(A.Arr(A.TypVar 1, A.TypVar 0), A.Var 0))))); *)
+(* val A.Lam(A.Nat, A.Var 0) = eval (A.TypApp(A.Nat, A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn)))); *)
+
+(* val A.Succ A.Zero = eval (A.App(A.TypApp(A.Nat, polymorphicIdFn), A.Succ(A.Zero))); *)
+
+(* val A.TypAbs(A.Zero) = step (A.TypAbs(A.Zero)); *)
+(* val true = isval (A.Lam(A.Nat, A.TypAbs(A.Zero))); *)
+(* val (A.TypAbs A.Zero) = step (A.App(A.Lam(A.Nat, A.TypAbs(A.Zero)), A.Zero)); *)
+
+(* val A.Nat = typsubst A.Nat (A.TypVar 0); (* Tho this isn't actually a well-formed type *) *)
+(* val A.Arr(A.Nat, A.Nat) = typsubst (A.Arr(A.Nat, A.Nat)) (A.TypVar 0); (* Tho this isn't actually a well-formed type *) *)
+(* val false = istype Nil (A.TypVar 0); *)
+(* val A.All(A.Nat) = typsubst A.Nat (A.All(A.TypVar 1)); *)
+(* val A.Some(A.Nat) = typsubst A.Nat (A.Some(A.TypVar 1)); *)
+(* val A.Some(A.Some(A.TypVar 1)) = typsubst A.Nat (A.Some(A.Some(A.TypVar 1))); *)
+(* val true = istype Nil (A.All(A.TypVar 0)); *)
+(* val true = istype Nil (A.Some(A.TypVar 0)); *)
+(* val A.All(A.Arr(A.Nat, (A.All(A.Nat)))) = typsubst (A.All(A.Nat)) (A.All(A.Arr(A.Nat, A.TypVar 1))); *)
+(* val A.All(A.Arr(A.Nat, (A.Some(A.Nat)))) = typsubst (A.Some(A.Nat)) (A.All(A.Arr(A.Nat, A.TypVar 1))); *)
+
+(* val A.Nat = typeof Nil Nil (A.TypApp(A.TypVar 0, A.Zero)) handle IllTyped => A.Nat; *)
+(* val A.All(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil (A.TypAbs(A.Lam(A.TypVar 0, A.Zero))); *)
+(* val A.Arr(A.Arr(A.Nat, A.Nat), A.Nat) = typeof Nil Nil (A.TypApp(A.Arr(A.Nat, A.Nat), (A.TypAbs(A.Lam(A.TypVar 0, A.Zero))))); *)
+(* val A.Nat = typeof Nil Nil (A.TypApp(A.Arr(A.Nat, A.Nat), (A.TypAbs(A.Lam(A.TypVar 1, A.Zero))))) handle IllTyped => A.Nat; *)
+
+
+(* val A.All(A.Nat) = typeof Nil Nil (A.TypAbs(A.Zero)); (* polymorphic zero *) *)
 (* (* polymorphic id function :) *) *)
-(* val All(Arr(TypVar 0, TypVar 0)) = *)
-(*     typeof Nil Nil (TypAbs(Lam(TypVar 0, Var 0))); *)
-(* val Arr(Nat, All(Arr(TypVar 0, TypVar 0))) = *)
-(*     typeof Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0)))); *)
-(* val Arr(Nat, All(Arr(TypVar 0, TypVar 0))) = *)
-(*     typeof Nil Nil (Lam(Nat, TypAbs(Lam(TypVar 0, Var 0)))); *)
+(* val A.All(A.Arr(A.TypVar 0, A.TypVar 0)) = *)
+(*     typeof Nil Nil (A.TypAbs(A.Lam(A.TypVar 0, A.Var 0))); *)
+(* val A.Arr(A.Nat, A.All(A.Arr(A.TypVar 0, A.TypVar 0))) = *)
+(*     typeof Nil Nil (A.Lam(A.Nat, A.TypAbs(A.Lam(A.TypVar 0, A.Var 0)))); *)
+(* val A.Arr(A.Nat, A.All(A.Arr(A.TypVar 0, A.TypVar 0))) = *)
+(*     typeof Nil Nil (A.Lam(A.Nat, A.TypAbs(A.Lam(A.TypVar 0, A.Var 0)))); *)
 (* (* Nested type variables *) *)
-(* val All(All(Arr(TypVar 1,Nat))) = *)
-(*     typeof Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Zero)))) *)
-(* val All(All(Arr(TypVar 1, TypVar 1))) = *)
-(*     typeof Nil Nil (TypAbs(TypAbs(Lam(TypVar 1, Var 0)))) *)
+(* val A.All(A.All(A.Arr(A.TypVar 1,A.Nat))) = *)
+(*     typeof Nil Nil (A.TypAbs(A.TypAbs(A.Lam(A.TypVar 1, A.Zero)))) *)
+(* val A.All(A.All(A.Arr(A.TypVar 1, A.TypVar 1))) = *)
+(*     typeof Nil Nil (A.TypAbs(A.TypAbs(A.Lam(A.TypVar 1, A.Var 0)))) *)
 
-(* val true = istype Nil Nat; *)
-(* val false = istype Nil (TypVar 0); (* Unbound type variable *) *)
-(* val false = istype Nil (Arr(TypVar 0, Nat)); (* Unbound type variable *) *)
-(* val false = istype Nil (Arr(Nat, TypVar 0)); (* Unbound type variable *) *)
-(* val true = istype Nil (All(Nat)); *)
-(* val true = istype Nil (All(TypVar 0)); *)
-(* val true = istype Nil (All(Arr(TypVar 0, Nat))); *)
-(* val true = istype Nil (All(Arr(Nat, TypVar 0))); *)
-(* val false = istype Nil (All(Arr(Nat, TypVar 1))); (* Unbound *) *)
-(* val true = istype Nil (All(All(Arr(Nat, TypVar 1)))); (* Bound *) *)
+(* val true = istype Nil A.Nat; *)
+(* val false = istype Nil (A.TypVar 0); (* Unbound type variable *) *)
+(* val false = istype Nil (A.Arr(A.TypVar 0, A.Nat)); (* Unbound type variable *) *)
+(* val false = istype Nil (A.Arr(A.Nat, A.TypVar 0)); (* Unbound type variable *) *)
+(* val true = istype Nil (A.All(A.Nat)); *)
+(* val true = istype Nil (A.All(A.TypVar 0)); *)
+(* val true = istype Nil (A.All(A.Arr(A.TypVar 0, A.Nat))); *)
+(* val true = istype Nil (A.All(A.Arr(A.Nat, A.TypVar 0))); *)
+(* val false = istype Nil (A.All(A.Arr(A.Nat, A.TypVar 1))); (* Unbound *) *)
+(* val true = istype Nil (A.All(A.All(A.Arr(A.Nat, A.TypVar 1)))); (* Bound *) *)
 
 (* val 0 = len Nil; *)
 (* val 1 = len (Cons(1, Nil)); *)
 
-(* val true = isval Zero; *)
-(* val true = isval (Succ(Zero)); *)
-(* val true = isval (Lam(Nat, Succ(Zero))); *)
-(* val true = isval (Lam(Nat, Zero)); *)
-(* val true = isval (Lam(Nat, Succ(Var(0)))); *)
-(* val false = isval (App(Lam(Nat, Zero), Zero)); *)
+(* val true = isval A.Zero; *)
+(* val true = isval (A.Succ(A.Zero)); *)
+(* val true = isval (A.Lam(A.Nat, A.Succ(A.Zero))); *)
+(* val true = isval (A.Lam(A.Nat, A.Zero)); *)
+(* val true = isval (A.Lam(A.Nat, A.Succ(A.Var(0)))); *)
+(* val false = isval (A.App(A.Lam(A.Nat, A.Zero), A.Zero)); *)
 
-(* val Zero = subst Zero Zero; *)
-(* val Succ Zero = subst Zero (Succ Zero); *)
-(* val (Lam(Nat, Var 0)) = subst (Succ Zero) (Lam(Nat, Var 0)); *)
-(* val (Var 0) = subst (Succ Zero) (Var 1); *)
-(* val Lam(Nat, Var 0) = subst (Succ Zero) (Lam(Nat, Var 0)); *)
-(* val Lam(Nat, (Succ Zero)) = subst (Succ Zero) (Lam(Nat, Var 1)); *)
-(* val App(Lam(Nat, Succ Zero), (Succ Zero)) = *)
-(*     subst (Succ Zero) (App(Lam(Nat, Var 1), (Var 0))); *)
+(* val A.Zero = subst A.Zero A.Zero; *)
+(* val A.Succ A.Zero = subst A.Zero (A.Succ A.Zero); *)
+(* val (A.Lam(A.Nat, A.Var 0)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 0)); *)
+(* val (A.Var 0) = subst (A.Succ A.Zero) (A.Var 1); *)
+(* val A.Lam(A.Nat, A.Var 0) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 0)); *)
+(* val A.Lam(A.Nat, (A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 1)); *)
+(* val A.App(A.Lam(A.Nat, A.Succ A.Zero), (A.Succ A.Zero)) = *)
+(*     subst (A.Succ A.Zero) (A.App(A.Lam(A.Nat, A.Var 1), (A.Var 0))); *)
 
-(* val Lam(Nat, Zero) = subst Zero (Lam(Nat, Var 1)); *)
-(* val Lam(Nat, Succ Zero) = subst (Succ Zero) (Lam(Nat, Var 1)); *)
-(* val Lam(Nat, Lam(Nat, Succ Zero)) = subst (Succ Zero) (Lam(Nat, Lam(Nat, Var 2))); *)
-(* val Lam(Nat, Rec(Zero, Zero, Succ Zero)) = subst (Succ Zero) (Lam(Nat, Rec(Zero, Zero, Var 2))); *)
+(* val A.Lam(A.Nat, A.Zero) = subst A.Zero (A.Lam(A.Nat, A.Var 1)); *)
+(* val A.Lam(A.Nat, A.Succ A.Zero) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 1)); *)
+(* val A.Lam(A.Nat, A.Lam(A.Nat, A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Lam(A.Nat, A.Var 2))); *)
+(* val A.Lam(A.Nat, A.Rec(A.Zero, A.Zero, A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Rec(A.Zero, A.Zero, A.Var 2))); *)
 
-(* val Lam(Nat, Rec(Zero, Var 0, Zero)) = subst Zero (Lam(Nat, Rec(Var 1, Var 0, Zero))); *)
-(* val Lam(Nat, Rec(Zero, Var 1, Zero)) = subst Zero (Lam(Nat, Rec(Var 1, Var 2, Zero))); *)
-(* val Rec(Zero, Zero, Zero) = step (App(Lam(Nat, Rec(Var 0, Var 0, Zero)), Zero)); *)
+(* val A.Lam(A.Nat, A.Rec(A.Zero, A.Var 0, A.Zero)) = subst A.Zero (A.Lam(A.Nat, A.Rec(A.Var 1, A.Var 0, A.Zero))); *)
+(* val A.Lam(A.Nat, A.Rec(A.Zero, A.Var 1, A.Zero)) = subst A.Zero (A.Lam(A.Nat, A.Rec(A.Var 1, A.Var 2, A.Zero))); *)
+(* val A.Rec(A.Zero, A.Zero, A.Zero) = step (A.App(A.Lam(A.Nat, A.Rec(A.Var 0, A.Var 0, A.Zero)), A.Zero)); *)
 
-(* val Nat = get (Cons(Nat, Nil)) 0; *)
-(* val Arr(Nat, Nat) = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 1; *)
-(* val Nat = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 0; *)
+(* val A.Nat = get (Cons(A.Nat, Nil)) 0; *)
+(* val A.Arr(A.Nat, A.Nat) = get (Cons(A.Nat, Cons(A.Arr(A.Nat, A.Nat), Nil))) 1; *)
+(* val A.Nat = get (Cons(A.Nat, Cons(A.Arr(A.Nat, A.Nat), Nil))) 0; *)
 
-(* val Nat = typeof Nil Nil Zero; *)
-(* val Nat = typeof Nil Nil (Succ (Zero)); *)
+(* val A.Nat = typeof Nil Nil A.Zero; *)
+(* val A.Nat = typeof Nil Nil (A.Succ (A.Zero)); *)
 
-(* val Nat = typeof (Cons(Nat, Nil)) Nil (Var(0)); *)
-(* val Arr(Nat, Nat) = typeof (Cons(Arr(Nat, Nat), Nil)) Nil (Var(0)); *)
-(* val Arr(Nat, Nat) = typeof (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) Nil (Var(0)); *)
-(* val Nat = typeof (Cons(Arr(Nat, Nat), Cons(Nat, Nil))) Nil (Var(1)); *)
+(* val A.Nat = typeof (Cons(A.Nat, Nil)) Nil (A.Var(0)); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Arr(A.Nat, A.Nat), Nil)) Nil (A.Var(0)); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Arr(A.Nat, A.Nat), Cons(A.Nat, Nil))) Nil (A.Var(0)); *)
+(* val A.Nat = typeof (Cons(A.Arr(A.Nat, A.Nat), Cons(A.Nat, Nil))) Nil (A.Var(1)); *)
 
-(* val Arr(Nat, Nat) = typeof Nil Nil (Lam(Nat, Zero)); *)
-(* val Arr(Nat, Nat) = typeof Nil Nil (Lam(Nat, Succ(Zero))); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam(A.Nat, A.Zero)); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam(A.Nat, A.Succ(A.Zero))); *)
 
-(* val Nat = typeof Nil Nil (App(Lam(Nat, Zero), Zero)); *)
+(* val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Nat, A.Zero), A.Zero)); *)
 
-(* val Nat = typeof Nil Nil (App(Lam(Nat, Succ(Zero)), Lam(Nat, Zero))) *)
-(*           handle IllTyped => Nat; *)
+(* val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Nat, A.Succ(A.Zero)), A.Lam(A.Nat, A.Zero))) *)
+(*           handle IllTyped => A.Nat; *)
 
-(* val timesTwo = Rec(Succ(Zero), Zero, Succ(Succ(Var(0 (* prev *))))); *)
-(* val Nat = typeof Nil Nil timesTwo; *)
+(* val timesTwo = A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Succ(A.Var(0 (* prev *))))); *)
+(* val A.Nat = typeof Nil Nil timesTwo; *)
 
-(* val Arr(Arr(Nat, Nat), Nat) = *)
-(*     typeof Nil Nil (Lam(Arr(Nat, Nat), App(Var(0), Zero))); *)
+(* val A.Arr(A.Arr(A.Nat, A.Nat), A.Nat) = *)
+(*     typeof Nil Nil (A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero))); *)
 
-(* val Arr(Nat, Nat) = typeof Nil Nil (Rec(Zero, *)
-(*                                        Lam(Nat, Succ(Zero)), *)
-(*                                        Lam(Nat, Succ(Var(0))))); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Rec(A.Zero, *)
+(*                                        A.Lam(A.Nat, A.Succ(A.Zero)), *)
+(*                                        A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
 
-(* val Arr(Nat, Nat) = typeof Nil Nil (Rec(Succ(Zero), *)
-(*                                        Lam(Nat, Succ(Zero)), *)
-(*                                        Lam(Nat, Succ(Var(0))))); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Rec(A.Succ(A.Zero), *)
+(*                                        A.Lam(A.Nat, A.Succ(A.Zero)), *)
+(*                                        A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
 
-(* val Arr(Nat, Nat) = typeof (Cons(Nat, Nil)) Nil (Rec(Var(0), *)
-(*                                        Lam(Nat, Succ(Zero)), *)
-(*                                        Lam(Nat, Succ(Var(0))))); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Nat, Nil)) Nil (A.Rec(A.Var(0), *)
+(*                                        A.Lam(A.Nat, A.Succ(A.Zero)), *)
+(*                                        A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
 
 
-(* val Nat = typeof Nil Nil (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)), Zero)) handle IllTyped => Nat; *)
+(* val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)), A.Zero)) handle IllTyped => A.Nat; *)
 
-(* (* Ill-formed; first param must be Nat. *) *)
-(* val Nat = typeof Nil Nil (Rec(Lam(Nat, Zero), Lam(Nat, Succ(Zero)), Lam(Nat, Succ(Var(0))))) handle Bind => Nat; *)
+(* (* Ill-formed; first param must be A.Nat. *) *)
+(* val A.Nat = typeof Nil Nil (A.Rec(A.Lam(A.Nat, A.Zero), A.Lam(A.Nat, A.Succ(A.Zero)), A.Lam(A.Nat, A.Succ(A.Var(0))))) handle Bind => A.Nat; *)
 
 (* (* Ill-formed; base case type does not match rec case type. *) *)
-(* val Nat = (typeof Nil Nil (Rec(Zero, Succ(Zero), Lam(Nat, Succ(Zero)))) *)
-(*           handle IllTyped => Nat); *)
+(* val A.Nat = (typeof Nil Nil (A.Rec(A.Zero, A.Succ(A.Zero), A.Lam(A.Nat, A.Succ(A.Zero)))) *)
+(*           handle IllTyped => A.Nat); *)
 
-(* val Arr(Nat, Nat) = typeof Nil Nil (Lam((TypVar 0), Zero)) handle IllTyped => Arr(Nat, Nat); *)
+(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam((A.TypVar 0), A.Zero)) handle IllTyped => A.Arr(A.Nat, A.Nat); *)
 
-(* val Succ(Rec(Zero, Zero, Succ(Var 0))) = step (Rec(Succ(Zero), Zero, Succ(Var 0))); *)
+(* val A.Succ(A.Rec(A.Zero, A.Zero, A.Succ(A.Var 0))) = step (A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Var 0))); *)
 
-(* val Succ(Succ(Rec(Zero, Zero, Succ(Succ(Var 0))))) = *)
-(*     step (Rec(Succ(Zero), Zero, Succ(Succ(Var 0)))); *)
+(* val A.Succ(A.Succ(A.Rec(A.Zero, A.Zero, A.Succ(A.Succ(A.Var 0))))) = *)
+(*     step (A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
 
-(* val Zero = step (Rec(Zero, Zero, Succ(Var 0))); *)
-(* val Succ(Succ(Zero)) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Var 0))); *)
-(* val Succ(Succ(Succ(Succ(Zero)))) = *)
-(*     eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var 0)))); *)
+(* val A.Zero = step (A.Rec(A.Zero, A.Zero, A.Succ(A.Var 0))); *)
+(* val A.Succ(A.Succ(A.Zero)) = eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Var 0))); *)
+(* val A.Succ(A.Succ(A.Succ(A.Succ(A.Zero)))) = *)
+(*     eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
 
-(* val Succ(Succ(Succ(Succ(Zero)))) = *)
-(*     eval (Rec(App(Lam(Nat, Succ(Var 0)), Succ(Zero)), *)
-(*               Zero, Succ(Succ(Var 0)))); *)
+(* val A.Succ(A.Succ(A.Succ(A.Succ(A.Zero)))) = *)
+(*     eval (A.Rec(A.App(A.Lam(A.Nat, A.Succ(A.Var 0)), A.Succ(A.Zero)), *)
+(*               A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
 
-(* val Zero = step Zero; *)
-(* val Succ(Zero) = step (Succ(Zero)); *)
-(* val Lam(Nat, Zero) = step (Lam(Nat, Zero)); *)
-(* val Succ Zero = step (App(Lam(Nat, Succ(Zero)), Zero)); *)
-(* val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero)); *)
-(* val Succ (Succ Zero) = step (App(Lam(Nat, Succ(Var(0))), Succ Zero)); *)
-(* val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Var(0))), Succ (Succ Zero))); *)
-(* val Succ (Succ (Succ Zero)) = step (App(Lam(Nat, Succ(Succ(Var(0)))), Succ Zero)); *)
+(* val A.Zero = step A.Zero; *)
+(* val A.Succ(A.Zero) = step (A.Succ(A.Zero)); *)
+(* val A.Lam(A.Nat, A.Zero) = step (A.Lam(A.Nat, A.Zero)); *)
+(* val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Zero)), A.Zero)); *)
+(* val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero)); *)
+(* val A.Succ (A.Succ A.Zero) = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Succ A.Zero)); *)
+(* val A.Succ (A.Succ (A.Succ A.Zero)) = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Succ (A.Succ A.Zero))); *)
+(* val A.Succ (A.Succ (A.Succ A.Zero)) = step (A.App(A.Lam(A.Nat, A.Succ(A.Succ(A.Var(0)))), A.Succ A.Zero)); *)
 
-(* (* Take in a nat -> nat and apply to zero. Input nat -> nat is Succ *) *)
-(* val App(Lam(Nat, Succ(Var(0))), Zero) = step (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)), *)
-(*                                                   Lam(Nat, Succ(Var(0))))); *)
-(* val Succ Zero = step (App(Lam(Nat, Succ(Var(0))), Zero)); *)
+(* (* Take in a nat -> nat and apply to zero. Input nat -> nat is A.Succ *) *)
+(* val A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero) = step (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)), *)
+(*                                                   A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
+(* val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero)); *)
 
-(* val Succ Zero = eval (App(Lam(Arr(Nat, Nat), App(Var(0), Zero)), *)
-(*                           Lam(Nat, Succ(Var(0))))); *)
-(* val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var 0)))); *)
+(* val A.Succ A.Zero = eval (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)), *)
+(*                           A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
+(* val A.Succ (A.Succ (A.Succ (A.Succ A.Zero))) = eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
 
-(* val multByThree = Lam(Nat, Rec(Var 0, Zero, Succ(Succ(Succ(Var 0))))); *)
-(* val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero)) *)
+(* val multByThree = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ(A.Succ(A.Succ(A.Var 0))))); *)
+(* val A.Succ (A.Succ (A.Succ A.Zero)) = eval (A.App(multByThree, A.Succ A.Zero)) *)
 in
 ()
 end
