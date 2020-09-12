@@ -76,3 +76,5 @@ typ:
   | IDX (A.TypVar IDX)
   | ALL typ (A.All typ)
   | SOME typ (A.Some typ)
+  (* TODO should this take precedence below star and arrow? *)
+  | typ PIPE typ (A.Plus (typ1, typ2))

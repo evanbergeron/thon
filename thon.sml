@@ -768,6 +768,12 @@ val TypAbs (Lam (All (TypVar 0),Var 0)) : Ast.Exp =
 val Lam (Some (TypVar 0),Var 0) : Ast.Exp =
     parse "\\ (some 0) -> 0"
 
+val Lam (Plus (Nat,Arr (Nat,Nat)),Var 0) : Ast.Exp =
+    parse "\\ (nat | nat -> nat) -> 0"
+
+val Lam (Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))),Var 0) : Ast.Exp =
+    parse "\\ (nat | ((nat -> nat) | (nat * nat))) -> 0"
+
 in
 ()
 end
