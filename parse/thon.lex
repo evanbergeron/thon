@@ -29,6 +29,7 @@ ws = [\ \t];
 "go"     => (Tokens.GO(!pos,!pos));
 "poly"   => (Tokens.POLY(!pos,!pos));
 ":"      => (Tokens.COLON(!pos,!pos));
+","      => (Tokens.COMMA(!pos,!pos));
 "("      => (Tokens.LPAREN(!pos,!pos));
 ")"      => (Tokens.RPAREN(!pos,!pos));
 "|"      => (Tokens.PIPE(!pos,!pos));

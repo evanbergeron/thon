@@ -89,7 +89,7 @@ in SML AST literals.
 | (_||(_|| | |(/_|_| |(_ | (_)|\/| | |(_)| |_)| ||_>| | |
                                /           |
 
-- TypAbs(Lam(TypVar 0, Var 0)) is the polymorphic identity function.
+-  poly \ 0 -> 0 is the polymorphic identity function.
 
 
  _                       _

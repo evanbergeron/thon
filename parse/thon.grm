@@ -20,6 +20,7 @@ structure A = Ast
  | IDX of int
  | GO
  | POLY
+ | COMMA
 
 %nonterm
    exp of A.Exp
@@ -58,6 +59,7 @@ exp:
   | LAM typ SARROW exp (A.Lam (typ, exp))
   | REC exp LPAREN ZERO SARROW exp PIPE SUCC SARROW exp RPAREN (A.Rec (exp1, exp2, exp3))
   | POLY exp (A.TypAbs exp)
+  | LPAREN exp COMMA exp RPAREN (A.Tuple(exp1, exp2))
 
 typ:
     NAT (A.Nat)

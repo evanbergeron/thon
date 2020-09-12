@@ -744,6 +744,12 @@ val TypApp (Nat,TypAbs (TypAbs (Lam (Arr (TypVar 1,TypVar 0),Var 0)))) =
 val TypAbs (Lam (Arr (Nat,TypVar 0),Var 0)) : Ast.Exp =
     run "((poly poly \\ (1 -> 0) -> 0) (nat))";
 
+val Tuple (Zero,Succ Zero) : Ast.Exp =
+    parse "(Z, S Z)";
+
+val Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero))) : Ast.Exp =
+    parse "(Z, (S Z, S S Z))";
+
 in
 ()
 end
