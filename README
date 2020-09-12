@@ -75,7 +75,7 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 
   e.g.
 
-  rec (S Z) (Z -> Z | S -> S S 0) (* 0 is the new bound var *) steps to
+  rec (S Z) (Z -> Z | S -> S S 0) steps to
   S S (rec (Z) (Z -> Z | S -> S S 0)) steps to
   S S (Z).
 
