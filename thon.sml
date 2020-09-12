@@ -750,6 +750,18 @@ val Tuple (Zero,Succ Zero) : Ast.Exp =
 val Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero))) : Ast.Exp =
     parse "(Z, (S Z, S S Z))";
 
+val Lam (Prod (Nat,Nat),Var 0) : Ast.Exp =
+    parse "\\ (nat * nat) -> 0";
+
+val ProdLeft (Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero)))) : Ast.Exp =
+    parse "left (Z, (S Z, S S Z))";
+val ProdRight (Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero)))) : Ast.Exp =
+    parse "right (Z, (S Z, S S Z))";
+val Zero : Ast.Exp =
+    run "left (Z, (S Z, S S Z))";
+val Succ Zero : Ast.Exp =
+    run "left right (Z, (S Z, S S Z))";
+
 in
 ()
 end

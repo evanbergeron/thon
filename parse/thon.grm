@@ -20,7 +20,10 @@ structure A = Ast
  | IDX of int
  | GO
  | POLY
+ | LEFT
+ | RIGHT
  | COMMA
+ | STAR
 
 %nonterm
    exp of A.Exp
@@ -38,7 +41,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -60,9 +63,12 @@ exp:
   | REC exp LPAREN ZERO SARROW exp PIPE SUCC SARROW exp RPAREN (A.Rec (exp1, exp2, exp3))
   | POLY exp (A.TypAbs exp)
   | LPAREN exp COMMA exp RPAREN (A.Tuple(exp1, exp2))
+  | LEFT exp (A.ProdLeft exp)
+  | RIGHT exp (A.ProdRight exp)
 
 typ:
     NAT (A.Nat)
   | typ SARROW typ (A.Arr(typ1, typ2))
+  | typ STAR typ (A.Prod(typ1, typ2))
   | LPAREN typ RPAREN (typ)
   | IDX (A.TypVar IDX)

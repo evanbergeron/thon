@@ -80,10 +80,6 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
   S S (Z).
 
 
-This is as far as the parser goes right now. Past this point, we speak
-in SML AST literals.
-
-
  _                        _
 |_)_..__.._ _  __|_._. _ |_)_ |  ._ _  _ ._._ |_ . _._ _
 | (_||(_|| | |(/_|_| |(_ | (_)|\/| | |(_)| |_)| ||_>| | |
