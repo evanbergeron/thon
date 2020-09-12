@@ -1,1 +1,4 @@
-(\ (nat -> nat -> nat) -> 0)
+(
+((\ ((nat -> nat) -> (nat -> nat)) -> 0)
+(\ (nat -> nat) -> 0)) (S Z)
+)
