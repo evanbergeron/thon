@@ -728,8 +728,20 @@ val (A.Succ (A.Succ A.Zero)) =
 val Succ (Succ (Succ (Succ Zero))) : Ast.Exp =
     run "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S S Z))";
 
-val A.Succ (A.Succ (A.Succ A.Zero)) = eval (A.App(multByThree, A.Succ A.Zero))
+val A.Succ (A.Succ (A.Succ A.Zero)) = eval (A.App(multByThree, A.Succ A.Zero));
 
+val TypAbs (Lam (TypVar 0,Var 0)) : Ast.Exp =
+    parse "poly \\ 0 -> 0";
+val TypAbs (TypAbs (Lam (TypVar 1,Var 0))) : Ast.Exp =
+    parse "poly poly \\ 1 -> 0";
+val TypApp (Nat,TypAbs (Lam (TypVar 0,Var 0))) : Ast.Exp =
+    parse "((poly \\ 0 -> 0) (nat))";
+val Lam (Nat,Var 0) : Ast.Exp =
+    run "((poly \\ 0 -> 0) (nat))";
+val TypApp (Nat,TypAbs (TypAbs (Lam (Arr (TypVar 1,TypVar 0),Var 0)))) =
+    parse "((poly poly \\ (1 -> 0) -> 0) (nat))";
+val TypAbs (Lam (Arr (Nat,TypVar 0),Var 0)) : Ast.Exp =
+    run "((poly poly \\ (1 -> 0) -> 0) (nat))";
 
 in
 ()
