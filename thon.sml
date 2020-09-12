@@ -9,6 +9,7 @@ structure Thon : sig
 struct
 
 exception IllTyped
+exception IllTypedMsg of string
 exception No
 exception ClientTypeCannotEscapeClientScope
 exception Unimplemented
@@ -194,13 +195,13 @@ fun typeof ctx typCtx e =
        | A.ProdRight e => let val A.Prod(l, r) = (typeof ctx typCtx e) in r end
        | A.PlusLeft (t, e) => let val A.Plus(l, r) = t in
                                 if l <> typeof ctx typCtx e then
-                                    raise IllTyped
+                                    raise IllTypedMsg "Sum type annotation does not match deduced type"
                                 else
                                     A.Plus(l, r)
                             end
        | A.PlusRight (t, e) => let val A.Plus(l, r) = t in
                                 if r <> typeof ctx typCtx e then
-                                    raise IllTyped
+                                    raise IllTypedMsg "Sum type annotation does not match deduced type"
                                 else
                                     A.Plus(l, r)
                             end
