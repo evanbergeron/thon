@@ -24,6 +24,8 @@ structure A = Ast
  | RIGHT
  | COMMA
  | STAR
+ | ALL
+ | SOME
 
 %nonterm
    exp of A.Exp
@@ -41,7 +43,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT ALL SOME
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -72,3 +74,5 @@ typ:
   | typ STAR typ (A.Prod(typ1, typ2))
   | LPAREN typ RPAREN (typ)
   | IDX (A.TypVar IDX)
+  | ALL typ (A.All typ)
+  | SOME typ (A.Some typ)

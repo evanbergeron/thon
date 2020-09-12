@@ -762,6 +762,12 @@ val Zero : Ast.Exp =
 val Succ Zero : Ast.Exp =
     run "left right (Z, (S Z, S S Z))";
 
+val TypAbs (Lam (All (TypVar 0),Var 0)) : Ast.Exp =
+    parse "poly \\ (all 0) -> 0"
+
+val Lam (Some (TypVar 0),Var 0) : Ast.Exp =
+    parse "\\ (some 0) -> 0"
+
 in
 ()
 end
