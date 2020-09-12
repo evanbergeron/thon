@@ -6,15 +6,21 @@
  \__|_| |_|\___/|_| |_|
 
 
-thon is a small programming language. The implementation in at the bottom of
-this text file. There's no parser, so if you want to play with it, you'll need
-to load the code into an sml repl somewhere.
+thon is a small programming language.
+
+ _         _        _ _
+(_)_ _  __| |_ __ _| | |
+| | ' \(_-<  _/ _` | | |
+|_|_||_/__/\__\__,_|_|_|
+
 
 This works for me on Ubuntu 20:
 
-    sudo apt install smlnj
-    sml
+    $ sudo apt install smlnj ml-yaxx ml-lex ml-lpt
+    $ sml
     - use "path/to/thon.sml";
+    - CM.make "path/to/thon.cm";
+    - Thon.parse "path/to/some/file.thon";
 
   __          _
  / _|___ __ _| |_ _  _ _ _ ___ ___
@@ -26,8 +32,7 @@ thon has natural numbers, functions, bounded recursion, binary product and sum
 types, parametric polymorphism, existential packages (a formalization of
 interfaces), and recursive types.
 
-All that stuff is sanity tested and seems to work. The code at the bottom of
-the page might have some other stuff that's not totally done.
+All that stuff is sanity tested and seems to work. The parser is not done yet.
 
 
 |\ | _._|_   .__.| |\ |   ._ _ |_  _ .__
