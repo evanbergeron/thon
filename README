@@ -18,9 +18,8 @@ This works for me on Ubuntu 20:
 
     $ sudo apt install smlnj ml-yaxx ml-lex ml-lpt
     $ sml
-    - use "path/to/thon.sml";
-    - CM.make "path/to/thon.cm";
-    - Thon.parse "path/to/some/file.thon";
+    - CM.make "path/to/your/git/clone/thon.cm";
+    - Thon.run "some thon program here";
 
   __          _
  / _|___ __ _| |_ _  _ _ _ ___ ___
@@ -39,28 +38,22 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 | \|(_| |_|_||(_|| | \||_|| | ||_)(/_|_>
 
 
-- Zero is the natural number 0.
+- Z is the natural number 0.
 
-- Succ Zero is 1.
-
+- S Z is 1.
 
  _
 |_  ._  __|_. _ ._  _
 ||_|| |(_ |_|(_)| |_>
 
 
-- Lam(Nat, Var 0) is the identity function on natural numbers. The 0 here means
+- \ nat -> 0 is the identity function on natural numbers. The 0 here means
   the variable is the "most recently bound" variable.
 
-  We could also have Lam(Nat, Lam(Nat, Var 1)). This function returns a
+  We could also have \ nat -> (\ nat -> 1))). This function returns a
   function that returns whatever was fed to the top-level function.
 
-  Let's call Lam(Nat, Var 0) by the name "natid". In the SML interpreter, we
-  can say
-
-  val natid = Lam(Nat, Var 0);
-
-- App(natid, Zero) applies the identity function to the natural number Zero.
+- ((\ nat -> 0) Z) applies the identity function to the natural number Zero.
 
 
  _                     _
@@ -68,22 +61,27 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 |_)(_)|_|| |(_|(/_(_| | \(/_(_|_||_>|(_)| |
 
 
-- Lam(Nat, Rec(Var 0, Zero Succ(Succ(Var 0)))) is a function that multiplies
+- \ nat -> rec 0 ( Z -> 0 | S -> S S Z ) is a function that multiplies
   its input by 2. Let's break it down:
 
-  Rec(i, b, r) evaluates to b if i is Zero. This is the base case.
+  rec i ( Z -> b | S -> r) evaluates to b if i is Zero. This is the base case.
 
   The recursive case (r) binds a new variable that represents the value of the
   previous recursion.
 
-  Rec(Succ i, b, r) plugs its previous recusive value Rec(i, b', r') for this
-  "previous recursion" variable in the recursive case r.
+  rec (S i) ( Z -> b | S -> r ) plugs its previous recusive value
+  rec i ( Z -> b' -> S - > r') in for this "previous recursion"
+  variable in the recursive case r.
 
   e.g.
 
-  Rec(Succ Zero, Zero, Succ (Succ (Var 0))) -> (* Var 0 is the new bound var *)
-  Succ (Succ (Rec(Zero, Zero, Succ (Succ (Var 0)))))) ->
-  Succ (Succ Zero)
+  rec (S Z) (Z -> Z | S -> S S 0) (* 0 is the new bound var *) steps to
+  S S (rec (Z) (Z -> Z | S -> S S 0)) steps to
+  S S (Z).
+
+
+This is as far as the parser goes right now. Past this point, we speak
+in SML AST literals.
 
 
  _                        _
