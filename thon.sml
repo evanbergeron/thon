@@ -3,6 +3,8 @@ structure Thon : sig
                    val parse : string -> Ast.Exp
                    val test : unit -> unit
                    val eval : A.Exp -> A.Exp
+                   val run : string -> A.Exp
+                   val runFile : string -> A.Exp
                  end =
 struct
 
@@ -390,6 +392,10 @@ fun step e =
 
 
 fun eval e = if isval e then e else eval (step e)
+
+fun run s = let val e = Parse.parse s in if isval e then e else eval (step e) end
+
+fun runFile s = let val e = Parse.parseFile s in if isval e then e else eval (step e) end
 
 fun parse filename =
     let val ast : A.Exp = Parse.parse filename
