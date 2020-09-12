@@ -30,7 +30,5 @@ ws = [\ \t];
 ":"      => (Tokens.COLON(!pos,!pos));
 "("      => (Tokens.LPAREN(!pos,!pos));
 ")"      => (Tokens.RPAREN(!pos,!pos));
-"{"      => (Tokens.LBRACE(!pos,!pos));
-"}"      => (Tokens.RBRACE(!pos,!pos));
 "|"      => (Tokens.PIPE(!pos,!pos));
 {digit}+ => (Tokens.IDX (valOf (Int.fromString yytext), !pos, !pos));

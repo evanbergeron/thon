@@ -10,7 +10,6 @@ structure A = Ast
  | ZERO
  | SUCC
  | LPAREN | RPAREN
- | LBRACE | RBRACE
  | PIPE
  | LAM
  | SARROW
@@ -55,7 +54,7 @@ exp:
   (* eventually would rather this be LAM ID COLON typ SARROW exp but
    * not until we manage to turn names into binding site indexes *)
   | LAM typ SARROW exp (A.Lam (typ, exp))
-  | REC exp LBRACE ZERO SARROW exp PIPE SUCC SARROW exp RBRACE (A.Rec (exp1, exp2, exp3))
+  | REC exp LPAREN ZERO SARROW exp PIPE SUCC SARROW exp RPAREN (A.Rec (exp1, exp2, exp3))
 
 typ:
     NAT (A.Nat)
