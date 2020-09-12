@@ -1,57 +1,154 @@
-Interpreters for four (very) small programming languages. There are
-no parsers, so if you want to play with it, you'll need to load the
-code in a sml repl somewhere.
+ _   _
+| | | |
+| |_| |__   ___  _ __
+| __| '_ \ / _ \| '_ \
+| |_| | | | (_) | | | |
+ \__|_| |_|\___/|_| |_|
 
-- CM.make "path/to/thon.cm";
-- Thon.parse "path/to/some/file.thon";
 
-Neither of these languages are Turing complete. All programs in both
-languages halt.
+thon is a small programming language. The implementation in at the bottom of
+this text file. There's no parser, so if you want to play with it, you'll need
+to load the code into an sml repl somewhere.
 
-* t.sml implements System T, the simply type lambda calculus with
-  primitive recursion (i.e. bounded recursion).
+This works for me on Ubuntu 20:
 
-* f.sml expands on t.sml by introducing variable types (parametric
-  polymorphism).
+    sudo apt install smlnj
+    sml
+    - use "path/to/thon.sml";
 
-* fe.sml expands on f.sml with existential packages and binary product
-  types.
+  __          _
+ / _|___ __ _| |_ _  _ _ _ ___ ___
+|  _/ -_) _` |  _| || | '_/ -_|_-<
+|_| \___\__,_|\__|\_,_|_| \___/__/
 
-* thon.sml expands on fe.sml with recursive types and binary sum types.
 
-I'm building out a parser, here is some example program text. Of
-course, all of this is subject to change.
+thon has natural numbers, functions, bounded recursion, binary product and sum
+types, parametric polymorphism, existential packages (a formalization of
+interfaces), and recursive types.
 
-  ((\ nat -> rec 0 { Z -> 0 | S -> S S Z }) (S Z))
+All that stuff is sanity tested and seems to work. The code at the bottom of
+the page might have some other stuff that's not totally done.
 
-multiplies the number 1 by 2.
 
-Some examples:
+|\ | _._|_   .__.| |\ |   ._ _ |_  _ .__
+| \|(_| |_|_||(_|| | \||_|| | ||_)(/_|_>
 
-- Lam(Nat, Var 0) is the identity function on the natural numbers.
-- Lam(Nat, Lam(Nat, Var 0)) is a function that returns the identity
-  function on the natural numbers.
+
+- Zero is the natural number 0.
+
+- Succ Zero is 1.
+
+
+ _
+|_  ._  __|_. _ ._  _
+||_|| |(_ |_|(_)| |_>
+
+
+- Lam(Nat, Var 0) is the identity function on natural numbers. The 0 here means
+  the variable is the "most recently bound" variable.
+
+  We could also have Lam(Nat, Lam(Nat, Var 1)). This function returns a
+  function that returns whatever was fed to the top-level function.
+
+  Let's call Lam(Nat, Var 0) by the name "natid". In the SML interpreter, we
+  can say
+
+  val natid = Lam(Nat, Var 0);
+
+- App(natid, Zero) applies the identity function to the natural number Zero.
+
+
+ _                     _
+|_) _    ._  _| _  _| |_) _  _   .__. _ ._
+|_)(_)|_|| |(_|(/_(_| | \(/_(_|_||_>|(_)| |
+
+
+- Lam(Nat, Rec(Var 0, Zero Succ(Succ(Var 0)))) is a function that multiplies
+  its input by 2. Let's break it down:
+
+  Rec(i, b, r) evaluates to b if i is Zero. This is the base case.
+
+  The recursive case (r) binds a new variable that represents the value of the
+  previous recursion.
+
+  Rec(Succ i, b, r) plugs its previous recusive value Rec(i, b', r') for this
+  "previous recursion" variable in the recursive case r.
+
+  e.g.
+
+  Rec(Succ Zero, Zero, Succ (Succ (Var 0))) -> (* Var 0 is the new bound var *)
+  Succ (Succ (Rec(Zero, Zero, Succ (Succ (Var 0)))))) ->
+  Succ (Succ Zero)
+
+
+ _                        _
+|_)_..__.._ _  __|_._. _ |_)_ |  ._ _  _ ._._ |_ . _._ _
+| (_||(_|| | |(/_|_| |(_ | (_)|\/| | |(_)| |_)| ||_>| | |
+                               /           |
+
 - TypAbs(Lam(TypVar 0, Var 0)) is the polymorphic identity function.
-- Succ Zero is the natural number 1.
-- Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Succ(Var 0)))) is a recursive
-  value. It recurses to depth two (Succ(Succ(Zero))). It returns Zero
-  at the base case. Each recursive step adds three to the value of the
-  previous recursion. So it computes 3 times the depth it recurses.
 
-So let's load that into a lambda function:
 
-    val multByThree = Lam(Nat, Rec(Var 0, Zero, Succ(Succ(Succ(Var 0)))));
+ _                       _
+|_  . __|_ _ .__|_. _.| |_)_. _|  _. _  _  _
+|_><|_> |_(/_| ||_|(_|| | (_|(_|<(_|(_|(/__>
+                                     _|
 
-And call it on the number one:
+- Pack makes a type private to an implementation. Here's a simple example:
 
-    eval (App(multByThree, Succ Zero));
-    val it = Succ (Succ (Succ Zero)) : Exp
+      Tuple(Lam(Nat, Tuple(Var 0, Zero)),
+            Lam(Prod(Nat, Nat), ProdLeft(Var 0)))
 
-Happily, we get three!
+      Tuple(Lam(Nat, Var 0), Lam(Nat, Var 0))
 
-See chapters 9, 16, and 17 of Bob Harper's "Practical Foundations for
-Programming Languages" for more. Also Pierce's Types and Programming
-Langauges.
+  These tuples are two different implementations of a (set, get) interface.
 
-*
-sudo apt install sml ml-yaxx ml-lex ml-lpt
+  The left function in each takes in a natural number and converts it to
+  something. The right function of each retrieves that natural number.
+
+  The first implementation stores its arg in the tuple (arg, 0). The second
+  stores arg by itself. Of course, these implementations have different types.
+
+  These internal storage types are implementation details; let's pack them away.
+
+      p0 = Pack(Nat,
+           Tuple(Lam(Nat, Tuple(Var 0, Zero)),
+                 Lam(Prod(Nat, Nat), ProdLeft(Var 0))),
+           Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat)))
+
+      p1 = Pack(Prod(Nat, Nat),
+           Tuple(Lam(Nat, Tuple(Var 0, Zero)),
+                 Lam(Prod(Nat, Nat), ProdLeft(Var 0))),
+           Prod(Arr(Nat,TypVar 0),Arr (TypVar 0,Nat)))
+
+  Both of these expression have type Prod(Arr(Nat,TypVar 0),Arr (TypVar 0,Nat)).
+  They've abstracted away their implementation type into an abstract type
+  variable.
+
+  So now we can use these two implementations interchangably. I'll write up an
+  example of how to do this later, but there are some test cases in the code
+  below. (Search for Open if you're interested).
+
+ _                   ___
+|_) _  _   .__.   _   |  ._  _  _
+| \(/_(_|_||_>|\/(/_  |\/|_)(/__>
+                       / |
+
+- TyRec(Plus(Unit, Prod(Nat, TypVar 0))) is the type of lists natural numbers.
+
+- Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit)) is the empty
+  list of natural numbers.
+
+- Lam(Prod(Nat, natlist),
+      Fold(natlist,
+           PlusRight(
+               Plus(Unit, Prod(Nat, natlist)),
+               Var 0
+           )
+          )
+     ); is a function that takes a pair (nat, natlist) and prepends nat to
+  natlist.
+
+I've mostly been working out of Bob Harper's "Practical Foundations for
+Programming Languages," though Pierce's "Types and Programming Languages" has
+been a useful source of examples and exposition as well.
