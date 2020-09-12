@@ -1,6 +1,7 @@
 signature AST =
 sig
 
+    (* TODO is there a way to dedupe this with the structure defn below? *)
     datatype Typ =
         Nat
       | TypVar of int
