@@ -1,0 +1,2 @@
+fold u . (unit | (nat * 0))
+with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))

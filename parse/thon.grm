@@ -22,10 +22,18 @@ structure A = Ast
  | POLY
  | LEFT
  | RIGHT
+ | FST
+ | SND
  | COMMA
  | STAR
  | ALL
  | SOME
+ | TYPEREC
+ | DOT
+ | UNIT
+ | FOLD
+ | UNFOLD
+ | WITH
 
 %nonterm
    exp of A.Exp
@@ -43,7 +51,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT ALL SOME
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -59,22 +67,28 @@ exp:
   | IDX (A.Var IDX)
   | ZERO (A.Zero)
   | SUCC exp (A.Succ exp)
+  | UNIT (A.TmUnit)
   (* eventually would rather this be LAM ID COLON typ SARROW exp but
    * not until we manage to turn names into binding site indexes *)
   | LAM typ SARROW exp (A.Lam (typ, exp))
   | REC exp LPAREN ZERO SARROW exp PIPE SUCC SARROW exp RPAREN (A.Rec (exp1, exp2, exp3))
   | POLY exp (A.TypAbs exp)
   | LPAREN exp COMMA exp RPAREN (A.Tuple(exp1, exp2))
-  | LEFT exp (A.ProdLeft exp)
-  | RIGHT exp (A.ProdRight exp)
+  | FST exp (A.ProdLeft exp)
+  | SND exp (A.ProdRight exp)
+  | LEFT exp COLON typ (A.PlusLeft(typ, exp))
+  | RIGHT exp COLON typ (A.PlusRight(typ, exp))
+  | FOLD typ WITH exp (A.Fold(typ, exp))
 
 typ:
     NAT (A.Nat)
+  | UNIT (A.Unit)
   | typ SARROW typ (A.Arr(typ1, typ2))
   | typ STAR typ (A.Prod(typ1, typ2))
   | LPAREN typ RPAREN (typ)
   | IDX (A.TypVar IDX)
   | ALL typ (A.All typ)
   | SOME typ (A.Some typ)
+  | TYPEREC DOT typ (A.TyRec typ)
   (* TODO should this take precedence below star and arrow? *)
   | typ PIPE typ (A.Plus (typ1, typ2))

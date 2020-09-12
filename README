@@ -50,7 +50,7 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 - \ nat -> 0 is the identity function on natural numbers. The 0 here means
   the variable is the "most recently bound" variable.
 
-  We could also have \ nat -> (\ nat -> 1))). This function returns a
+  We could also have \ nat -> (\ nat -> 1). This function returns a
   function that returns whatever was fed to the top-level function.
 
 - ((\ nat -> 0) Z) applies the identity function to the natural number Zero.
@@ -133,21 +133,23 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 | \(/_(_|_||_>|\/(/_  |\/|_)(/__>
                        / |
 
-- TyRec(Plus(Unit, Prod(Nat, TypVar 0))) is the type of lists natural numbers.
+- u.(unit | (nat * 0)) is the type of lists natural numbers.
 
-- Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit)) is the empty
-  list of natural numbers.
+- fold u . (unit | (nat * 0))
+  with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
 
-- Lam(Prod(Nat, natlist),
-      Fold(natlist,
-           PlusRight(
-               Plus(Unit, Prod(Nat, natlist)),
-               Var 0
-           )
-          )
-     ); is a function that takes a pair (nat, natlist) and prepends nat to
+  is the empty list of natural numbers. Haha I will add more sugar
+  over time for this...
+
+- \ (nat * (u. (unit |  (nat * 0)))) ->
+  fold u.(unit |  (nat * 0)) with
+  right 0 : (unit | (nat * (u. (unit |  (nat * 0)))))
+
+  is a function that takes a pair (nat, natlist) and prepends nat to
   natlist.
 
 I've mostly been working out of Bob Harper's "Practical Foundations for
 Programming Languages," though Pierce's "Types and Programming Languages" has
-been a useful source of examples and exposition as well.
+been a useful source of examples and exposition as well. I am also
+grateful to Rob Simmons and every other contributor to the SML starter
+code for CMU's Fall 2016 compilers course.

@@ -1,6 +1,7 @@
 (* A system FE interpreter - System F with existential packages *)
 structure Thon : sig
                    val parse : string -> Ast.Exp
+                   val parseFile : string -> Ast.Exp
                    val test : unit -> unit
                    val eval : A.Exp -> A.Exp
                    val run : string -> A.Exp
@@ -399,8 +400,14 @@ fun run s = let val e = Parse.parse s in if isval e then e else eval (step e) en
 
 fun runFile s = let val e = Parse.parseFile s in if isval e then e else eval (step e) end
 
-fun parse filename =
-    let val ast : A.Exp = Parse.parse filename
+fun parse s =
+    let val ast : A.Exp = Parse.parse s
+    in
+        ast
+    end
+
+fun parseFile filename =
+    let val ast : A.Exp = Parse.parseFile filename
     in
         ast
     end
@@ -408,18 +415,28 @@ fun parse filename =
 
 (******* Tests *******)
 
-fun test() =
-    let
+fun test() = let
+open A;
 (* Data Natlist = None | Some(Nat, Natlist) *)
-val natlist : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, A.TypVar 0)));
+val natlist : Typ = TyRec(Plus(Unit, Prod(Nat, TypVar 0)));
+val Lam (TyRec (Plus (Unit,Prod (Nat,TypVar 0))),Var 0) : Ast.Exp =
+    parse "\\ (u. (unit |  (nat * 0))) -> 0";
+(* id function on natlists *)
+val Lam (natlist, Var 0) : Ast.Exp =
+    parse "\\ (u. (unit |  (nat * 0))) -> 0";
+val TypApp(natlist, TypAbs (Lam (TypVar 0,Var 0))) : Exp =
+    parse "((poly \\ 0 -> 0) (u. (unit | (nat * 0))))";
 (* Unfolded Natlist type *)
 val nlbody : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, natlist)));
-
-(* empty : natlist *)
-
-(* We're projecting.... against a sum type... needs to be a plus. *)
 val nilNatList =
-    A.Fold(natlist, A.PlusLeft(A.Plus(A.Unit, A.Prod(A.Nat, natlist)), A.TmUnit));
+    Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
+
+(* TODO don't hardcode dir *)
+val parsedNilNatList = parseFile "/home/evan/thon/examples/emptynatlist.thon";
+
+val true = (nilNatList = parsedNilNatList);
+
+val TmUnit : Ast.Exp = parse "unit";
 
 val singletonList =
     A.Fold(natlist, A.PlusRight(A.Plus(A.Unit, A.Prod(A.Nat, natlist)), A.Tuple(A.Zero,
@@ -428,14 +445,24 @@ val singletonList =
 val A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))) = typeof Nil Nil singletonList;
 
 val natlistCons =
-    A.Lam(A.Prod(A.Nat, natlist),
-        A.Fold(natlist,
-             A.PlusRight(
-                 A.Plus(A.Unit, A.Prod(A.Nat, natlist)),
-                 A.Var 0
+    Lam(Prod(Nat, natlist),
+        Fold(natlist,
+             PlusRight(
+                 Plus(Unit, Prod(Nat, natlist)),
+                 Var 0
              )
             )
        );
+
+val Lam(Prod (Nat, TyRec (Plus (Unit,Prod (Nat,TypVar 0)))),
+     Fold(TyRec (Plus (Unit,Prod (Nat,TypVar 0))),
+          PlusRight(
+              Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))),
+           Var 0))) : Exp =
+    parseFile "/home/evan/thon/examples/natlistcons.thon";
+val parsedNatlistCons =
+    parseFile "/home/evan/thon/examples/natlistcons.thon";
+val true = (parsedNatlistCons = natlistCons);
 
 val A.Arr (A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))),
          A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))) : A.Typ =
@@ -717,8 +744,6 @@ val multByThree = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ(A.Succ(A.Succ(A.Var
 val A.Lam (A.Nat,A.Rec (A.Var 0,A.Var 0,A.Succ (A.Succ A.Zero))) : Ast.Exp =
     parse "\\ nat -> rec 0 ( Z -> 0 | S -> S S Z )";
 
-(* TODO can move this to the top and rm all the A.'s *)
-open A;
 
 val App (Lam (Nat,Rec (Var 0,Zero,Succ (Succ (Var 0)))),Succ Zero) =
     parse "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S Z))";
@@ -754,13 +779,13 @@ val Lam (Prod (Nat,Nat),Var 0) : Ast.Exp =
     parse "\\ (nat * nat) -> 0";
 
 val ProdLeft (Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero)))) : Ast.Exp =
-    parse "left (Z, (S Z, S S Z))";
+    parse "fst (Z, (S Z, S S Z))";
 val ProdRight (Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero)))) : Ast.Exp =
-    parse "right (Z, (S Z, S S Z))";
+    parse "snd (Z, (S Z, S S Z))";
 val Zero : Ast.Exp =
-    run "left (Z, (S Z, S S Z))";
+    run "fst (Z, (S Z, S S Z))";
 val Succ Zero : Ast.Exp =
-    run "left right (Z, (S Z, S S Z))";
+    run "fst snd (Z, (S Z, S S Z))";
 
 val TypAbs (Lam (All (TypVar 0),Var 0)) : Ast.Exp =
     parse "poly \\ (all 0) -> 0"
