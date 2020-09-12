@@ -36,7 +36,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LBRACE RBRACE LAM COLON NAT IDX REC PIPE
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 

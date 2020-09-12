@@ -716,11 +716,17 @@ val multByThree = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ(A.Succ(A.Succ(A.Var
 val A.Lam (A.Nat,A.Rec (A.Var 0,A.Var 0,A.Succ (A.Succ A.Zero))) : Ast.Exp =
     parse "\\ nat -> rec 0 ( Z -> 0 | S -> S S Z )";
 
-val A.App(A.Lam (A.Nat,A.Rec (A.Var 0,A.Var 0,A.Succ (A.Succ A.Zero))), A.Succ A.Zero) : Ast.Exp =
-    parse "((\\ nat -> rec 0 ( Z -> 0 | S -> S S Z )) (S Z))";
+(* TODO can move this to the top and rm all the A.'s *)
+open A;
+
+val App (Lam (Nat,Rec (Var 0,Zero,Succ (Succ (Var 0)))),Succ Zero) =
+    parse "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S Z))";
 
 val (A.Succ (A.Succ A.Zero)) =
-    run "((\\ nat -> rec 0 ( Z -> 0 | S -> S S Z )) (S Z))";
+    run "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S Z))";
+
+val Succ (Succ (Succ (Succ Zero))) : Ast.Exp =
+    run "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S S Z))";
 
 val A.Succ (A.Succ (A.Succ A.Zero)) = eval (A.App(multByThree, A.Succ A.Zero))
 

@@ -61,7 +61,7 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 |_)(_)|_|| |(_|(/_(_| | \(/_(_|_||_>|(_)| |
 
 
-- \ nat -> rec 0 ( Z -> 0 | S -> S S Z ) is a function that multiplies
+- \ nat -> rec 0 ( Z -> Z | S -> S S 0 ) is a function that multiplies
   its input by 2. Let's break it down:
 
   rec i ( Z -> b | S -> r) evaluates to b if i is Zero. This is the base case.
