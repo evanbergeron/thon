@@ -409,15 +409,14 @@ fun parse filename =
 
 fun test() =
     let
-(* Data A.Natlist = None | A.Some(A.Nat, A.Natlist) *)
+(* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, A.TypVar 0)));
-(* A.Unfolded A.Natlist type *)
+(* Unfolded Natlist type *)
 val nlbody : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, natlist)));
 
-(* (* empty : natlist *) *)
+(* empty : natlist *)
 
-(* (* We're projecting.... against a sum type... needs to be a plus. *) *)
-(* (* Why does this need to be nlbody, not natlist? *) *)
+(* We're projecting.... against a sum type... needs to be a plus. *)
 val nilNatList =
     A.Fold(natlist, A.PlusLeft(A.Plus(A.Unit, A.Prod(A.Nat, natlist)), A.TmUnit));
 
@@ -425,300 +424,296 @@ val singletonList =
     A.Fold(natlist, A.PlusRight(A.Plus(A.Unit, A.Prod(A.Nat, natlist)), A.Tuple(A.Zero,
     A.Fold(natlist, A.PlusLeft(A.Plus(A.Unit, A.Prod(A.Nat, natlist)), A.TmUnit)))));
 
-(* val A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))) = .Atypeof Nil Nil singletonList; *)
-
-(* val natlistCons = *)
-(*     A.Lam(A.Prod(A.Nat, natlist), *)
-(*         A.Fold(natlist, *)
-(*              A.PlusRight( *)
-(*                  A.Plus(A.Unit, A.Prod(A.Nat, natlist)), *)
-(*                  A.Var 0 *)
-(*              ) *)
-(*             ) *)
-(*        ); *)
-
-(* val A.Arr (A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))), *)
-(*          A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))) : Typ = *)
-(*     typeof Nil Nil natlistCons; *)
-
-(* val deducedSingleListA.AppResType = typeof Nil Nil (A.App(natlistCons, A.Tuple(A.Zero, nilA.NatList))); *)
-(* val true = (deducedSingleListA.AppResType = natlist); *)
-
-(* val deducedA.Natlist = typeof Nil Nil nilA.NatList; *)
-(* val true = (natlist = deducedA.Natlist); *)
-
-(* val A.Plus (A.Unit,A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))))) : Typ = *)
-(*     typeof Nil Nil (A.Unfold(nilA.NatList)); *)
-
-(* val A.PlusLeft *)
-(*     (A.Plus (A.Unit,A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))))),A.TmUnit) : Exp = eval (A.Unfold(nilA.NatList)); *)
-
-(* (* isnil : nlbody..... ? -> A.Nat (*True or False*) *) *)
-(* val isnil = A.Lam(natlist, A.Case(A.Unfold(A.Var 0), A.Succ A.Zero, A.Zero)); *)
-(* val A.Nat = typeof Nil Nil (A.App(isnil, nilA.NatList)); *)
-(* (* isnil nilA.NatList == 1. *) *)
-(* val A.Succ A.Zero = eval (A.App(isnil, nilA.NatList)); *)
-
-(* (* natlistConsType*) *)
-(* val natlistConstype = A.Arr(A.Prod(A.Nat, natlist), natlist); *)
-
-(* (* A.PlusRight(natlist, (A.Zero, nilA.NatList)) *) *)
-
-(* (* val natlistCons = A.Lam(A.Prod(A.Nat, natlist), A.Fold(natlist, A.Tuple(A.Var 1, A.Var 0))); *) *)
-
-(* (* Defines a type of natural number queues. Can wrap in an existential type, also. *) *)
-(* val natQueueType = A.Prod( *)
-(*     (* empty queue *) natlist, *)
-(*     A.Prod((* insert *) (A.Arr(A.Prod(A.Nat, natlist), natlist)), *)
-(*         (* remove*) A.Arr(natlist, (A.Plus((*None*) A.Unit, (*A.Some(A.Nat, natlist)*)A.Prod(A.Nat, natlist)))) *)
-(*     ) *)
-(* ); *)
-
-(* val A.Plus(A.Nat, A.Nat) = typeof Nil Nil (A.PlusLeft (A.Plus(A.Nat, A.Nat), A.Zero)); *)
-(* val A.Plus(A.Nat, A.Prod(A.Nat, A.Nat)) = typeof Nil Nil (A.PlusLeft (A.Plus(A.Nat, A.Prod(A.Nat, A.Nat)), A.Zero)); *)
-(* val A.Zero = step (A.Case(A.PlusLeft (A.Plus(A.Nat, A.Nat), A.Zero), A.Var 0, A.Succ(A.Var 0))); *)
-(* val (A.Succ A.Zero) = step (A.Case(A.PlusRight (A.Plus(A.Nat, A.Nat), A.Zero), A.Var 0, A.Succ(A.Var 0))); *)
-
-
-(* (* Seems there are multiple valid typings of this expression. Up *) *)
-(* (* front, I thought A.Some(A.Arr(A.TypVar 0, A.Nat)) is the only correct typing, *) *)
-(* (* but the chapter on existential types in TAPL suggests otherwise. *) *)
-
-(* (* That's why we require an explicit type annotation from the programmer. *) *)
-(* val A.Arr(A.Nat, A.Nat) = typeof Nil (Cons(42, Nil)) (A.Lam(A.Nat, A.Zero)); *)
-(* val A.Arr(A.TypVar 0, A.TypVar 0) = typAbstractOut A.Nat (A.Arr(A.Nat, A.Nat)); *)
-(* val A.All(A.Arr(A.TypVar 0, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.All(A.Arr(A.TypVar 0, A.Nat))); *)
-
-(* val e0 = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.TypVar 0)); *)
-(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e0; *)
-(* val e1 = A.Pack(A.Nat, A.Lam(A.Nat, A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0)); *)
-(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e1; *)
-(* val e2 = A.Pack(A.Arr(A.Nat, A.Nat), A.Lam(A.Arr(A.Nat, A.Nat), A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0)); *)
-(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e2; *)
-(* val e4 = A.Pack(A.All(A.Nat), A.Lam(A.All(A.Nat), A.Zero), A.Arr(A.TypVar 0, A.Nat)); *)
-(* val A.Some(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil e4 *)
-
-(* val e5 = A.Pack(A.Nat, A.Lam(A.All(A.Nat), A.Zero), A.Arr(A.All (A.TypVar 1), A.TypVar 0)); *)
-(* val A.Some(A.Arr(A.All (A.TypVar 1), A.TypVar 0)) = typeof Nil Nil e5 *)
-
-(* val t5 = typeof Nil Nil (A.Lam(A.All(A.Nat), A.Zero)); *)
-(* val (A.Arr(A.All A.Nat, A.Nat)) = t5; *)
-(* val A.Arr(A.All (A.TypVar 1), A.TypVar 0) = typAbstractOut A.Nat (A.Arr(A.All A.Nat, A.Nat)); *)
-
-(* val f = A.Lam(A.Arr(A.Nat, A.Nat), A.Zero); *)
-(* val g = A.Lam (A.Nat,A.Succ (A.Var 0)); *)
-(* val pkg = A.Pack(A.Arr(A.Nat, A.Nat), f, A.Arr(A.TypVar 0, A.Nat)); *)
-(* val A.Some (A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil pkg; *)
-
-(* val A.Some(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.Nat))); *)
-(* val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.TypVar 0))); *)
-(* val A.Nat = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.TypVar 0)) handle IllTyped => A.Nat; *)
-
-(* val zeroFnPkg = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.Nat)); *)
-(* val zeroFnPkg2 = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.Nat, A.TypVar 0)); *)
-
-(* (* Define identity package; can convert A.Nat to internal repr type and back. *) *)
-(* val idid = A.Tuple(A.Lam(A.Nat, A.Var 0), A.Lam(A.Nat, A.Var 0)); *)
-(* val A.Prod(A.Arr(A.Nat, A.Nat), A.Arr(A.Nat, A.Nat)) = typeof Nil Nil idid; *)
-(* val inoutpkg = A.Pack(A.Nat, idid, A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))); *)
-(* val A.Some(A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))) = typeof Nil Nil inoutpkg; *)
-(* val A.Nat = typeof Nil Nil (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
-(* val true = isval inoutpkg; *)
-(* (* Dynamics *) *)
-(* val A.App *)
-(*     (A.ProdRight (A.Tuple (A.Lam (A.Nat,A.Var 0),A.Lam (A.Nat,A.Var 0))), *)
-(*      A.App (A.ProdLeft (A.Tuple (A.Lam (A.Nat,A.Var 0),A.Lam (A.Nat,A.Var 0))),A.Zero)) *)
-(*     = step (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
-
-(* val A.Zero = eval (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
-
-(* val leftandback = A.Tuple(A.Lam(A.Nat, A.Tuple(A.Var 0, A.Zero)), A.Lam(A.Prod(A.Nat, A.Nat), A.ProdLeft (A.Var 0))); *)
-(* val A.Prod (A.Arr (A.Nat,A.Prod (A.Nat, A.Nat)),A.Arr (A.Prod (A.Nat, A.Nat),A.Nat)) = typeof Nil Nil leftandback; *)
-(* val inoutpkg2 = A.Pack(A.Prod(A.Nat, A.Nat), leftandback, A.Prod (A.Arr (A.Nat,A.TypVar 0),A.Arr (A.TypVar 0,A.Nat))); *)
-(* val A.Some(A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))) = typeof Nil Nil inoutpkg2; *)
-(* val A.Nat = typeof Nil Nil (A.Open(inoutpkg2, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
-(* val A.Zero = eval (A.Open(inoutpkg2, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero)))); *)
-
-(* val double = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ (A.Succ (A.Var 0)))); *)
-(* val A.Succ (A.Succ A.Zero) = eval (A.App(double, (A.Succ A.Zero))); *)
-
-(* val A.All(A.TypVar 1) = typAbstractOut A.Nat (A.All(A.Nat)); *)
-(* val A.TypVar 0 = typAbstractOut A.Nat A.Nat; *)
-(* val A.Arr(A.TypVar 0, A.Nat)= typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Arr(A.Arr(A.Nat, A.Nat), A.Nat)); *)
-(* val A.Some(A.Arr(A.TypVar 1, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Some(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat))); *)
-(* val A.All(A.Arr(A.TypVar 1, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.All(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat))); *)
-(* val A.Some(A.All(A.Arr(A.TypVar 2, A.Nat))) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Some(A.All(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat)))); *)
-
-
-(* val polymorphicIdFn = A.TypAbs(A.Lam(A.TypVar 0, A.Var 0)); *)
-
-(* val A.Lam(A.Nat, A.Var 0) = step (A.TypApp(A.Nat, polymorphicIdFn)); *)
-(* val A.Lam(A.Arr(A.Nat, A.Nat), A.Var 0) = step (A.TypApp(A.Arr(A.Nat, A.Nat), polymorphicIdFn)); *)
-(* val A.TypAbs (A.Lam (A.TypVar 0, A.Var 0)) = step (A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn))) *)
-(* val A.TypApp(A.Nat, A.TypAbs((A.Lam (A.TypVar 0, A.Var 0)))) = step (A.TypApp(A.Nat, A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn)))) *)
-(* val A.TypAbs(A.Lam(A.Arr(A.Nat, A.TypVar 0), A.Var 0)) = step (A.TypApp(A.Nat, A.TypAbs(A.TypAbs(A.Lam(A.Arr(A.TypVar 1, A.TypVar 0), A.Var 0))))); *)
-(* val A.Lam(A.Nat, A.Var 0) = eval (A.TypApp(A.Nat, A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn)))); *)
-
-(* val A.Succ A.Zero = eval (A.App(A.TypApp(A.Nat, polymorphicIdFn), A.Succ(A.Zero))); *)
-
-(* val A.TypAbs(A.Zero) = step (A.TypAbs(A.Zero)); *)
-(* val true = isval (A.Lam(A.Nat, A.TypAbs(A.Zero))); *)
-(* val (A.TypAbs A.Zero) = step (A.App(A.Lam(A.Nat, A.TypAbs(A.Zero)), A.Zero)); *)
-
-(* val A.Nat = typsubst A.Nat (A.TypVar 0); (* Tho this isn't actually a well-formed type *) *)
-(* val A.Arr(A.Nat, A.Nat) = typsubst (A.Arr(A.Nat, A.Nat)) (A.TypVar 0); (* Tho this isn't actually a well-formed type *) *)
-(* val false = istype Nil (A.TypVar 0); *)
-(* val A.All(A.Nat) = typsubst A.Nat (A.All(A.TypVar 1)); *)
-(* val A.Some(A.Nat) = typsubst A.Nat (A.Some(A.TypVar 1)); *)
-(* val A.Some(A.Some(A.TypVar 1)) = typsubst A.Nat (A.Some(A.Some(A.TypVar 1))); *)
-(* val true = istype Nil (A.All(A.TypVar 0)); *)
-(* val true = istype Nil (A.Some(A.TypVar 0)); *)
-(* val A.All(A.Arr(A.Nat, (A.All(A.Nat)))) = typsubst (A.All(A.Nat)) (A.All(A.Arr(A.Nat, A.TypVar 1))); *)
-(* val A.All(A.Arr(A.Nat, (A.Some(A.Nat)))) = typsubst (A.Some(A.Nat)) (A.All(A.Arr(A.Nat, A.TypVar 1))); *)
-
-(* val A.Nat = typeof Nil Nil (A.TypApp(A.TypVar 0, A.Zero)) handle IllTyped => A.Nat; *)
-(* val A.All(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil (A.TypAbs(A.Lam(A.TypVar 0, A.Zero))); *)
-(* val A.Arr(A.Arr(A.Nat, A.Nat), A.Nat) = typeof Nil Nil (A.TypApp(A.Arr(A.Nat, A.Nat), (A.TypAbs(A.Lam(A.TypVar 0, A.Zero))))); *)
-(* val A.Nat = typeof Nil Nil (A.TypApp(A.Arr(A.Nat, A.Nat), (A.TypAbs(A.Lam(A.TypVar 1, A.Zero))))) handle IllTyped => A.Nat; *)
-
-
-(* val A.All(A.Nat) = typeof Nil Nil (A.TypAbs(A.Zero)); (* polymorphic zero *) *)
-(* (* polymorphic id function :) *) *)
-(* val A.All(A.Arr(A.TypVar 0, A.TypVar 0)) = *)
-(*     typeof Nil Nil (A.TypAbs(A.Lam(A.TypVar 0, A.Var 0))); *)
-(* val A.Arr(A.Nat, A.All(A.Arr(A.TypVar 0, A.TypVar 0))) = *)
-(*     typeof Nil Nil (A.Lam(A.Nat, A.TypAbs(A.Lam(A.TypVar 0, A.Var 0)))); *)
-(* val A.Arr(A.Nat, A.All(A.Arr(A.TypVar 0, A.TypVar 0))) = *)
-(*     typeof Nil Nil (A.Lam(A.Nat, A.TypAbs(A.Lam(A.TypVar 0, A.Var 0)))); *)
-(* (* Nested type variables *) *)
-(* val A.All(A.All(A.Arr(A.TypVar 1,A.Nat))) = *)
-(*     typeof Nil Nil (A.TypAbs(A.TypAbs(A.Lam(A.TypVar 1, A.Zero)))) *)
-(* val A.All(A.All(A.Arr(A.TypVar 1, A.TypVar 1))) = *)
-(*     typeof Nil Nil (A.TypAbs(A.TypAbs(A.Lam(A.TypVar 1, A.Var 0)))) *)
-
-(* val true = istype Nil A.Nat; *)
-(* val false = istype Nil (A.TypVar 0); (* Unbound type variable *) *)
-(* val false = istype Nil (A.Arr(A.TypVar 0, A.Nat)); (* Unbound type variable *) *)
-(* val false = istype Nil (A.Arr(A.Nat, A.TypVar 0)); (* Unbound type variable *) *)
-(* val true = istype Nil (A.All(A.Nat)); *)
-(* val true = istype Nil (A.All(A.TypVar 0)); *)
-(* val true = istype Nil (A.All(A.Arr(A.TypVar 0, A.Nat))); *)
-(* val true = istype Nil (A.All(A.Arr(A.Nat, A.TypVar 0))); *)
-(* val false = istype Nil (A.All(A.Arr(A.Nat, A.TypVar 1))); (* Unbound *) *)
-(* val true = istype Nil (A.All(A.All(A.Arr(A.Nat, A.TypVar 1)))); (* Bound *) *)
-
-(* val 0 = len Nil; *)
-(* val 1 = len (Cons(1, Nil)); *)
-
-(* val true = isval A.Zero; *)
-(* val true = isval (A.Succ(A.Zero)); *)
-(* val true = isval (A.Lam(A.Nat, A.Succ(A.Zero))); *)
-(* val true = isval (A.Lam(A.Nat, A.Zero)); *)
-(* val true = isval (A.Lam(A.Nat, A.Succ(A.Var(0)))); *)
-(* val false = isval (A.App(A.Lam(A.Nat, A.Zero), A.Zero)); *)
-
-(* val A.Zero = subst A.Zero A.Zero; *)
-(* val A.Succ A.Zero = subst A.Zero (A.Succ A.Zero); *)
-(* val (A.Lam(A.Nat, A.Var 0)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 0)); *)
-(* val (A.Var 0) = subst (A.Succ A.Zero) (A.Var 1); *)
-(* val A.Lam(A.Nat, A.Var 0) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 0)); *)
-(* val A.Lam(A.Nat, (A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 1)); *)
-(* val A.App(A.Lam(A.Nat, A.Succ A.Zero), (A.Succ A.Zero)) = *)
-(*     subst (A.Succ A.Zero) (A.App(A.Lam(A.Nat, A.Var 1), (A.Var 0))); *)
-
-(* val A.Lam(A.Nat, A.Zero) = subst A.Zero (A.Lam(A.Nat, A.Var 1)); *)
-(* val A.Lam(A.Nat, A.Succ A.Zero) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 1)); *)
-(* val A.Lam(A.Nat, A.Lam(A.Nat, A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Lam(A.Nat, A.Var 2))); *)
-(* val A.Lam(A.Nat, A.Rec(A.Zero, A.Zero, A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Rec(A.Zero, A.Zero, A.Var 2))); *)
-
-(* val A.Lam(A.Nat, A.Rec(A.Zero, A.Var 0, A.Zero)) = subst A.Zero (A.Lam(A.Nat, A.Rec(A.Var 1, A.Var 0, A.Zero))); *)
-(* val A.Lam(A.Nat, A.Rec(A.Zero, A.Var 1, A.Zero)) = subst A.Zero (A.Lam(A.Nat, A.Rec(A.Var 1, A.Var 2, A.Zero))); *)
-(* val A.Rec(A.Zero, A.Zero, A.Zero) = step (A.App(A.Lam(A.Nat, A.Rec(A.Var 0, A.Var 0, A.Zero)), A.Zero)); *)
-
-(* val A.Nat = get (Cons(A.Nat, Nil)) 0; *)
-(* val A.Arr(A.Nat, A.Nat) = get (Cons(A.Nat, Cons(A.Arr(A.Nat, A.Nat), Nil))) 1; *)
-(* val A.Nat = get (Cons(A.Nat, Cons(A.Arr(A.Nat, A.Nat), Nil))) 0; *)
-
-(* val A.Nat = typeof Nil Nil A.Zero; *)
-(* val A.Nat = typeof Nil Nil (A.Succ (A.Zero)); *)
-
-(* val A.Nat = typeof (Cons(A.Nat, Nil)) Nil (A.Var(0)); *)
-(* val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Arr(A.Nat, A.Nat), Nil)) Nil (A.Var(0)); *)
-(* val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Arr(A.Nat, A.Nat), Cons(A.Nat, Nil))) Nil (A.Var(0)); *)
-(* val A.Nat = typeof (Cons(A.Arr(A.Nat, A.Nat), Cons(A.Nat, Nil))) Nil (A.Var(1)); *)
-
-(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam(A.Nat, A.Zero)); *)
-(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam(A.Nat, A.Succ(A.Zero))); *)
-
-(* val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Nat, A.Zero), A.Zero)); *)
-
-(* val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Nat, A.Succ(A.Zero)), A.Lam(A.Nat, A.Zero))) *)
-(*           handle IllTyped => A.Nat; *)
-
-(* val timesTwo = A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Succ(A.Var(0 (* prev *))))); *)
-(* val A.Nat = typeof Nil Nil timesTwo; *)
-
-(* val A.Arr(A.Arr(A.Nat, A.Nat), A.Nat) = *)
-(*     typeof Nil Nil (A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero))); *)
-
-(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Rec(A.Zero, *)
-(*                                        A.Lam(A.Nat, A.Succ(A.Zero)), *)
-(*                                        A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
-
-(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Rec(A.Succ(A.Zero), *)
-(*                                        A.Lam(A.Nat, A.Succ(A.Zero)), *)
-(*                                        A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
-
-(* val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Nat, Nil)) Nil (A.Rec(A.Var(0), *)
-(*                                        A.Lam(A.Nat, A.Succ(A.Zero)), *)
-(*                                        A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
-
-
-(* val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)), A.Zero)) handle IllTyped => A.Nat; *)
-
-(* (* Ill-formed; first param must be A.Nat. *) *)
-(* val A.Nat = typeof Nil Nil (A.Rec(A.Lam(A.Nat, A.Zero), A.Lam(A.Nat, A.Succ(A.Zero)), A.Lam(A.Nat, A.Succ(A.Var(0))))) handle Bind => A.Nat; *)
-
-(* (* Ill-formed; base case type does not match rec case type. *) *)
-(* val A.Nat = (typeof Nil Nil (A.Rec(A.Zero, A.Succ(A.Zero), A.Lam(A.Nat, A.Succ(A.Zero)))) *)
-(*           handle IllTyped => A.Nat); *)
-
-(* val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam((A.TypVar 0), A.Zero)) handle IllTyped => A.Arr(A.Nat, A.Nat); *)
-
-(* val A.Succ(A.Rec(A.Zero, A.Zero, A.Succ(A.Var 0))) = step (A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Var 0))); *)
-
-(* val A.Succ(A.Succ(A.Rec(A.Zero, A.Zero, A.Succ(A.Succ(A.Var 0))))) = *)
-(*     step (A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
-
-(* val A.Zero = step (A.Rec(A.Zero, A.Zero, A.Succ(A.Var 0))); *)
-(* val A.Succ(A.Succ(A.Zero)) = eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Var 0))); *)
-(* val A.Succ(A.Succ(A.Succ(A.Succ(A.Zero)))) = *)
-(*     eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
-
-(* val A.Succ(A.Succ(A.Succ(A.Succ(A.Zero)))) = *)
-(*     eval (A.Rec(A.App(A.Lam(A.Nat, A.Succ(A.Var 0)), A.Succ(A.Zero)), *)
-(*               A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
-
-(* val A.Zero = step A.Zero; *)
-(* val A.Succ(A.Zero) = step (A.Succ(A.Zero)); *)
-(* val A.Lam(A.Nat, A.Zero) = step (A.Lam(A.Nat, A.Zero)); *)
-(* val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Zero)), A.Zero)); *)
-(* val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero)); *)
-(* val A.Succ (A.Succ A.Zero) = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Succ A.Zero)); *)
-(* val A.Succ (A.Succ (A.Succ A.Zero)) = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Succ (A.Succ A.Zero))); *)
-(* val A.Succ (A.Succ (A.Succ A.Zero)) = step (A.App(A.Lam(A.Nat, A.Succ(A.Succ(A.Var(0)))), A.Succ A.Zero)); *)
-
-(* (* Take in a nat -> nat and apply to zero. Input nat -> nat is A.Succ *) *)
-(* val A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero) = step (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)), *)
-(*                                                   A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
-(* val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero)); *)
-
-(* val A.Succ A.Zero = eval (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)), *)
-(*                           A.Lam(A.Nat, A.Succ(A.Var(0))))); *)
-(* val A.Succ (A.Succ (A.Succ (A.Succ A.Zero))) = eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Succ(A.Var 0)))); *)
-
-(* val multByThree = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ(A.Succ(A.Succ(A.Var 0))))); *)
-(* val A.Succ (A.Succ (A.Succ A.Zero)) = eval (A.App(multByThree, A.Succ A.Zero)) *)
+val A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))) = typeof Nil Nil singletonList;
+
+val natlistCons =
+    A.Lam(A.Prod(A.Nat, natlist),
+        A.Fold(natlist,
+             A.PlusRight(
+                 A.Plus(A.Unit, A.Prod(A.Nat, natlist)),
+                 A.Var 0
+             )
+            )
+       );
+
+val A.Arr (A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))),
+         A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0)))) : A.Typ =
+    typeof Nil Nil natlistCons;
+
+val deducedSingleListAppResType = typeof Nil Nil (A.App(natlistCons, A.Tuple(A.Zero, nilNatList)));
+val true = (deducedSingleListAppResType = natlist);
+
+val deducedNatlist = typeof Nil Nil nilNatList;
+val true = (natlist = deducedNatlist);
+
+val A.Plus (A.Unit,A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))))) : A.Typ =
+    typeof Nil Nil (A.Unfold(nilNatList));
+
+val A.PlusLeft
+    (A.Plus (A.Unit,A.Prod (A.Nat,A.TyRec (A.Plus (A.Unit,A.Prod (A.Nat,A.TypVar 0))))),A.TmUnit) : A.Exp = eval (A.Unfold(nilNatList));
+
+val isnil = A.Lam(natlist, A.Case(A.Unfold(A.Var 0), A.Succ A.Zero, A.Zero));
+val A.Nat = typeof Nil Nil (A.App(isnil, nilNatList));
+(* isnil nilNatList == 1. *)
+val A.Succ A.Zero = eval (A.App(isnil, nilNatList));
+
+(* natlistConsType*)
+val natlistConstype = A.Arr(A.Prod(A.Nat, natlist), natlist);
+
+val natlistCons = A.Lam(A.Prod(A.Nat, natlist), A.Fold(natlist, A.Tuple(A.Var 1, A.Var 0)));
+
+(* Defines a type of natural number queues. Can wrap in an existential type, also. *)
+val natQueueType = A.Prod(
+    (* empty queue *) natlist,
+    A.Prod((* insert *) (A.Arr(A.Prod(A.Nat, natlist), natlist)),
+        (* remove*) A.Arr(natlist, (A.Plus((*None*) A.Unit, (*A.Some(A.Nat, natlist)*)A.Prod(A.Nat, natlist))))
+    )
+);
+
+val A.Plus(A.Nat, A.Nat) = typeof Nil Nil (A.PlusLeft (A.Plus(A.Nat, A.Nat), A.Zero));
+val A.Plus(A.Nat, A.Prod(A.Nat, A.Nat)) = typeof Nil Nil (A.PlusLeft (A.Plus(A.Nat, A.Prod(A.Nat, A.Nat)), A.Zero));
+val A.Zero = step (A.Case(A.PlusLeft (A.Plus(A.Nat, A.Nat), A.Zero), A.Var 0, A.Succ(A.Var 0)));
+val (A.Succ A.Zero) = step (A.Case(A.PlusRight (A.Plus(A.Nat, A.Nat), A.Zero), A.Var 0, A.Succ(A.Var 0)));
+
+(* Seems there are multiple valid typings of this expression. Up *)
+(* front, I thought A.Some(A.Arr(A.TypVar 0, A.Nat)) is the only correct typing, *)
+(* but the chapter on existential types in TAPL suggests otherwise. *)
+
+(* That's why we require an explicit type annotation from the programmer. *)
+val A.Arr(A.Nat, A.Nat) = typeof Nil (Cons(42, Nil)) (A.Lam(A.Nat, A.Zero));
+val A.Arr(A.TypVar 0, A.TypVar 0) = typAbstractOut A.Nat (A.Arr(A.Nat, A.Nat));
+val A.All(A.Arr(A.TypVar 0, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.All(A.Arr(A.TypVar 0, A.Nat)));
+
+val e0 = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.TypVar 0));
+val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e0;
+val e1 = A.Pack(A.Nat, A.Lam(A.Nat, A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0));
+val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e1;
+val e2 = A.Pack(A.Arr(A.Nat, A.Nat), A.Lam(A.Arr(A.Nat, A.Nat), A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0));
+val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil e2;
+val e4 = A.Pack(A.All(A.Nat), A.Lam(A.All(A.Nat), A.Zero), A.Arr(A.TypVar 0, A.Nat));
+val A.Some(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil e4
+
+val e5 = A.Pack(A.Nat, A.Lam(A.All(A.Nat), A.Zero), A.Arr(A.All (A.TypVar 1), A.TypVar 0));
+val A.Some(A.Arr(A.All (A.TypVar 1), A.TypVar 0)) = typeof Nil Nil e5
+
+val t5 = typeof Nil Nil (A.Lam(A.All(A.Nat), A.Zero));
+val (A.Arr(A.All A.Nat, A.Nat)) = t5;
+val A.Arr(A.All (A.TypVar 1), A.TypVar 0) = typAbstractOut A.Nat (A.Arr(A.All A.Nat, A.Nat));
+
+val f = A.Lam(A.Arr(A.Nat, A.Nat), A.Zero);
+val g = A.Lam (A.Nat,A.Succ (A.Var 0));
+val pkg = A.Pack(A.Arr(A.Nat, A.Nat), f, A.Arr(A.TypVar 0, A.Nat));
+val A.Some (A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil pkg;
+
+val A.Some(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.Nat)));
+val A.Some(A.Arr(A.TypVar 0, A.TypVar 0)) = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.TypVar 0)));
+val A.Nat = typeof Nil Nil (A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.TypVar 0)) handle IllTyped => A.Nat;
+
+val zeroFnPkg = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.TypVar 0, A.Nat));
+val zeroFnPkg2 = A.Pack(A.Nat, A.Lam(A.Nat, A.Zero), A.Arr(A.Nat, A.TypVar 0));
+
+(* Define identity package; can convert A.Nat to internal repr type and back. *)
+val idid = A.Tuple(A.Lam(A.Nat, A.Var 0), A.Lam(A.Nat, A.Var 0));
+val A.Prod(A.Arr(A.Nat, A.Nat), A.Arr(A.Nat, A.Nat)) = typeof Nil Nil idid;
+val inoutpkg = A.Pack(A.Nat, idid, A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat)));
+val A.Some(A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))) = typeof Nil Nil inoutpkg;
+val A.Nat = typeof Nil Nil (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero))));
+val true = isval inoutpkg;
+(* Dynamics *)
+val A.App
+    (A.ProdRight (A.Tuple (A.Lam (A.Nat,A.Var 0),A.Lam (A.Nat,A.Var 0))),
+     A.App (A.ProdLeft (A.Tuple (A.Lam (A.Nat,A.Var 0),A.Lam (A.Nat,A.Var 0))),A.Zero))
+    = step (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero))));
+
+val A.Zero = eval (A.Open(inoutpkg, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero))));
+
+val leftandback = A.Tuple(A.Lam(A.Nat, A.Tuple(A.Var 0, A.Zero)), A.Lam(A.Prod(A.Nat, A.Nat), A.ProdLeft (A.Var 0)));
+val A.Prod (A.Arr (A.Nat,A.Prod (A.Nat, A.Nat)),A.Arr (A.Prod (A.Nat, A.Nat),A.Nat)) = typeof Nil Nil leftandback;
+val inoutpkg2 = A.Pack(A.Prod(A.Nat, A.Nat), leftandback, A.Prod (A.Arr (A.Nat,A.TypVar 0),A.Arr (A.TypVar 0,A.Nat)));
+val A.Some(A.Prod(A.Arr(A.Nat, A.TypVar 0), A.Arr(A.TypVar 0, A.Nat))) = typeof Nil Nil inoutpkg2;
+val A.Nat = typeof Nil Nil (A.Open(inoutpkg2, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero))));
+val A.Zero = eval (A.Open(inoutpkg2, A.App(A.ProdRight(A.Var 0), A.App(A.ProdLeft(A.Var 0), A.Zero))));
+
+val double = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ (A.Succ (A.Var 0))));
+val A.Succ (A.Succ A.Zero) = eval (A.App(double, (A.Succ A.Zero)));
+
+val A.All(A.TypVar 1) = typAbstractOut A.Nat (A.All(A.Nat));
+val A.TypVar 0 = typAbstractOut A.Nat A.Nat;
+val A.Arr(A.TypVar 0, A.Nat)= typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Arr(A.Arr(A.Nat, A.Nat), A.Nat));
+val A.Some(A.Arr(A.TypVar 1, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Some(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat)));
+val A.All(A.Arr(A.TypVar 1, A.Nat)) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.All(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat)));
+val A.Some(A.All(A.Arr(A.TypVar 2, A.Nat))) = typAbstractOut (A.Arr(A.Nat, A.Nat)) (A.Some(A.All(A.Arr(A.Arr(A.Nat, A.Nat), A.Nat))));
+
+val polymorphicIdFn = A.TypAbs(A.Lam(A.TypVar 0, A.Var 0));
+
+val A.Lam(A.Nat, A.Var 0) = step (A.TypApp(A.Nat, polymorphicIdFn));
+val A.Lam(A.Arr(A.Nat, A.Nat), A.Var 0) = step (A.TypApp(A.Arr(A.Nat, A.Nat), polymorphicIdFn));
+val A.TypAbs (A.Lam (A.TypVar 0, A.Var 0)) = step (A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn)))
+val A.TypApp(A.Nat, A.TypAbs((A.Lam (A.TypVar 0, A.Var 0)))) = step (A.TypApp(A.Nat, A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn))))
+val A.TypAbs(A.Lam(A.Arr(A.Nat, A.TypVar 0), A.Var 0)) = step (A.TypApp(A.Nat, A.TypAbs(A.TypAbs(A.Lam(A.Arr(A.TypVar 1, A.TypVar 0), A.Var 0)))));
+val A.Lam(A.Nat, A.Var 0) = eval (A.TypApp(A.Nat, A.TypApp(A.Nat, A.TypAbs(polymorphicIdFn))));
+
+val A.Succ A.Zero = eval (A.App(A.TypApp(A.Nat, polymorphicIdFn), A.Succ(A.Zero)));
+
+val A.TypAbs(A.Zero) = step (A.TypAbs(A.Zero));
+val true = isval (A.Lam(A.Nat, A.TypAbs(A.Zero)));
+val (A.TypAbs A.Zero) = step (A.App(A.Lam(A.Nat, A.TypAbs(A.Zero)), A.Zero));
+
+val A.Nat = typsubst A.Nat (A.TypVar 0); (* Tho this isn't actually a well-formed type *)
+val A.Arr(A.Nat, A.Nat) = typsubst (A.Arr(A.Nat, A.Nat)) (A.TypVar 0); (* Tho this isn't actually a well-formed type *)
+val false = istype Nil (A.TypVar 0);
+val A.All(A.Nat) = typsubst A.Nat (A.All(A.TypVar 1));
+val A.Some(A.Nat) = typsubst A.Nat (A.Some(A.TypVar 1));
+val A.Some(A.Some(A.TypVar 1)) = typsubst A.Nat (A.Some(A.Some(A.TypVar 1)));
+val true = istype Nil (A.All(A.TypVar 0));
+val true = istype Nil (A.Some(A.TypVar 0));
+val A.All(A.Arr(A.Nat, (A.All(A.Nat)))) = typsubst (A.All(A.Nat)) (A.All(A.Arr(A.Nat, A.TypVar 1)));
+val A.All(A.Arr(A.Nat, (A.Some(A.Nat)))) = typsubst (A.Some(A.Nat)) (A.All(A.Arr(A.Nat, A.TypVar 1)));
+
+val A.Nat = typeof Nil Nil (A.TypApp(A.TypVar 0, A.Zero)) handle IllTyped => A.Nat;
+val A.All(A.Arr(A.TypVar 0, A.Nat)) = typeof Nil Nil (A.TypAbs(A.Lam(A.TypVar 0, A.Zero)));
+val A.Arr(A.Arr(A.Nat, A.Nat), A.Nat) = typeof Nil Nil (A.TypApp(A.Arr(A.Nat, A.Nat), (A.TypAbs(A.Lam(A.TypVar 0, A.Zero)))));
+val A.Nat = typeof Nil Nil (A.TypApp(A.Arr(A.Nat, A.Nat), (A.TypAbs(A.Lam(A.TypVar 1, A.Zero))))) handle IllTyped => A.Nat;
+
+
+val A.All(A.Nat) = typeof Nil Nil (A.TypAbs(A.Zero)); (* polymorphic zero *)
+(* polymorphic id function :) *)
+val A.All(A.Arr(A.TypVar 0, A.TypVar 0)) =
+    typeof Nil Nil (A.TypAbs(A.Lam(A.TypVar 0, A.Var 0)));
+val A.Arr(A.Nat, A.All(A.Arr(A.TypVar 0, A.TypVar 0))) =
+    typeof Nil Nil (A.Lam(A.Nat, A.TypAbs(A.Lam(A.TypVar 0, A.Var 0))));
+val A.Arr(A.Nat, A.All(A.Arr(A.TypVar 0, A.TypVar 0))) =
+    typeof Nil Nil (A.Lam(A.Nat, A.TypAbs(A.Lam(A.TypVar 0, A.Var 0))));
+(* Nested type variables *)
+val A.All(A.All(A.Arr(A.TypVar 1,A.Nat))) =
+    typeof Nil Nil (A.TypAbs(A.TypAbs(A.Lam(A.TypVar 1, A.Zero))))
+val A.All(A.All(A.Arr(A.TypVar 1, A.TypVar 1))) =
+    typeof Nil Nil (A.TypAbs(A.TypAbs(A.Lam(A.TypVar 1, A.Var 0))))
+
+val true = istype Nil A.Nat;
+val false = istype Nil (A.TypVar 0); (* Unbound type variable *)
+val false = istype Nil (A.Arr(A.TypVar 0, A.Nat)); (* Unbound type variable *)
+val false = istype Nil (A.Arr(A.Nat, A.TypVar 0)); (* Unbound type variable *)
+val true = istype Nil (A.All(A.Nat));
+val true = istype Nil (A.All(A.TypVar 0));
+val true = istype Nil (A.All(A.Arr(A.TypVar 0, A.Nat)));
+val true = istype Nil (A.All(A.Arr(A.Nat, A.TypVar 0)));
+val false = istype Nil (A.All(A.Arr(A.Nat, A.TypVar 1))); (* Unbound *)
+val true = istype Nil (A.All(A.All(A.Arr(A.Nat, A.TypVar 1)))); (* Bound *)
+
+val 0 = len Nil;
+val 1 = len (Cons(1, Nil));
+
+val true = isval A.Zero;
+val true = isval (A.Succ(A.Zero));
+val true = isval (A.Lam(A.Nat, A.Succ(A.Zero)));
+val true = isval (A.Lam(A.Nat, A.Zero));
+val true = isval (A.Lam(A.Nat, A.Succ(A.Var(0))));
+val false = isval (A.App(A.Lam(A.Nat, A.Zero), A.Zero));
+
+val A.Zero = subst A.Zero A.Zero;
+val A.Succ A.Zero = subst A.Zero (A.Succ A.Zero);
+val (A.Lam(A.Nat, A.Var 0)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 0));
+val (A.Var 0) = subst (A.Succ A.Zero) (A.Var 1);
+val A.Lam(A.Nat, A.Var 0) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 0));
+val A.Lam(A.Nat, (A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 1));
+val A.App(A.Lam(A.Nat, A.Succ A.Zero), (A.Succ A.Zero)) =
+    subst (A.Succ A.Zero) (A.App(A.Lam(A.Nat, A.Var 1), (A.Var 0)));
+
+val A.Lam(A.Nat, A.Zero) = subst A.Zero (A.Lam(A.Nat, A.Var 1));
+val A.Lam(A.Nat, A.Succ A.Zero) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Var 1));
+val A.Lam(A.Nat, A.Lam(A.Nat, A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Lam(A.Nat, A.Var 2)));
+val A.Lam(A.Nat, A.Rec(A.Zero, A.Zero, A.Succ A.Zero)) = subst (A.Succ A.Zero) (A.Lam(A.Nat, A.Rec(A.Zero, A.Zero, A.Var 2)));
+
+val A.Lam(A.Nat, A.Rec(A.Zero, A.Var 0, A.Zero)) = subst A.Zero (A.Lam(A.Nat, A.Rec(A.Var 1, A.Var 0, A.Zero)));
+val A.Lam(A.Nat, A.Rec(A.Zero, A.Var 1, A.Zero)) = subst A.Zero (A.Lam(A.Nat, A.Rec(A.Var 1, A.Var 2, A.Zero)));
+val A.Rec(A.Zero, A.Zero, A.Zero) = step (A.App(A.Lam(A.Nat, A.Rec(A.Var 0, A.Var 0, A.Zero)), A.Zero));
+
+val A.Nat = get (Cons(A.Nat, Nil)) 0;
+val A.Arr(A.Nat, A.Nat) = get (Cons(A.Nat, Cons(A.Arr(A.Nat, A.Nat), Nil))) 1;
+val A.Nat = get (Cons(A.Nat, Cons(A.Arr(A.Nat, A.Nat), Nil))) 0;
+
+val A.Nat = typeof Nil Nil A.Zero;
+val A.Nat = typeof Nil Nil (A.Succ (A.Zero));
+
+val A.Nat = typeof (Cons(A.Nat, Nil)) Nil (A.Var(0));
+val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Arr(A.Nat, A.Nat), Nil)) Nil (A.Var(0));
+val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Arr(A.Nat, A.Nat), Cons(A.Nat, Nil))) Nil (A.Var(0));
+val A.Nat = typeof (Cons(A.Arr(A.Nat, A.Nat), Cons(A.Nat, Nil))) Nil (A.Var(1));
+
+val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam(A.Nat, A.Zero));
+val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam(A.Nat, A.Succ(A.Zero)));
+
+val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Nat, A.Zero), A.Zero));
+
+val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Nat, A.Succ(A.Zero)), A.Lam(A.Nat, A.Zero)))
+          handle IllTyped => A.Nat;
+
+val timesTwo = A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Succ(A.Var(0 (* prev *)))));
+val A.Nat = typeof Nil Nil timesTwo;
+
+val A.Arr(A.Arr(A.Nat, A.Nat), A.Nat) =
+    typeof Nil Nil (A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)));
+
+val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Rec(A.Zero,
+                                       A.Lam(A.Nat, A.Succ(A.Zero)),
+                                       A.Lam(A.Nat, A.Succ(A.Var(0)))));
+
+val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Rec(A.Succ(A.Zero),
+                                       A.Lam(A.Nat, A.Succ(A.Zero)),
+                                       A.Lam(A.Nat, A.Succ(A.Var(0)))));
+
+val A.Arr(A.Nat, A.Nat) = typeof (Cons(A.Nat, Nil)) Nil (A.Rec(A.Var(0),
+                                       A.Lam(A.Nat, A.Succ(A.Zero)),
+                                       A.Lam(A.Nat, A.Succ(A.Var(0)))));
+
+
+val A.Nat = typeof Nil Nil (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)), A.Zero)) handle IllTyped => A.Nat;
+
+(* Ill-formed; first param must be A.Nat. *)
+val A.Nat = typeof Nil Nil (A.Rec(A.Lam(A.Nat, A.Zero), A.Lam(A.Nat, A.Succ(A.Zero)), A.Lam(A.Nat, A.Succ(A.Var(0))))) handle Bind => A.Nat;
+
+(* Ill-formed; base case type does not match rec case type. *)
+val A.Nat = (typeof Nil Nil (A.Rec(A.Zero, A.Succ(A.Zero), A.Lam(A.Nat, A.Succ(A.Zero))))
+          handle IllTyped => A.Nat);
+
+val A.Arr(A.Nat, A.Nat) = typeof Nil Nil (A.Lam((A.TypVar 0), A.Zero)) handle IllTyped => A.Arr(A.Nat, A.Nat);
+
+val A.Succ(A.Rec(A.Zero, A.Zero, A.Succ(A.Var 0))) = step (A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Var 0)));
+
+val A.Succ(A.Succ(A.Rec(A.Zero, A.Zero, A.Succ(A.Succ(A.Var 0))))) =
+    step (A.Rec(A.Succ(A.Zero), A.Zero, A.Succ(A.Succ(A.Var 0))));
+
+val A.Zero = step (A.Rec(A.Zero, A.Zero, A.Succ(A.Var 0)));
+val A.Succ(A.Succ(A.Zero)) = eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Var 0)));
+val A.Succ(A.Succ(A.Succ(A.Succ(A.Zero)))) =
+    eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Succ(A.Var 0))));
+
+val A.Succ(A.Succ(A.Succ(A.Succ(A.Zero)))) =
+    eval (A.Rec(A.App(A.Lam(A.Nat, A.Succ(A.Var 0)), A.Succ(A.Zero)),
+              A.Zero, A.Succ(A.Succ(A.Var 0))));
+
+val A.Zero = step A.Zero;
+val A.Succ(A.Zero) = step (A.Succ(A.Zero));
+val A.Lam(A.Nat, A.Zero) = step (A.Lam(A.Nat, A.Zero));
+val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Zero)), A.Zero));
+val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero));
+val A.Succ (A.Succ A.Zero) = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Succ A.Zero));
+val A.Succ (A.Succ (A.Succ A.Zero)) = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Succ (A.Succ A.Zero)));
+val A.Succ (A.Succ (A.Succ A.Zero)) = step (A.App(A.Lam(A.Nat, A.Succ(A.Succ(A.Var(0)))), A.Succ A.Zero));
+
+(* Take in a nat -> nat and apply to zero. Input nat -> nat is A.Succ *)
+val A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero) = step (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)),
+                                                  A.Lam(A.Nat, A.Succ(A.Var(0)))));
+val A.Succ A.Zero = step (A.App(A.Lam(A.Nat, A.Succ(A.Var(0))), A.Zero));
+
+val A.Succ A.Zero = eval (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zero)),
+                          A.Lam(A.Nat, A.Succ(A.Var(0)))));
+val A.Succ (A.Succ (A.Succ (A.Succ A.Zero))) = eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Succ(A.Var 0))));
+
+val multByThree = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ(A.Succ(A.Succ(A.Var 0)))));
+val A.Succ (A.Succ (A.Succ A.Zero)) = eval (A.App(multByThree, A.Succ A.Zero))
+
 in
 ()
 end
