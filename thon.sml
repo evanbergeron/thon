@@ -712,7 +712,18 @@ val A.Succ A.Zero = eval (A.App(A.Lam(A.Arr(A.Nat, A.Nat), A.App(A.Var(0), A.Zer
 val A.Succ (A.Succ (A.Succ (A.Succ A.Zero))) = eval (A.Rec(A.Succ(A.Succ(A.Zero)), A.Zero, A.Succ(A.Succ(A.Var 0))));
 
 val multByThree = A.Lam(A.Nat, A.Rec(A.Var 0, A.Zero, A.Succ(A.Succ(A.Succ(A.Var 0)))));
+
+val A.Lam (A.Nat,A.Rec (A.Var 0,A.Var 0,A.Succ (A.Succ A.Zero))) : Ast.Exp =
+    parse "\\ nat -> rec 0 { Z -> 0 | S -> S S Z }";
+
+val A.App(A.Lam (A.Nat,A.Rec (A.Var 0,A.Var 0,A.Succ (A.Succ A.Zero))), A.Succ A.Zero) : Ast.Exp =
+    parse "((\\ nat -> rec 0 { Z -> 0 | S -> S S Z }) (S Z))";
+
+val (A.Succ (A.Succ A.Zero)) =
+    run "((\\ nat -> rec 0 { Z -> 0 | S -> S S Z }) (S Z))";
+
 val A.Succ (A.Succ (A.Succ A.Zero)) = eval (A.App(multByThree, A.Succ A.Zero))
+
 
 in
 ()

@@ -19,6 +19,13 @@ languages halt.
 
 * thon.sml expands on fe.sml with recursive types and binary sum types.
 
+I'm building out a parser, here is some example program text. Of
+course, all of this is subject to change.
+
+  ((\ nat -> rec 0 { Z -> 0 | S -> S S Z }) (S Z))
+
+multiplies the number 1 by 2.
+
 Some examples:
 
 - Lam(Nat, Var 0) is the identity function on the natural numbers.
