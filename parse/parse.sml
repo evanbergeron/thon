@@ -23,13 +23,11 @@ struct
 
   fun parse filename = let
       val instream = TextIO.openIn filename
-      val lexer = ThonParse.makeLexer (fn _ => (case TextIO.inputLine TextIO.stdIn
-                                                  of SOME s => s | _ => ""))
       fun parseerror (s, i, p2) = TextIO.output(TextIO.stdOut,
                             "Error, line " ^ (Int.toString i) ^ ", " ^ s ^ "\n")
-      val lexer0 = LrParser.Stream.streamify
+      val lexer = LrParser.Stream.streamify
                        (ThonLex.makeLexer (fn _ => TextIO.input instream))
-      val (absyn, _) = ThonParse.parse(100, lexer0, parseerror, ())
+      val (absyn, _) = ThonParse.parse(100, lexer, parseerror, ())
       in absyn end
 
 end
