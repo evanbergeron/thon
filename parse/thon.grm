@@ -38,6 +38,8 @@ structure A = Ast
  | AS
  | OPEN
  | IN
+ | CASE
+ | OF
 
 %nonterm
    exp of A.Exp
@@ -55,7 +57,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH PACK AS OPEN IN
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH PACK AS OPEN IN CASE OF
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -86,6 +88,7 @@ exp:
   (* pack reprType in pkgImpl as pkgType *)
   | PACK typ WITH exp AS typ (A.Pack(typ1, exp, typ2))
   | OPEN exp IN exp (A.Open(exp1, exp2))
+  | CASE exp OF exp PIPE exp (A.Case(exp1, exp2, exp3))
 
 typ:
     NAT (A.Nat)

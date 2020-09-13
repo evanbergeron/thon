@@ -809,6 +809,20 @@ val Lam (Some (TypVar 0),Var 0) : Ast.Exp =
 val Lam (Plus (Nat,Arr (Nat,Nat)),Var 0) : Ast.Exp =
     parse "\\ (nat | nat -> nat) -> 0"
 
+val Lam (Plus (Nat,Arr (Nat,Nat)),Case (Var 0,Zero,Succ Zero)) : Exp =
+    run "\\ (nat | nat -> nat) -> case 0 of Z | S Z"
+
+val App
+    (Lam (Plus (Nat,Arr (Nat,Nat)),Case (Var 0,Zero,Succ Zero)),
+     PlusLeft (Plus (Nat,Arr (Nat,Nat)),Zero)) : Exp =
+    parse "((\\ (nat | nat -> nat) -> case 0 of Z | S Z) (left Z : (nat | nat -> nat)))";
+
+val Zero : Exp =
+    run "((\\ (nat | nat -> nat) -> case 0 of Z | S Z) (left Z : (nat | nat -> nat)))";
+
+val Succ Zero: Exp =
+    run "((\\ (nat | nat -> nat) -> case 0 of Z | S Z) (right (\\ nat -> Z) : (nat | nat -> nat)))";
+
 val Lam (Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))),Var 0) : Ast.Exp =
     parse "\\ (nat | ((nat -> nat) | (nat * nat))) -> 0"
 
