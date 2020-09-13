@@ -35,6 +35,7 @@ structure A = Ast
  | UNFOLD
  | WITH
  | PACK
+ | IMPL
  | AS
  | OPEN
  | IN
@@ -57,7 +58,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH PACK AS OPEN IN CASE OF
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH PACK AS OPEN IN CASE OF IMPL
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -86,7 +87,7 @@ exp:
   | RIGHT exp COLON typ (A.PlusRight(typ, exp))
   | FOLD typ WITH exp (A.Fold(typ, exp))
   (* pack reprType in pkgImpl as pkgType *)
-  | PACK typ WITH exp AS typ (A.Pack(typ1, exp, typ2))
+  | IMPL typ WITH exp AS typ (A.Pack(typ1, exp, typ2))
   | OPEN exp IN exp (A.Open(exp1, exp2))
   | CASE exp OF exp PIPE exp (A.Case(exp1, exp2, exp3))
 
@@ -97,8 +98,8 @@ typ:
   | typ STAR typ (A.Prod(typ1, typ2))
   | LPAREN typ RPAREN (typ)
   | IDX (A.TypVar IDX)
-  | ALL typ (A.All typ)
-  | SOME typ (A.Some typ)
+  | ALL typ (A.All typ) (* TODO maybe have a dot *)
+  | SOME typ (A.Some typ) (* TODO maybe have a dot *)
   | TYPEREC DOT typ (A.TyRec typ)
   (* TODO should this take precedence below star and arrow? *)
   | typ PIPE typ (A.Plus (typ1, typ2))
