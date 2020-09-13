@@ -87,7 +87,8 @@ exp:
   | RIGHT exp COLON typ (A.PlusRight(typ, exp))
   | FOLD typ WITH exp (A.Fold(typ, exp))
   (* pack reprType in pkgImpl as pkgType *)
-  | IMPL typ WITH exp AS typ (A.Pack(typ1, exp, typ2))
+  (* Pack (reprType, pkgImpl, pkgType) *)
+  | IMPL typ WITH typ AS exp (A.Pack(typ2, exp, typ1))
   | OPEN exp IN exp (A.Open(exp1, exp2))
   | CASE exp OF exp PIPE exp (A.Case(exp1, exp2, exp3))
 

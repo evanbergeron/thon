@@ -518,21 +518,21 @@ val e0 = A.Pack(Nat, Lam(Nat, Zero), Arr(TypVar 0, TypVar 0));
 val Some(Arr(TypVar 0, TypVar 0)) = typeof' Nil Nil e0;
 
 val Pack (Nat,Lam (Nat,Zero),Arr (TypVar 0,TypVar 0)) : Exp =
-    parse "impl nat with \\ nat -> Z as (0 -> 0)";
+    parse "impl (0 -> 0) with nat as \\ nat -> Z";
 
 val Pack (Nat,Lam (Nat,Zero),Arr (TypVar 0,TypVar 0)) : Exp =
-    run "impl nat with \\ nat -> Z as (0 -> 0)";
+    run "impl (0 -> 0) with nat as \\ nat -> Z";
 
 val Pack
     (TyRec (Plus (Unit,Prod (Nat,TypVar 0))),
      Lam (TyRec (Plus (Unit,Prod (Nat,TypVar 0))),Zero),
      Arr (TypVar 0,TypVar 0)) : Exp =
-    parse "impl (u. (unit |  (nat * 0))) with \\ (u. (unit |  (nat * 0))) -> Z as (0 -> 0)";
+    parse "impl (0 -> 0) with (u. (unit |  (nat * 0))) as \\ (u. (unit |  (nat * 0))) -> Z";
 
 val Open (Pack (Nat,Lam (Nat,Zero),Arr (TypVar 0,TypVar 0)),Var 0) : Exp =
-    parse "open (impl nat with \\ nat -> Z as (0 -> 0)) in (0)";
+    parse "open (impl (0 -> 0) with nat as \\ nat -> Z) in (0)";
 
-val Zero = run "open (impl nat with \\ nat -> Z as (0 -> 0)) in (0)"
+val Zero = run "open (impl (0 -> 0) with nat as \\ nat -> Z) in (0)"
            handle ClientTypeCannotEscapeClientScope => Zero;
 
 val e1 = A.Pack(A.Nat, A.Lam(A.Nat, A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0));
@@ -838,9 +838,6 @@ val Some (Prod (TypVar 0,Arr (Prod (Nat,TypVar 0),TypVar 0))) : Typ =
     typeof (parseFile "/home/evan/thon/examples/natlist.thon");
 
 val natList = (parseFile "/home/evan/thon/examples/natlist.thon");
-
-val Zero = parse "(*" handle UnbalancedComments => Zero;
-val Zero = parse "*)" handle UnbalancedComments => Zero;
 
 in
 ()
