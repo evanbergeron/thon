@@ -530,9 +530,9 @@ val Pack
     parse "impl (0 -> 0) with (u. (unit |  (nat * 0))) as \\ (u. (unit |  (nat * 0))) -> Z";
 
 val Open (Pack (Nat,Lam (Nat,Zero),Arr (TypVar 0,TypVar 0)),Var 0) : Exp =
-    parse "open (impl (0 -> 0) with nat as \\ nat -> Z) in (0)";
+    parse "use (impl (0 -> 0) with nat as \\ nat -> Z) in (0)";
 
-val Zero = run "open (impl (0 -> 0) with nat as \\ nat -> Z) in (0)"
+val Zero = run "use (impl (0 -> 0) with nat as \\ nat -> Z) in (0)"
            handle ClientTypeCannotEscapeClientScope => Zero;
 
 val e1 = A.Pack(A.Nat, A.Lam(A.Nat, A.Var 0), A.Arr(A.TypVar 0, A.TypVar 0));
