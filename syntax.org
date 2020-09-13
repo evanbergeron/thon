@@ -1,15 +1,167 @@
-|------------+-------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
-| sml        | fun foo a =       | a : int      | if then else | datatype a Some =                                | module shit      | let a = | async stuff   | records      |   |
-|------------+-------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
-| haskell    | foo a = or \ a -> | a :: Integer | if then else | data Maybe a = None \  Some a or type (no ctors) | class Eq a where | a =     |               |              |   |
-| ocaml      | let               |              |              |                                                  |                  |         |               |              |   |
-| coq        | fun foo =>        |              |              |                                                  |                  |         |               |              |   |
-| elm        |                   |              |              |                                                  |                  |         |               |              |   |
-| purescript | let or \          |              |              |                                                  |                  |         |               |              |   |
-| alice      |                   |              |              |                                                  |                  |         | spawn or lazy |              |   |
-| idris      | foo a =           |              |              | similar to haskell                               |                  |         |               | record where |   |
-| f#         | let foo a =       |              |              | type Maybe = None                                | Some of          |         |               | async        |   |
-|------------+-------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
+|------------+-------------------+----------------------------------------------------------------------------------------------------------------------------------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
+| sml        | fun foo a =       | signature Thong = sig .. end and structure Thon :> THON struct end OR structure Thon : sig type type someSig val end = struct someStruct end | a : int      | if then else | datatype a Some =                                | module shit      | let a = | async stuff   | records      |   |
+|------------+-------------------+----------------------------------------------------------------------------------------------------------------------------------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
+| haskell    | foo a = or \ a -> | class Thon a where someStruct AND instance Thon bool where                                                                                   | a :: Integer | if then else | data Maybe a = None \  Some a or type (no ctors) | class Eq a where | a =     |               |              |   |
+| ocaml      | let               |                                                                                                                                              |              |              |                                                  |                  |         |               |              |   |
+| coq        | fun foo =>        |                                                                                                                                              |              |              |                                                  |                  |         |               |              |   |
+| elm        |                   |                                                                                                                                              |              |              |                                                  |                  |         |               |              |   |
+| purescript | let or \          |                                                                                                                                              |              |              |                                                  |                  |         |               |              |   |
+| alice      |                   |                                                                                                                                              |              |              |                                                  |                  |         | spawn or lazy |              |   |
+| idris      | foo a =           |                                                                                                                                              |              |              | similar to haskell                               |                  |         |               | record where |   |
+| f#         | let foo a =       |                                                                                                                                              |              |              | type Maybe = None                                | Some of          |         |               | async        |   |
+| rust       |                   | trait ThonTrait {} AND impl ThonTrait for SomeStruct {}                                                                                      |              |              |                                                  |                  |         |               |              |   |
+|------------+-------------------+----------------------------------------------------------------------------------------------------------------------------------------------+--------------+--------------+--------------------------------------------------+------------------+---------+---------------+--------------+---|
+
+or just like yah traits are types so with type var names could just say
+
+
+* Typeclasses / modules should feel like functions.
+** Introduction / definition
+The argument is the module structure, of type signature.
+This relationship is many-to-many.
+
+"Moreover, a given module may well support a variety of views, for
+example by “forgetting” certain aspects of it in particular contexts.
+For example, one may neglect that an implementation of mapping
+supports deletion in a setting where only extension and application
+are required."
+
+This is likely why subclassing is ideal...
+
+** Bob has two criticisms of typeclasses
+*** They insist that a type can implement a type class in exactly one way. 
+    This is true of rust traits as well.
+*** They confound two separate issues: specifying how a type implements a type class and specifying when such a specification should be used during type inference.  
+(See the borked example above).
+
+sign Foo = ()
+
+* The syntax
+*** type someNatList = some t (t, (nat, t) -> t)
+    matches lambda syntax and that works same as subst.
+*** trait someNatList t = (t, (nat, t) -> t)
+*** impl (someNatList t) as pkgImpl
+*** impl (some t  (t, (nat, t) -> t)) as pkgImpl
+*** use pkg as l : someNatList t in
+puts impl, and type var at the front
+** Defining a signature is different than defining a package. Signatures are types; packages are expressions.
+** Defining a signature is defining a type.
+some types are parametrized. usually this means universal parametrization.
+but here we have existential...
+*** [sugar-free] type someNatList = some t (t, (nat, t) -> t)
+    matches lambda syntax and that works same as subst.
+*** [GOOD] trait someNatList t = (t, (nat, t) -> t)
+    not sure about the =
+and just restrict it to one or the other entirely. can't mix ALL and SOME.
+*** type someNatList (some t) = (t, (nat, t) -> t)
+*** sig someNatList t = (t, (nat, t) -> t)
+*** sig someNatList t where (t, (nat, t) -> t)
+*** sign someNatList t is (t, (nat, t) -> t)
+*** interface someNatList t = (t, (nat, t) -> t)
+** Usage: traits are parametrized types; they go everywhere types go.
+Just need a way to define the internal type also (without creating a var name).
+Or maybe we just allow both or none?
+*** [PFPL] open pkg as l : some t (t, (nat, t) -> t)
+binds a fresh type variable t.
+*** use pkg as l : someNatList t in
+*** l : some t (t, (nat, t) -> t) = pkg
+the same as 
+open l
+*** l : someNatList t = pkg
+*** l : someNatList t
+
+
+
+struct Foo a (
+) : ()
+
+maybe another way to put it is just that some types define interfaces.
+and there is a subtyping relation between these (eventually....)
+
+** Defining a package is defining an expression.
+*** Thoughts
+But you have to provide a type also. So it's like a lambda. It's just
+a chunk of reusable code. \ (foo : nat) -> ye
+type t. nice to have a keyword or char at the front to identify.
+
+\ (x : nat) -> foo
+
+it's like a \ also bc it's a value. it's not being "called". but the
+binding structure is different. there's no "argument name"; the
+argument is the impl type.
+
+\ implType -> pkgImpl
+
+It's like a polymorphic function. You're instantiating the
+polymorphism, but leaving the function part. Providing a type.
+
+*** [PFPL] pack implType with pkgImpl as (t, (nat, t) -> t)
+*** [GOOD] impl (someNatList t) as pkgImpl (puts impl and trait name at the front - pretty readable. puts details in the back)
+*** [GOOD] impl (some t . t, (nat, t) -> t) as pkgImpl (puts impl and trait name at the front - pretty readable. puts details in the back)
+*** pkgImpl deriving (some t (t, (nat, t) -> t)) [similar to rust, haskell?]
+*** impl (some t (t, (nat, t) -> t)) as pkgImpl
+similar to deriving clause of haskell typeclasses, but is at expression layer not type layer.
+similar to impl () for () { } in rust, but it's a many-to-many relationship between impls and sigs
+but i think in rust, for a fixed "struct type" and fixed trait, there is a single impl.
+not the case here. fix a tuple type and a sign. impl() 
+
+*** pkgImpl deriving (someNatList t) [similar to rust, haskell?]
+similar to haskell, but it's at the expression layer, not the type definition layer. so bit more flexible?
+
+*** pkg : some t (t, (nat, t) -> t) = pkgImpl
+*** pkg : (someNatList t) = pkgImpl [good, but forces a name decl]
+*** pkgImpl : (someNatList t) [good, but forces a name decl]
+*** pkgImpl (someNatList t) [good, but forces a name decl]
+*** pack implType with pkgImpl as someNatList
+*** impl someNatList t = pkgImpl
+*** struct pkg : someNatList implType = pkgImpl
+*** pkgImpl : someNatList implType
+
+
+* Elimination / calling
+
+defining the signature should feel like a defining a function
+defining the structure should feel like calling a function
+
+https://existentialtype.wordpress.com/2011/04/16/modules-matter-most/
+
+
+class Foo natlist trait
+
+type someNatList = some t (t, (nat, t) -> t)
+sugar to
+class someNatList t where (t, (nat, t) -> t)
+or
+class someNatList t = (t, (nat, t) -> t)
+
+instance 
+
+then we just define an object of this type.
+name : t = ...
+NatList : someNatList = ( , )
+
+could spell it out as
+NatList : some t (t, (nat, t) -> t) = ( , )
+
+
+
+the thing i want to avoid (i think) is having a separate object for "traits" and "types"....
+
+that's a nice thing about the pack model: there's not really a separate notion of traits, a trait is a type.
+
+haha
+FOLD IS CAST
+TRAITS ARE TYPES
+
+one nice thing about rust is it can impl many traits on a single struct.
+maybe sml and haskell can do the same?
+
+can also do
+signature THON = sig ... end
+
+struct Thon :> THON =
+struct
+end
 
 so tldr is basic stuff should look like haskell or idris.
 english language keywords over symbols
@@ -19,3 +171,33 @@ case of
 no let or var or val or fun
 probs skip `of` for datatype definitions
 also list comphrensions cause list comphrensions are great.
+
+here's the overlapping typeclass issue from haskell
+
+-- file: ch06/Overlap.hs
+
+
+
+instance Borked Int where
+    bork = show
+
+instance Borked (Int, Int) where
+    bork (a, b) = bork a ++ ", " ++ bork b
+
+instance (Borked a, Borked b) => Borked (a, b) where
+    bork (a, b) = ">>" ++ bork a ++ " " ++ bork b ++ "<<"
+    
+We have two instances of the typeclass Borked for pairs: one for a pair of Ints and another for a pair of anything else that's Borked. No comments
+
+Suppose that we want to bork a pair of Int values. To do so, the compiler must choose an instance to use. Because these instances are right next to each other, it may seem that it could simply choose the more specific instance. 2 comments
+
+However, GHC is conservative by default, and insists that there must be only one possible instance that it can use. It will thus report an error if we try to use bork.
+
+
+some nice more sugar:
+
+data DataInt = D Int
+    deriving (Eq, Ord, Show)
+* possible words
+port trait lot pack
+could use symbols too;
