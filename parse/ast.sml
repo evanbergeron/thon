@@ -24,8 +24,8 @@ sig
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
       | TypApp of Typ * Exp
-      | Pack of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
-      | Open of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
+      | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
+      | Use of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
       | Tuple of Exp * Exp
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of Exp
@@ -72,8 +72,8 @@ struct
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
       | TypApp of Typ * Exp
-      | Pack of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
-      | Open of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
+      | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
+      | Use of Exp (*package*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
       | Tuple of Exp * Exp
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of Exp
