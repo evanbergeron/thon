@@ -1,1 +1,13 @@
-fold u.(unit |  (nat * 0)) with left unit : u. (unit |  (nat * 0))
+impl (*private impl type*) (u. (unit |  (nat * 0))) with (
+(* structure / instance / impl TraitName for struct *)
+    (* nil :: *)
+    fold u . (unit | (nat * 0)) with
+    left unit : (unit |  (nat * (u . (unit | (nat * 0))))),
+    (* cons :: *)
+    \ (nat * (u. (unit |  (nat * 0)))) ->
+        fold u.(unit |  (nat * 0)) with
+            right 0 : (unit | (nat * (u. (unit |  (nat * 0)))))
+)
+as
+(* signature / class / trait *)
+((* val nil: / nil :: / natlist nil =*) 0 * (* val cons : / cons ::*) ((nat * 0) -> 0))
