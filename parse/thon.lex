@@ -61,7 +61,6 @@ ws = [\ \t];
 <INITIAL> "fold"   => (Tokens.FOLD(!pos,!pos));
 <INITIAL> "unfold" => (Tokens.UNFOLD(!pos,!pos));
 <INITIAL> "with"   => (Tokens.WITH(!pos,!pos));
-<INITIAL> "pack"   => (Tokens.PACK(!pos,!pos));
 <INITIAL> "impl"   => (Tokens.IMPL(!pos,!pos));
 <INITIAL> "use"    => (Tokens.USE(!pos,!pos));
 <INITIAL> "case"   => (Tokens.CASE(!pos,!pos));

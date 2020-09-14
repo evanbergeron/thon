@@ -34,7 +34,6 @@ structure A = Ast
  | FOLD
  | UNFOLD
  | WITH
- | PACK
  | IMPL
  | AS
  | USE
@@ -58,7 +57,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH PACK AS USE IN CASE OF IMPL
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -86,7 +85,7 @@ exp:
   | LEFT exp COLON typ (A.PlusLeft(typ, exp))
   | RIGHT exp COLON typ (A.PlusRight(typ, exp))
   | FOLD typ WITH exp (A.Fold(typ, exp))
-  (* pack reprType in pkgImpl as pkgType *)
+  (* impl reprType in pkgImpl as pkgType *)
   (* Impl (reprType, pkgImpl, pkgType) *)
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp IN exp (A.Use(exp1, exp2))

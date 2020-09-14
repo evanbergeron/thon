@@ -7,3 +7,12 @@ impl (0 * ((nat * 0) -> 0)) with (u. (unit |  (nat * 0))) as
     (*cons*) \ (nat * (u. (unit |  (nat * 0)))) -> fold u.(unit |  (nat * 0))
     with right 0 : (unit | (nat * (u. (unit |  (nat * 0)))))
 )
+(*
+data natlist = Nil | Cons of nat * natlist;
+trait Queue a = (nil :: a, cons :: (nat * a) -> a)
+impl (trait Queue a) with natlist as
+(
+nil = nil;
+cons = \ (x, l) -> Cons (x, l)
+)
+*)
