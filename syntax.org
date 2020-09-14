@@ -201,3 +201,36 @@ data DataInt = D Int
 * possible words
 port trait lot pack
 could use symbols too;
+
+* Down the line
+data natlist = nil | nat * natlist;
+trait Stack t = (t * ((nat * t) -> t))
+
+impl Queue natlist as (...)
+impl Queue (natlist, natlist) as (...)
+
+eventually, want something like
+```(u. (unit |  (nat * 0)))```
+becomes
+```data natlist = nil | nat * natlist;```
+and
+```0 * ((nat * 0) -> 0)```
+becomes
+```some t (t * ((nat * t) -> t))```
+or 
+```trait Stack = (t * ((nat * t) -> t))```
+and then
+```impl (0 * ((nat * 0) -> 0)) with (u. (unit |  (nat * 0))) as```
+becomes
+```impl (some t (t * ((nat * t) -> t))) with (natlist) as```
+or
+```impl (Stack) with (natlist) as```
+or
+```impl Stack natlist as```
+
+so the whole program could look like
+```
+data natlist = nil | nat * natlist;
+trait Stack t = (t * ((nat * t) -> t))
+impl Stack natlist as (...)
+```
