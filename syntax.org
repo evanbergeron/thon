@@ -234,3 +234,8 @@ data natlist = nil | nat * natlist;
 trait Stack t = (t * ((nat * t) -> t))
 impl Stack natlist as (...)
 ```
+
+* requires and ensures clause
+taken from fortress
+factorial(n) requires (n>=0) ensures (result >= 0) =
+* s = [ x | x > 0] would be nice
