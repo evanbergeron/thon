@@ -18,6 +18,7 @@ structure A = Ast
  | REC
  | APP
  | IDX of int
+ | ID of string
  | GO
  | POLY
  | LEFT
@@ -57,7 +58,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -71,12 +72,14 @@ exp:
   | exp exp %prec APP (A.App(exp1, exp2))
   | exp typ %prec APP (A.TypApp(typ, exp))
   | IDX (A.Var IDX)
+  | ID (A.VarName (ID, ~1))
   | ZERO (A.Zero)
   | SUCC exp (A.Succ exp)
   | UNIT (A.TmUnit)
   (* eventually would rather this be LAM ID COLON typ SARROW exp but
    * not until we manage to turn names into binding site indexes *)
-  | LAM typ SARROW exp (A.Lam (typ, exp))
+  | LAM ID COLON typ SARROW exp (A.LamWithName (ID, typ, exp))
+  | LAM typ SARROW exp (A.Lam(typ, exp)) (* TODO deprecate *)
   | REC exp LPAREN ZERO SARROW exp PIPE SUCC SARROW exp RPAREN (A.Rec (exp1, exp2, exp3))
   | POLY exp (A.TypAbs exp)
   | LPAREN exp COMMA exp RPAREN (A.Tuple(exp1, exp2))

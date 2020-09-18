@@ -18,8 +18,10 @@ sig
     datatype Exp =
         Zero
       | Var of int (* idx into ctx *)
+      | VarName of string * int
       | Succ of Exp
       | Lam of Typ (*argType*) * Exp (*funcBody*)
+      | LamWithName of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
@@ -66,8 +68,10 @@ struct
     datatype Exp =
         Zero
       | Var of int (* idx into ctx *)
+      | VarName of string * int
       | Succ of Exp
       | Lam of Typ (*argType*) * Exp (*funcBody*)
+      | LamWithName of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)

@@ -185,6 +185,48 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | A.Unfold(e') => A.Unfold(typSubstInExp' srcType e' bindingDepth)
 
 
+fun setDeBruijnIndex e varnames typnames =
+    let fun find name names =
+        (case List.findi (fn (_, n) => n = name) names
+         of NONE => NONE
+          | SOME (i, _) => SOME i)
+    in
+    case e
+     of  A.Zero => e
+       | A.TmUnit => e
+       | A.Var i => e (* TODO deprecate *)
+       | A.VarName (n, i) =>
+         (case find n varnames of
+             NONE => raise No
+           | SOME i => A.VarName (n, i))
+       | A.LamWithName (name, argType, funcBody) =>
+            A.Lam(argType, setDeBruijnIndex funcBody (name::varnames) typnames)
+       | A.Succ e2 => A.Succ (setDeBruijnIndex e2 varnames typnames)
+       | A.ProdLeft e => A.ProdLeft (setDeBruijnIndex e varnames typnames)
+       | A.ProdRight e => A.ProdRight (setDeBruijnIndex e varnames typnames)
+       | A.PlusLeft (t, e) => A.PlusLeft (t, setDeBruijnIndex e varnames typnames)
+       | A.PlusRight (t, e) => A.PlusRight (t, setDeBruijnIndex e varnames typnames)
+       | A.App (f, n) => A.App (setDeBruijnIndex f varnames typnames,
+                                setDeBruijnIndex n varnames typnames)
+       | A.Tuple (l, r) => A.Tuple (setDeBruijnIndex l varnames typnames,
+                                    setDeBruijnIndex r varnames typnames)
+       | _ => e (* TODO *)
+       (* | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) => *)
+       (* | A.Unfold(e') => *)
+       (* | A.Use (pkg, client) => *)
+       (* | A.Impl (reprType, pkgImpl, pkgType) => *)
+       (* | A.TypApp (appType, e) => *)
+       (* | A.TypAbs e => *)
+       (* | A.Rec (i, baseCase, recCase) => *)
+       (* | A.Case (c, l, r) => A.Case( (*TODO left and right both bind - this is wrong still*) *)
+       (*      setDeBruijnIndex c varnames typnames, *)
+       (*      setDeBruijnIndex l varnames typnames, *)
+       (*      setDeBruijnIndex r varnames typnames) *)
+end
+
+
+
+
 fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
 
 fun typeof' ctx typCtx e =
@@ -405,13 +447,13 @@ fun runFile s = let val e = Parse.parseFile s in if isval e then e else eval (st
 fun parse s =
     let val ast : A.Exp = Parse.parse s
     in
-        ast
+        setDeBruijnIndex ast [] []
     end
 
 fun parseFile filename =
     let val ast : A.Exp = Parse.parseFile filename
     in
-        ast
+        setDeBruijnIndex ast [] []
     end
 
 
@@ -421,13 +463,11 @@ fun test() = let
 open A;
 (* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : Typ = TyRec(Plus(Unit, Prod(Nat, TypVar 0)));
-val Lam (TyRec (Plus (Unit,Prod (Nat,TypVar 0))),Var 0) : Ast.Exp =
-    parse "\\ (u. (unit |  (nat * 0))) -> 0";
+val Lam (TyRec (Plus (Unit,Prod (Nat,TypVar 0))),VarName ("natlist",0)) =
+    parse "\\ natlist : (u. (unit |  (nat * 0))) -> natlist";
 (* id function on natlists *)
-val Lam (natlist, Var 0) : Ast.Exp =
-    parse "\\ (u. (unit |  (nat * 0))) -> 0";
 val TypApp(natlist, TypAbs (Lam (TypVar 0,Var 0))) : Exp =
-    parse "((poly \\ 0 -> 0) (u. (unit | (nat * 0))))";
+    parse "((poly \\ : 0 -> 0) (u. (unit | (nat * 0))))";
 (* Unfolded Natlist type *)
 val nlbody : A.Typ = A.TyRec(A.Plus(A.Unit, A.Prod(A.Nat, natlist)));
 val nilNatList =

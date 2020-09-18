@@ -38,6 +38,7 @@ fun error (e,l : int,_) = TextIO.output (TextIO.stdOut, String.concat[
 %header (functor ThonLexFn(structure Tokens: Thon_TOKENS));
 %s COMMENT;
 alpha=[A-Za-z];
+id=[A-Za-z_\']*;
 digit=[0-9];
 ws = [\ \t];
 %%
@@ -76,6 +77,7 @@ ws = [\ \t];
 <INITIAL> ")"      => (Tokens.RPAREN(!pos,!pos));
 <INITIAL> "|"      => (Tokens.PIPE(!pos,!pos));
 <INITIAL> {digit}+ => (Tokens.IDX (valOf (Int.fromString yytext), !pos, !pos));
+<INITIAL> {id}     => (Tokens.ID(yytext, !pos, !pos));
 
 <INITIAL> "(*"        => (YYBEGIN COMMENT; enterComment yypos; lex());
 <INITIAL> "*)"        => (raise UnbalancedComments);
