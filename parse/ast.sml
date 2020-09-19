@@ -17,8 +17,7 @@ sig
 
     datatype Exp =
         Zero
-      | Var of int (* idx into ctx *)
-      | VarName of string * int
+      | Var of string * int
       | Succ of Exp
       | Lam of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
@@ -66,8 +65,7 @@ struct
 
     datatype Exp =
         Zero
-      | Var of int (* idx into ctx *)
-      | VarName of string * int
+      | Var of string * int (* idx into ctx *)
       | Succ of Exp
       | Lam of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
