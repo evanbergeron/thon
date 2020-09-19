@@ -2,4 +2,4 @@
  * takes a nat and a natlist, prepends nat to natlist *)
 \ natAndNatlist : (nat * (u. (unit |  (nat * 0)))) ->
 fold u.(unit |  (nat * 0)) with
-right 0 : (unit | (nat * (u. (unit |  (nat * 0)))))
+right natAndNatlist : (unit | (nat * (u. (unit |  (nat * 0)))))

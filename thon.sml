@@ -207,7 +207,7 @@ fun setDeBruijnIndex e varnames typnames =
        | A.TmUnit => e
        | A.Var (n, i) =>
          (case find n varnames of
-             NONE => raise No
+             NONE => (print ("unknown var: "^ n); raise No)
            | SOME i => A.Var (n, i))
        | A.Lam(name, argType, funcBody) =>
             A.Lam(name, argType, setDeBruijnIndex funcBody (name::varnames) typnames)
@@ -234,12 +234,17 @@ fun setDeBruijnIndex e varnames typnames =
             setDeBruijnIndex pkg varnames typnames,
             clientName,
             setDeBruijnIndex client (clientName::varnames) typnames) (* TODO need a type name still *)
-       (* | A.TypApp (appType, e) => *)
-       (* | A.TypAbs e => *)
+       | A.TypApp (appType, e) => A.TypApp (appType, setDeBruijnIndex e varnames typnames)
+       | A.TypAbs e => A.TypAbs (setDeBruijnIndex e varnames typnames)
+       | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) => 
+            A.Fold (A.TyRec(t), setDeBruijnIndex e' varnames typnames)
+       | A.Unfold(e') =>
+            A.Unfold (setDeBruijnIndex e' varnames typnames)
+       | A.Impl (reprType, pkgImpl, pkgType) =>
+            A.Impl(reprType,
+                   setDeBruijnIndex pkgImpl varnames typnames,
+                   pkgType)
        | _ => raise Unimplemented (* TODO *)
-       (* | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) => *)
-       (* | A.Unfold(e') => *)
-       (* | A.Impl (reprType, pkgImpl, pkgType) => *)
 end
 
 
@@ -484,15 +489,18 @@ open A;
 val natlist : Typ = TyRec(Plus(Unit, Prod(Nat, TypVar 0)));
 val Lam ("natlist", TyRec (Plus (Unit,Prod (Nat,TypVar 0))),Var ("natlist",0)) =
     parse "\\ natlist : (u. (unit |  (nat * 0))) -> natlist";
+
 (* id function on natlists *)
 val TypApp
     (TyRec (Plus (Unit,Prod (Nat,TypVar 0))),
-     TypAbs (Lam("x",TypVar 0,Var ("x",~1)))) : Ast.Exp =
+     TypAbs (Lam("x",TypVar 0,Var ("x",0)))) : Ast.Exp =
     parse "((poly \\ x : 0 -> x) (u. (unit | (nat * 0))))";
 (* Unfolded Natlist type *)
 val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
 val nilNatList =
     Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
+
+val () = print "1";
 
 (* TODO don't hardcode dir *)
 val parsedNilNatList = parseFile "/home/evan/thon/examples/emptynatlist.thon";
@@ -528,6 +536,8 @@ val parsedNatlistCons =
     parseFile "/home/evan/thon/examples/natlistcons.thon";
 val true = (parsedNatlistCons = natlistCons);
 
+val () = print "2";
+
 val Arr (Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0)))),
          TyRec (Plus (Unit,Prod (Nat,TypVar 0)))) : Typ =
     typeof' Nil Nil natlistCons;
@@ -541,6 +551,7 @@ val true = (natlist = deducedNatlist);
 val Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))) : Typ =
     typeof' Nil Nil (Unfold(nilNatList));
 
+val () = print "3";
 val PlusLeft
     (Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))),TmUnit) : Exp = eval (Unfold(nilNatList));
 
@@ -589,11 +600,12 @@ val Impl
      Arr (TypVar 0,TypVar 0)) : Ast.Exp =
     parse "impl (0 -> 0) with (u. (unit |  (nat * 0))) as \\ l : (u. (unit |  (nat * 0))) -> Z";
 
-val Use (Impl (Nat,Lam("x",Nat,Zero),Arr (TypVar 0,TypVar 0)), "pkg", Var ("x", 0)) =
+val Use (Impl (Nat,Lam ("x",Nat,Zero),Arr (TypVar 0,TypVar 0)),
+         "pkg", Var ("pkg",0)) : Exp =
     parse "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as pkg in (pkg)";
 
-val Zero = run "use (impl (0 -> 0) with nat as \\ nat -> Z) in (0)"
-           handle ClientTypeCannotEscapeClientScope => Zero;
+val Zero = run "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as pkg in (pkg)"
+           handle No (* TODO *)=> Zero;
 
 val e1 = Impl(Nat, Lam("x", Nat, Var ("x", 0)), Arr(TypVar 0, TypVar 0));
 val Some(Arr(TypVar 0, TypVar 0)) = typeof' Nil Nil e1;
