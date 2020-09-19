@@ -933,6 +933,8 @@ val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.Exp =
 
 val Zero : Ast.Exp = run "let x : nat = Z in x";
 
+val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/nilisempty.thon";
+
 in
 ()
 end
