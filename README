@@ -47,13 +47,12 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 ||_|| |(_ |_|(_)| |_>
 
 
-- \ nat -> 0 is the identity function on natural numbers. The 0 here means
-  the variable is the "most recently bound" variable.
+- \ x : nat -> x is the identity function on natural numbers.
 
-  We could also have \ nat -> (\ nat -> 1). This function returns a
+  We could also have \ x : nat -> (\ y : nat -> y). This function returns a
   function that returns whatever was fed to the top-level function.
 
-- ((\ nat -> 0) Z) applies the identity function to the natural number Zero.
+- ((\ x : nat -> x) Z) applies the identity function to the natural number Zero.
 
 
  _                     _

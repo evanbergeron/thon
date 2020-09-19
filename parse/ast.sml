@@ -20,8 +20,7 @@ sig
       | Var of int (* idx into ctx *)
       | VarName of string * int
       | Succ of Exp
-      | Lam of Typ (*argType*) * Exp (*funcBody*)
-      | LamWithName of string * Typ (*argType*) * Exp (*funcBody*)
+      | Lam of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
@@ -70,8 +69,7 @@ struct
       | Var of int (* idx into ctx *)
       | VarName of string * int
       | Succ of Exp
-      | Lam of Typ (*argType*) * Exp (*funcBody*)
-      | LamWithName of string * Typ (*argType*) * Exp (*funcBody*)
+      | Lam of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)

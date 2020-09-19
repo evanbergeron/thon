@@ -78,8 +78,8 @@ exp:
   | UNIT (A.TmUnit)
   (* eventually would rather this be LAM ID COLON typ SARROW exp but
    * not until we manage to turn names into binding site indexes *)
-  | LAM ID COLON typ SARROW exp (A.LamWithName (ID, typ, exp))
-  | LAM typ SARROW exp (A.Lam(typ, exp)) (* TODO deprecate *)
+  | LAM ID COLON typ SARROW exp (A.Lam (ID, typ, exp))
+  | LAM typ SARROW exp (A.Lam("TODO", typ, exp)) (* TODO deprecate *)
   | REC exp LPAREN ZERO SARROW exp PIPE SUCC SARROW exp RPAREN (A.Rec (exp1, exp2, exp3))
   | POLY exp (A.TypAbs exp)
   | LPAREN exp COMMA exp RPAREN (A.Tuple(exp1, exp2))

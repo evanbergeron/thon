@@ -1,5 +1,5 @@
 (* cons function.
  * takes a nat and a natlist, prepends nat to natlist *)
-\ (nat * (u. (unit |  (nat * 0)))) -> 
+\ natAndNatlist : (nat * (u. (unit |  (nat * 0)))) ->
 fold u.(unit |  (nat * 0)) with
 right 0 : (unit | (nat * (u. (unit |  (nat * 0)))))
