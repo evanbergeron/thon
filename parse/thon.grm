@@ -87,6 +87,7 @@ exp:
   | LEFT exp COLON typ (A.PlusLeft(typ, exp))
   | RIGHT exp COLON typ (A.PlusRight(typ, exp))
   | FOLD typ WITH exp (A.Fold(typ, exp))
+  | UNFOLD exp (A.Unfold(exp))
   (* impl reprType in pkgImpl as pkgType *)
   (* Impl (reprType, pkgImpl, pkgType) *)
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))

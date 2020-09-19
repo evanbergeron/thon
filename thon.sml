@@ -890,7 +890,7 @@ val Succ Zero: Exp =
 val Lam ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))), Var ("natOrFuncOrProd",0)) : Ast.Exp =
     parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"
 
-val Some (Prod (TypVar 0,Arr (Prod (Nat,TypVar 0),TypVar 0))) : Typ =
+val Some (Prod (TypVar 0,Prod (Arr (Prod (Nat,TypVar 0),TypVar 0),Arr (TypVar 0,Nat)))) : Typ =
     typeof (parseFile "/home/evan/thon/examples/natlist.thon");
 
 val natList = (parseFile "/home/evan/thon/examples/natlist.thon");

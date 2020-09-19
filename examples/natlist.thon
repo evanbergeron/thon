@@ -1,11 +1,18 @@
-impl (0 * ((nat * 0) -> 0)) with (u. (unit |  (nat * 0))) as
+impl (0 * (((nat * 0) -> 0) * (0 -> nat))) with (u. (unit |  (nat * 0))) as
 (
     (*nil*)
     fold u . (unit | (nat * 0))
-    with left unit : (unit |  (nat * (u . (unit | (nat * 0))))),
-
-    (*cons*) \ natAndNatList : (nat * (u. (unit |  (nat * 0)))) -> fold u.(unit |  (nat * 0))
+    with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
+    ,
+    ((*cons*)
+    \ natAndNatList : (nat * (u. (unit |  (nat * 0)))) -> fold u.(unit |  (nat * 0))
     with right natAndNatList : (unit | (nat * (u. (unit |  (nat * 0)))))
+    ,
+    (*isempty*)
+    \ natlist : (u. (unit |  (nat * 0))) ->
+        (case (unfold natlist) of
+           empty -> Z
+         | hdAndTl -> S Z))
 )
 (*
 data natlist = Nil | Cons of nat * natlist;
