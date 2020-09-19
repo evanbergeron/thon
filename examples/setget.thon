@@ -1,0 +1,5 @@
+impl (nat -> 0, 0 -> nat) with nat as
+(
+    ((*set*) \ x : nat -> x,
+    (*get*) \ x : nat -> x)
+)

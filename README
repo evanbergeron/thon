@@ -94,10 +94,12 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 
 - Pack makes a type private to an implementation. Here's a simple example:
 
-      Tuple(Lam(Nat, Tuple(Var 0, Zero)),
-            Lam(Prod(Nat, Nat), ProdLeft(Var 0)))
+      ((*set*) \ x : nat -> (x, Z),
+      (*get*) \ tup : (nat * nat) -> fst tup)
 
-      Tuple(Lam(Nat, Var 0), Lam(Nat, Var 0))
+
+      ((*set*) \ x : nat -> x,
+       (*get*) \ x : nat -> x)
 
   These tuples are two different implementations of a (set, get) interface.
 
@@ -109,23 +111,24 @@ All that stuff is sanity tested and seems to work. The parser is not done yet.
 
   These internal storage types are implementation details; let's pack them away.
 
-      p0 = Pack(Nat,
-           Tuple(Lam(Nat, Tuple(Var 0, Zero)),
-                 Lam(Prod(Nat, Nat), ProdLeft(Var 0))),
-           Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat)))
+      impl (nat -> 0, 0 -> nat) with nat as
+      (
+          ((*set*) \ x : nat -> x,
+          (*get*) \ x : nat -> x)
+      )
 
-      p1 = Pack(Prod(Nat, Nat),
-           Tuple(Lam(Nat, Tuple(Var 0, Zero)),
-                 Lam(Prod(Nat, Nat), ProdLeft(Var 0))),
-           Prod(Arr(Nat,TypVar 0),Arr (TypVar 0,Nat)))
+      impl (nat -> 0, 0 -> nat) with (nat * nat) as
+      (
+          ((*set*) \ x : nat -> (x, Z),
+          (*get*) \ tup : (nat * nat) -> fst tup)
+      )
 
-  Both of these expression have type Prod(Arr(Nat,TypVar 0),Arr (TypVar 0,Nat)).
+  Both of these expression have type ((nat -> T) * (T -> nat)) for some type T.
   They've abstracted away their implementation type into an abstract type
   variable.
 
-  So now we can use these two implementations interchangably. I'll write up an
-  example of how to do this later, but there are some test cases in the code
-  below. (Search for Open if you're interested).
+  Now we can use these two implementations interchangably. I'll write up an
+  example of how to do this later.
 
  _                   ___
 |_) _  _   .__.   _   |  ._  _  _
