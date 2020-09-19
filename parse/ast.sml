@@ -17,11 +17,11 @@ sig
 
     datatype Exp =
         Zero
-      | Var of string * int
+      | Var of string * int (* idx into ctx *)
       | Succ of Exp
       | Lam of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
-      | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
+      | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
       | TypApp of Typ * Exp
       | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
@@ -69,7 +69,7 @@ struct
       | Succ of Exp
       | Lam of string * Typ (*argType*) * Exp (*funcBody*)
       | App of Exp * Exp
-      | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * Exp (*recCase - binds*)
+      | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
       | TypApp of Typ * Exp
       | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)

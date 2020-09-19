@@ -132,8 +132,10 @@ fun typDecrVarIdxs e =
        | A.Lam (argName, argType, funcBody) => A.Lam(argName, typtypDecrVarIdxs argType, typDecrVarIdxs funcBody)
        | A.App (f, n) => A.App(typDecrVarIdxs f, typDecrVarIdxs n)
        | A.Tuple (l, r) => A.Tuple(typDecrVarIdxs l, typDecrVarIdxs r)
-       | A.Rec (i, baseCase, recCase) =>
-            A.Rec(typDecrVarIdxs i, typDecrVarIdxs baseCase, typDecrVarIdxs recCase)
+       | A.Rec (i, baseCase, prevCaseName, recCase) =>
+         A.Rec(typDecrVarIdxs i,
+               typDecrVarIdxs baseCase,
+               prevCaseName, typDecrVarIdxs recCase)
        | A.TypAbs e => A.TypAbs (typDecrVarIdxs e)
        | A.TypApp (appType, e) => A.TypApp(typtypDecrVarIdxs appType, typDecrVarIdxs e)
        | A.Impl (reprType, pkgImpl, pkgType) => A.Impl(typtypDecrVarIdxs reprType, typDecrVarIdxs pkgImpl, typtypDecrVarIdxs pkgType)
@@ -165,10 +167,10 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | A.Tuple (l, r) =>
             A.Tuple (typSubstInExp' srcType l bindingDepth,
                    typSubstInExp' srcType r bindingDepth)
-       | A.Rec (i, baseCase, recCase) =>
+       | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec(typSubstInExp' srcType i bindingDepth,
                 typSubstInExp' srcType baseCase bindingDepth,
-                typSubstInExp' srcType recCase bindingDepth)
+                prevCaseName, typSubstInExp' srcType recCase bindingDepth)
        | A.TypAbs e => A.TypAbs(typSubstInExp' srcType e (bindingDepth+1)) (* binds type var *)
        | A.TypApp (appType, e) =>
             A.TypApp(typsubst' srcType appType bindingDepth,
@@ -210,6 +212,10 @@ fun setDeBruijnIndex e varnames typnames =
                                 setDeBruijnIndex n varnames typnames)
        | A.Tuple (l, r) => A.Tuple (setDeBruijnIndex l varnames typnames,
                                     setDeBruijnIndex r varnames typnames)
+       | A.Rec (i, baseCase, prevCaseName, recCase) =>
+            A.Rec (setDeBruijnIndex i varnames typnames,
+                   setDeBruijnIndex baseCase varnames typnames,
+                   prevCaseName, (setDeBruijnIndex recCase (prevCaseName::varnames) typnames))
        (* | A.TypApp (appType, e) => *)
        (* | A.TypAbs e => *)
        | _ => e (* TODO *)
@@ -217,7 +223,6 @@ fun setDeBruijnIndex e varnames typnames =
        (* | A.Unfold(e') => *)
        (* | A.Use (pkg, client) => *)
        (* | A.Impl (reprType, pkgImpl, pkgType) => *)
-       (* | A.Rec (i, baseCase, recCase) => *)
        (* | A.Case (c, l, r) => A.Case( (*TODO left and right both bind - this is wrong still*) *)
        (*      setDeBruijnIndex c varnames typnames, *)
        (*      setDeBruijnIndex l varnames typnames, *)
@@ -270,7 +275,7 @@ fun typeof' ctx typCtx e =
                 else c
             end
        | A.Tuple (l, r) => A.Prod(typeof' ctx typCtx l, typeof' ctx typCtx r)
-       | A.Rec (i, baseCase, recCase) =>
+       | A.Rec (i, baseCase, prevCaseName, recCase) =>
             let val A.Nat = typeof' ctx typCtx i
                 val t = typeof' ctx typCtx baseCase
                 val t2 = typeof' (Cons(t, ctx)) typCtx recCase
@@ -352,10 +357,10 @@ fun subst' src dst bindingDepth =
                                subst' src r (bindingDepth+1))
        | A.Lam (argName, t, f) => A.Lam(argName, t, (subst' src f (bindingDepth+1)))
        | A.App (f, n) => A.App((subst' src f bindingDepth), (subst' src n bindingDepth))
-       | A.Rec (i, baseCase, recCase) =>
+       | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec(subst' src i bindingDepth,
                 subst' src baseCase bindingDepth,
-                subst' src recCase (bindingDepth+1))
+                prevCaseName, subst' src recCase (bindingDepth+1))
        | A.TypAbs e => A.TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
        | A.TypApp (appType, e) => A.TypApp(appType, subst' src e bindingDepth)
        | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, subst' src pkgImpl bindingDepth, t)
@@ -389,13 +394,13 @@ fun step e =
                            end
                           )
       | A.Var (name, x) => A.Var (name, x)
-      | A.Rec (A.Zero, baseCase, recCase) => baseCase
-      | A.Rec (A.Succ(i), baseCase, recCase) =>
+      | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
+      | A.Rec (A.Succ(i), baseCase, prevCaseName, recCase) =>
             (* Doesn't evaluate recursive call if not required. *)
-            subst (A.Rec(i, baseCase, recCase)) recCase
-      | A.Rec (i, baseCase, recCase) =>
+            subst (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
+      | A.Rec (i, baseCase, prevCaseName, recCase) =>
             if not (isval i) then
-                A.Rec(step i, baseCase, recCase)
+                A.Rec(step i, baseCase, prevCaseName, recCase)
             else raise No
       | A.TypAbs e' => raise No (* Already isval *)
       | A.TypApp (t, e') =>
@@ -624,7 +629,7 @@ val Some(Prod(Arr(Nat, TypVar 0), Arr(TypVar 0, Nat))) = typeof' Nil Nil inoutpk
 val Nat = typeof' Nil Nil (Use(inoutpkg2, App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 val Zero = eval (Use(inoutpkg2, App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 
-val double = Lam("x", Nat, Rec(Var ("x", 0), Zero, Succ (Succ (Var ("x", 0)))));
+val double = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ (Succ (Var ("x", 0)))));
 val Succ (Succ Zero) = eval (App(double, (Succ Zero)));
 
 val All(TypVar 1) = typAbstractOut Nat (All(Nat));
@@ -713,11 +718,11 @@ val App(Lam("x", Nat, Succ Zero), (Succ Zero)) =
 val Lam("y", Nat, Zero) = subst Zero (Lam("y", Nat, Var ("x", 1)));
 val Lam("x", Nat, Succ Zero) = subst (Succ Zero) (Lam("x", Nat, Var ("x", 1)));
 val Lam("x", Nat, Lam("x", Nat, Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Lam("x", Nat, Var ("z", 2))));
-val Lam("x", Nat, Rec(Zero, Zero, Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Rec(Zero, Zero, Var ("z", 2))));
+val Lam("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
 
-val Lam("x", Nat, Rec(Zero, Var ("y", 0), Zero)) = subst Zero (Lam("x", Nat, Rec(Var ("x", 1), Var ("x", 0), Zero)));
-val Lam("x", Nat, Rec(Zero, Var ("x", 1), Zero)) = subst Zero (Lam("x", Nat, Rec(Var ("x", 1), Var ("x", 2), Zero)));
-val Rec(Zero, Zero, Zero) = step (App(Lam("x", Nat, Rec(Var ("x", 0), Var ("x", 0), Zero)), Zero));
+val Lam("x", Nat, Rec(Zero, Var ("y", 0), "prev", Zero)) = subst Zero (Lam("x", Nat, Rec(Var ("x", 1), Var ("x", 0), "prev", Zero)));
+val Lam("x", Nat, Rec(Zero, Var ("x", 1), "prev", Zero)) = subst Zero (Lam("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
+val Rec(Zero, Zero, "prev", Zero) = step (App(Lam("x", Nat, Rec(Var ("x", 0), Var ("x", 0), "prev", Zero)), Zero));
 
 val Nat = get (Cons(Nat, Nil)) 0;
 val Arr(Nat, Nat) = get (Cons(Nat, Cons(Arr(Nat, Nat), Nil))) 1;
@@ -739,7 +744,7 @@ val Nat = typeof' Nil Nil (App(Lam("x", Nat, Zero), Zero));
 val Nat = typeof' Nil Nil (App(Lam("x", Nat, Succ(Zero)), Lam("x", Nat, Zero)))
           handle IllTyped => Nat;
 
-val timesTwo = Rec(Succ(Zero), Zero, Succ(Succ(Var("prevCase", 0))));
+val timesTwo = Rec(Succ(Zero), Zero, "prev", Succ(Succ(Var("prev", 0))));
 val Nat = typeof' Nil Nil timesTwo;
 
 val Arr(Arr(Nat, Nat), Nat) =
@@ -747,41 +752,45 @@ val Arr(Arr(Nat, Nat), Nat) =
 
 val Arr(Nat, Nat) = typeof' Nil Nil (Rec(Zero,
                                        Lam("x", Nat, Succ(Zero)),
-                                       Lam("x", Nat, Succ(Var("x", 0)))));
+                                       "prev", Lam("x", Nat, Succ(Var("x", 0)))));
 
 val Arr(Nat, Nat) = typeof' Nil Nil (Rec(Succ(Zero),
                                        Lam("x", Nat, Succ(Zero)),
-                                       Lam("x", Nat, Succ(Var("x", 0)))));
+                                       "prev", Lam("x", Nat, Succ(Var("x", 0)))));
 
 val Arr(Nat, Nat) = typeof' (Cons(Nat, Nil)) Nil (Rec(Var("dne", 0),
                                        Lam("x", Nat, Succ(Zero)),
-                                       Lam("x", Nat, Succ(Var("x", 0)))));
+                                       "prev", Lam("x", Nat, Succ(Var("x", 0)))));
 
 
 val Nat = typeof' Nil Nil (App(Lam("f", Arr(Nat, Nat), App(Var("f", 0), Zero)), Zero)) handle IllTyped => Nat;
 
 (* Ill-formed; first param must be Nat. *)
-val Nat = typeof' Nil Nil (Rec(Lam("x", Nat, Zero), Lam("x", Nat, Succ(Zero)), Lam("x", Nat, Succ(Var("x", 0))))) handle Bind => Nat;
+val Nat = typeof' Nil Nil (Rec(Lam("x", Nat, Zero),
+                               Lam("x", Nat, Succ(Zero)),
+                               "prev", Lam("x", Nat, Succ(Var("x", 0))))) handle Bind => Nat;
 
 (* Ill-formed; base case type does not match rec case type. *)
-val Nat = (typeof' Nil Nil (Rec(Zero, Succ(Zero), Lam("x", Nat, Succ(Zero))))
+val Nat = (typeof' Nil Nil (Rec(Zero,
+                                Succ(Zero),
+                                "prev", Lam("x", Nat, Succ(Zero))))
           handle IllTyped => Nat);
 
 val Arr(Nat, Nat) = typeof' Nil Nil (Lam("x", (TypVar 0), Zero)) handle IllTyped => Arr(Nat, Nat);
 
-val Succ(Rec(Zero, Zero, Succ(Var("x", 0)))) = step (Rec(Succ(Zero), Zero, Succ(Var ("x", 0))));
+val Succ(Rec(Zero, Zero, "prev", Succ(Var("prev", 0)))) = step (Rec(Succ(Zero), Zero, "prev", Succ(Var ("prev", 0))));
 
-val Succ(Succ(Rec(Zero, Zero, Succ(Succ(Var ("x", 0)))))) =
-    step (Rec(Succ(Zero), Zero, Succ(Succ(Var ("x", 0)))));
+val Succ(Succ(Rec(Zero, Zero, "prev", Succ(Succ(Var ("prev", 0)))))) =
+    step (Rec(Succ(Zero), Zero, "prev", Succ(Succ(Var ("prev", 0)))));
 
-val Zero = step (Rec(Zero, Zero, Succ(Var ("x", 0))));
-val Succ(Succ(Zero)) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Var ("x", 0))));
+val Zero = step (Rec(Zero, Zero, "prev", Succ(Var ("prev", 0))));
+val Succ(Succ(Zero)) = eval (Rec(Succ(Succ(Zero)), Zero, "prev", Succ(Var ("prev", 0))));
 val Succ(Succ(Succ(Succ(Zero)))) =
-    eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var ("x", 0)))));
+    eval (Rec(Succ(Succ(Zero)), Zero, "prev", Succ(Succ(Var ("prev", 0)))));
 
 val Succ(Succ(Succ(Succ(Zero)))) =
     eval (Rec(App(Lam("x", Nat, Succ(Var ("x", 0))), Succ(Zero)),
-              Zero, Succ(Succ(Var ("x", 0)))));
+              Zero, "prev", Succ(Succ(Var ("prev", 0)))));
 
 val Zero = step Zero;
 val Succ(Zero) = step (Succ(Zero));
@@ -799,16 +808,16 @@ val Succ Zero = step (App(Lam("x", Nat, Succ(Var("x", 0))), Zero));
 
 val Succ Zero = eval (App(Lam("x", Arr(Nat, Nat), App(Var("x", 0), Zero)),
                           Lam("x", Nat, Succ(Var("x", 0)))));
-val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, Succ(Succ(Var ("x", 0)))));
+val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, "prev", Succ(Succ(Var ("prev", 0)))));
 
-val multByThree = Lam("x", Nat, Rec(Var ("x", 0), Zero, Succ(Succ(Succ(Var("prevCase", 0))))));
+val multByThree = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ(Succ(Succ(Var("prev", 0))))));
 
 (* TODO this is wrong *)
-val Lam ("n", Nat,Rec (Var ("n",~1),Var ("n", 0),Succ (Succ Zero))) : Ast.Exp =
-    parse "\\ n : nat -> rec n ( Z -> 0 | S -> S S Z )";
+val Lam ("n", Nat,Rec (Var ("n",~1),Var ("n", 0), "prev", Succ (Succ Zero))) : Ast.Exp =
+    parse "\\ n : nat -> rec n ( Z -> 0 | S prev -> S S Z )";
 
-val App (Lam ("n", Nat,Rec (Var ("n",~1),Zero,Succ (Succ (Var ("n", 0))))),Succ Zero) : Ast.Exp =
-    parse "((\\ n : nat -> rec n ( Z -> Z | S -> S S 0 )) (S Z))";
+val App (Lam ("n", Nat,Rec (Var ("n",~1),Zero, "prev", Succ (Succ (Var ("n", 0))))),Succ Zero) : Ast.Exp =
+    parse "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S 0 )) (S Z))";
 
 val (Succ (Succ Zero)) =
     run "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S Z))";
