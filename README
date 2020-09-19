@@ -6,7 +6,19 @@
  \__|_| |_|\___/|_| |_|
 
 
-thon is a small programming language.
+thon is a small programming language. Here's an example program that
+verifies the empty list is empty.
+
+    let isempty : (u. (unit |  (nat * 0))) -> nat =
+        \ natlist : (u. (unit |  (nat * 0))) ->
+            (case (unfold natlist) of
+            empty -> S Z
+            | hdAndTl -> Z)
+    in let nil : (u. (unit |  (nat * 0))) =
+        fold u . (unit | (nat * 0))
+        with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
+    in
+    (isempty nil)
 
  _         _        _ _
 (_)_ _  __| |_ __ _| | |
