@@ -20,6 +20,7 @@ sig
       | Var of string * int (* idx into ctx *)
       | Succ of Exp
       | Lam of string * Typ (*argType*) * Exp (*funcBody*)
+      | Let of string * Typ (*vartype*) * Exp (*varval*) * Exp (*varscope*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
@@ -68,6 +69,7 @@ struct
       | Var of string * int (* idx into ctx *)
       | Succ of Exp
       | Lam of string * Typ (*argType*) * Exp (*funcBody*)
+      | Let of string * Typ (*vartype*) * Exp (*varval*) * Exp (*varscope*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
       | TypAbs of Exp (* binds type variable *)
@@ -90,10 +92,10 @@ struct
 
   structure Print =
   struct
-    fun pp e = 
+    fun pp e =
         case e of
             Zero => "Z"
           | Succ e => "S (" ^ (pp e) ^ ")"
-  end                                      
-       
+  end
+
 end

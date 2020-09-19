@@ -142,6 +142,11 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | A.Lam (argName, argType, funcBody) =>
             A.Lam(argName, (typsubst' srcType argType bindingDepth),
                 typSubstInExp' srcType funcBody bindingDepth)
+       | A.Let (varname, vartype, varval, varscope) =>
+            A.Let(varname, (typsubst' srcType vartype bindingDepth),
+                  typSubstInExp' srcType varval bindingDepth,
+                  typSubstInExp' srcType varscope bindingDepth
+                 )
        | A.App (f, n) =>
             A.App (typSubstInExp' srcType f bindingDepth,
                  typSubstInExp' srcType n bindingDepth)
@@ -184,6 +189,10 @@ fun setDeBruijnIndex e varnames typnames =
            | SOME i => A.Var (n, i))
        | A.Lam(name, argType, funcBody) =>
             A.Lam(name, argType, setDeBruijnIndex funcBody (name::varnames) typnames)
+       | A.Let (varname, vartype, varval, varscope) =>
+         A.Let(varname, vartype,
+               (setDeBruijnIndex varval (varnames) typnames),
+               setDeBruijnIndex varscope (varname::varnames) typnames)
        | A.Succ e2 => A.Succ (setDeBruijnIndex e2 varnames typnames)
        | A.ProdLeft e => A.ProdLeft (setDeBruijnIndex e varnames typnames)
        | A.ProdRight e => A.ProdRight (setDeBruijnIndex e varnames typnames)
@@ -258,6 +267,10 @@ fun typeof' ctx typCtx e =
        | A.Lam (argName, argType, funcBody) =>
             if not (istype typCtx argType) then raise IllTyped else
             A.Arr (argType, typeof' (Cons(argType, ctx)) typCtx funcBody)
+       | A.Let (varname, vartype, varval, varscope) =>
+            if not (istype typCtx vartype) then raise IllTyped else
+            if (typeof' ctx typCtx varval) <> vartype then raise IllTyped else
+            typeof' (Cons(vartype, ctx)) typCtx varscope
        | A.App (f, n) =>
             let val A.Arr (d, c) = typeof' ctx typCtx f
                 val argType = typeof' ctx typCtx n
@@ -321,7 +334,8 @@ fun isval e =
         A.Zero => true
       | A.TmUnit => true
       | A.Succ(n) => isval n
-      | A.Lam(argName, _, _) => true
+      | A.Lam(_, _, _) => true
+      | A.Let(_, _, _, _) => false
       | A.Tuple(l, r) => (isval l) andalso (isval r)
       | A.TypAbs _  => true
       | A.Impl(_, pkgImpl, _) => isval pkgImpl
@@ -348,6 +362,11 @@ fun subst' src dst bindingDepth =
                    lname, subst' src l (bindingDepth+1),
                    rname, subst' src r (bindingDepth+1))
        | A.Lam (argName, t, f) => A.Lam(argName, t, (subst' src f (bindingDepth+1)))
+       | A.Let (varname, vartype, varval, varscope) =>
+            A.Let(varname,
+                  vartype,
+                  (subst' src varval (bindingDepth)),
+                  (subst' src varscope (bindingDepth+1)))
        | A.App (f, n) => A.App((subst' src f bindingDepth), (subst' src n bindingDepth))
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec(subst' src i bindingDepth,
@@ -385,6 +404,7 @@ fun step e =
                                subst n f'
                            end
                           )
+      | A.Let (varname, vartype, varval, varscope) => subst varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
       | A.Rec (A.Succ(i), baseCase, prevCaseName, recCase) =>
@@ -904,6 +924,14 @@ val Lam
        ("y",Nat,Case (Var ("x",1),"somex",Var ("somex",0),"none",Var ("y",1))))
   : Exp =
     parseFile "/home/evan/thon/examples/option.thon";
+
+val Let ("x",Nat,Zero,Var ("x",0)) : Ast.Exp = parse "let x : nat = Z in x";
+val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.Exp =
+    parse "let x : nat = Z in (let y : nat = S Z in x)";
+val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.Exp =
+    parse "let x : nat = Z in let y : nat = S Z in x";
+
+val Zero : Ast.Exp = run "let x : nat = Z in x";
 
 in
 ()
