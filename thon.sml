@@ -216,6 +216,10 @@ fun setDeBruijnIndex e varnames typnames =
             A.Rec (setDeBruijnIndex i varnames typnames,
                    setDeBruijnIndex baseCase varnames typnames,
                    prevCaseName, (setDeBruijnIndex recCase (prevCaseName::varnames) typnames))
+       | A.Case (c, lname, l, rname, r) => A.Case(
+            setDeBruijnIndex c varnames typnames,
+            setDeBruijnIndex l (lname::varnames) typnames,
+            setDeBruijnIndex r (rname::varnames) typnames)
        (* | A.TypApp (appType, e) => *)
        (* | A.TypAbs e => *)
        | _ => e (* TODO *)
@@ -223,10 +227,6 @@ fun setDeBruijnIndex e varnames typnames =
        (* | A.Unfold(e') => *)
        (* | A.Use (pkg, client) => *)
        (* | A.Impl (reprType, pkgImpl, pkgType) => *)
-       (* | A.Case (c, l, r) => A.Case( (*TODO left and right both bind - this is wrong still*) *)
-       (*      setDeBruijnIndex c varnames typnames, *)
-       (*      setDeBruijnIndex l varnames typnames, *)
-       (*      setDeBruijnIndex r varnames typnames) *)
 end
 
 
@@ -254,7 +254,7 @@ fun typeof' ctx typCtx e =
                                 else
                                     A.Plus(l, r)
                             end
-       | A.Case (c, l, r) => let val A.Plus(lt, rt) = typeof' ctx typCtx c
+       | A.Case (c, lname, l, rname, r) => let val A.Plus(lt, rt) = typeof' ctx typCtx c
                                (* both bind a term var *)
                                val typeof'LeftBranch = typeof' (Cons(lt, ctx)) typCtx l
                                val typeof'RightBranch= typeof' (Cons(rt, ctx)) typCtx r
@@ -352,9 +352,10 @@ fun subst' src dst bindingDepth =
        | A.ProdRight e => A.ProdRight (subst' src e bindingDepth)
        | A.PlusLeft (t, e) => A.PlusLeft (t, subst' src e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, subst' src e bindingDepth)
-       | A.Case(c, l, r) => A.Case(subst' src c bindingDepth,
-                               subst' src l (bindingDepth+1),
-                               subst' src r (bindingDepth+1))
+       | A.Case(c, lname, l, rname, r) =>
+            A.Case(subst' src c bindingDepth,
+                   lname, subst' src l (bindingDepth+1),
+                   rname, subst' src r (bindingDepth+1))
        | A.Lam (argName, t, f) => A.Lam(argName, t, (subst' src f (bindingDepth+1)))
        | A.App (f, n) => A.App((subst' src f bindingDepth), (subst' src n bindingDepth))
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
@@ -427,8 +428,8 @@ fun step e =
       | A.PlusRight (t, e') =>
             if not (isval e) then A.PlusRight(t, step e')
             else e
-      | A.Case (c, l, r) =>
-        if not (isval c) then A.Case(step c, l, r)
+      | A.Case (c, lname, l, rname, r) =>
+        if not (isval c) then A.Case(step c, lname, l, rname, r)
         else (
             case c of
                  A.PlusLeft(_, e) => subst e l
@@ -530,7 +531,7 @@ val Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))) : Typ =
 val PlusLeft
     (Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))),TmUnit) : Exp = eval (Unfold(nilNatList));
 
-val isnil = Lam("x", natlist, Case(Unfold(Var ("x", 0)), Succ Zero, Zero));
+val isnil = Lam("x", natlist, Case(Unfold(Var ("x", 0)), "l", Succ Zero, "r", Zero));
 val Nat = typeof' Nil Nil (App(isnil, nilNatList));
 (* isnil nilNatList == 1. *)
 val Succ Zero = eval (App(isnil, nilNatList));
@@ -548,8 +549,8 @@ val natQueueType = Prod(
 
 val Plus(Nat, Nat) = typeof' Nil Nil (PlusLeft (Plus(Nat, Nat), Zero));
 val Plus(Nat, Prod(Nat, Nat)) = typeof' Nil Nil (PlusLeft (Plus(Nat, Prod(Nat, Nat)), Zero));
-val Zero = step (Case(PlusLeft (Plus(Nat, Nat), Zero), Var ("x", 0), Succ(Var ("x", 0))));
-val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), Var ("x", 0), Succ(Var ("x", 0))));
+val Zero = step (Case(PlusLeft (Plus(Nat, Nat), Zero), "l", Var ("l", 0), "r", Succ(Var ("r", 0))));
+val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), "l", Var ("l", 0), "r", Succ(Var ("r", 0))));
 
 (* Seems there are multiple valid typings of this expression. Up *)
 (* front, I thought Some(Arr(TypVar 0, Nat)) is the only correct typing, *)
@@ -873,19 +874,19 @@ val Lam ("pkg", Some (TypVar 0),Var ("pkg",0)) : Ast.Exp =
 val Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Var ("natOrFunc",0)) : Ast.Exp =
     parse "\\ natOrFunc : (nat | nat -> nat) -> natOrFunc"
 
-val Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Case (Var ("natOrFunc", 0),Zero,Succ Zero)) : Exp =
-    run "\\ natOrFunc : (nat | nat -> nat) -> case 0 of Z | S Z"
+val Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Case (Var ("natOrFunc", 0),"l", Zero,"r", Succ Zero)) : Exp =
+    run "\\ natOrFunc : (nat | nat -> nat) -> case 0 of l -> Z | r -> S Z"
 
 val App
-    (Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)), Case (Var ("natOrFunc",~1),Zero,Succ Zero)),
+    (Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)), Case (Var ("natOrFunc",~1),"l", Zero,"r", Succ Zero)),
      PlusLeft (Plus (Nat,Arr (Nat,Nat)),Zero)) : Ast.Exp =
-    parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of Z | S Z) (left Z : (nat | nat -> nat)))";
+    parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
 
 val Zero : Exp =
-    run "((\\ (nat | nat -> nat) -> case 0 of Z | S Z) (left Z : (nat | nat -> nat)))";
+    run "((\\ (nat | nat -> nat) -> case 0 of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
 
 val Succ Zero: Exp =
-    run "((\\ (nat | nat -> nat) -> case 0 of Z | S Z) (right (\\ nat -> Z) : (nat | nat -> nat)))";
+    run "((\\ (nat | nat -> nat) -> case 0 of l -> Z | r -> S Z) (right (\\ nat -> Z) : (nat | nat -> nat)))";
 
 val Lam ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))), Var ("natOrFuncOrProd",0)) : Ast.Exp =
     parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"

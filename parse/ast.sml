@@ -34,8 +34,8 @@ sig
       | PlusLeft of Typ * Exp
       | PlusRight of Typ * Exp
       | Case of Exp (* thing being cased on*) *
-                Exp (* Left binds term var *) *
-                Exp (* Right binds term var *)
+                string * Exp (* Left binds term var *) *
+                string * Exp (* Right binds term var *)
       | Fold of Typ (*binds*) * Exp
       | Unfold of Exp
       | TmUnit
@@ -82,8 +82,8 @@ struct
       | PlusLeft of Typ * Exp
       | PlusRight of Typ * Exp
       | Case of Exp (* thing being cased on*) *
-              Exp (* Left binds term var *) *
-              Exp (* Right binds term var *)
+                string * Exp (* Left binds term var *) *
+                string * Exp (* Right binds term var *)
       | Fold of Typ (*binds*) * Exp
       | Unfold of Exp
       | TmUnit

@@ -91,7 +91,7 @@ exp:
   (* Impl (reprType, pkgImpl, pkgType) *)
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp IN exp (A.Use(exp1, exp2))
-  | CASE exp OF exp PIPE exp (A.Case(exp1, exp2, exp3))
+  | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
 
 typ:
     NAT (A.Nat)
