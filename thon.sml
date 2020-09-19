@@ -5,6 +5,9 @@ structure Thon : sig
                    val typeof : A.Exp -> A.Typ
                    val test : unit -> unit
                    val eval : A.Exp -> A.Exp
+                   val isval : A.Exp -> bool
+                   val step : A.Exp -> A.Exp
+                   val subst : A.Exp -> A.Exp -> A.Exp
                    val run : string -> A.Exp
                    val runFile : string -> A.Exp
                    (* TODO val repl : () -> () *)
@@ -14,6 +17,8 @@ struct
 exception IllTyped
 exception IllTypedMsg of string
 exception No
+exception VarNotInContext
+exception VarWithNegativeDeBruijinIndex of string * int
 exception ClientTypeCannotEscapeClientScope
 exception Unimplemented
 
@@ -28,7 +33,7 @@ datatype 'a List = Nil | Cons of 'a * 'a List
 
 fun get ctx i =
     case ctx of
-        Nil => raise No
+        Nil => (print (Int.toString i); raise VarNotInContext)
       | Cons (h, t) => if i = 0 then h else get t (i-1)
 
 
@@ -115,38 +120,6 @@ fun typtypDecrVarIdxs t =
       | A.All t' => A.All(typtypDecrVarIdxs t')
       | A.Some t' => A.Some(typtypDecrVarIdxs t')
       | A.TyRec t' => A.TyRec(typtypDecrVarIdxs t')
-
-
-fun typDecrVarIdxs e =
-    case e
-     of  A.Zero => A.Zero
-       | A.TmUnit => A.TmUnit
-       | A.Var (name, i) => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
-                  else A.Var (name, i - 1)
-       | A.Succ e2 => (A.Succ (typDecrVarIdxs e2))
-       | A.ProdLeft e => (A.ProdLeft (typDecrVarIdxs e))
-       | A.ProdRight e => (A.ProdRight (typDecrVarIdxs e))
-       | A.PlusLeft(t, e) => (A.PlusLeft (t, typDecrVarIdxs e))
-       | A.PlusRight(t, e) => (A.PlusRight (t, typDecrVarIdxs e))
-       | A.Case(c, lname, l, rname, r) =>
-         A.Case(typDecrVarIdxs c,
-                lname,
-                typDecrVarIdxs l,
-                rname,
-                typDecrVarIdxs r)
-       | A.Lam (argName, argType, funcBody) => A.Lam(argName, typtypDecrVarIdxs argType, typDecrVarIdxs funcBody)
-       | A.App (f, n) => A.App(typDecrVarIdxs f, typDecrVarIdxs n)
-       | A.Tuple (l, r) => A.Tuple(typDecrVarIdxs l, typDecrVarIdxs r)
-       | A.Rec (i, baseCase, prevCaseName, recCase) =>
-         A.Rec(typDecrVarIdxs i,
-               typDecrVarIdxs baseCase,
-               prevCaseName, typDecrVarIdxs recCase)
-       | A.TypAbs e => A.TypAbs (typDecrVarIdxs e)
-       | A.TypApp (appType, e) => A.TypApp(typtypDecrVarIdxs appType, typDecrVarIdxs e)
-       | A.Impl (reprType, pkgImpl, pkgType) => A.Impl(typtypDecrVarIdxs reprType, typDecrVarIdxs pkgImpl, typtypDecrVarIdxs pkgType)
-       | A.Use (pkg, clientName, client) => A.Use(typDecrVarIdxs pkg, clientName, typDecrVarIdxs client)
-       | A.Fold(t, e') => A.Fold(typtypDecrVarIdxs t, typDecrVarIdxs e')
-       | A.Unfold(e') => A.Unfold(typDecrVarIdxs e')
 
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
@@ -236,7 +209,7 @@ fun setDeBruijnIndex e varnames typnames =
             setDeBruijnIndex client (clientName::varnames) typnames) (* TODO need a type name still *)
        | A.TypApp (appType, e) => A.TypApp (appType, setDeBruijnIndex e varnames typnames)
        | A.TypAbs e => A.TypAbs (setDeBruijnIndex e varnames typnames)
-       | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) => 
+       | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) =>
             A.Fold (A.TyRec(t), setDeBruijnIndex e' varnames typnames)
        | A.Unfold(e') =>
             A.Unfold (setDeBruijnIndex e' varnames typnames)
@@ -256,7 +229,7 @@ fun typeof' ctx typCtx e =
     case e
      of  A.Zero => A.Nat
        | A.TmUnit => A.Unit
-       | A.Var (name, i) => get ctx i
+       | A.Var (name, i) => (if i < 0 then raise VarWithNegativeDeBruijinIndex(name, i) else get ctx i)
        | A.Succ e2 => (typeof' ctx typCtx e2)
        | A.ProdLeft e => let val A.Prod(l, r) = (typeof' ctx typCtx e) in l end
        | A.ProdRight e => let val A.Prod(l, r) = (typeof' ctx typCtx e) in r end
@@ -412,7 +385,7 @@ fun step e =
                                subst n f'
                            end
                           )
-      | A.Var (name, x) => A.Var (name, x)
+      | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
       | A.Rec (A.Succ(i), baseCase, prevCaseName, recCase) =>
             (* Doesn't evaluate recursive call if not required. *)
@@ -462,23 +435,25 @@ fun step e =
     end
 
 
-fun eval e = if isval e then e else eval (step e)
-
-fun run s = let val e = Parse.parse s in if isval e then e else eval (step e) end
-
-fun runFile s = let val e = Parse.parseFile s in if isval e then e else eval (step e) end
-
 fun parse s =
+    (print ("parse " ^ s ^ "\n");
     let val ast : A.Exp = Parse.parse s
     in
         setDeBruijnIndex ast [] []
-    end
+    end)
 
 fun parseFile filename =
     let val ast : A.Exp = Parse.parseFile filename
     in
         setDeBruijnIndex ast [] []
     end
+
+fun eval e = if isval e then e else eval (step e)
+
+fun run s = let val e = parse s in if isval e then e else eval (step e) end
+
+fun runFile s = let val e = parseFile s in if isval e then e else eval (step e) end
+
 
 
 (******* Tests *******)
@@ -499,8 +474,6 @@ val TypApp
 val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
 val nilNatList =
     Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
-
-val () = print "1";
 
 (* TODO don't hardcode dir *)
 val parsedNilNatList = parseFile "/home/evan/thon/examples/emptynatlist.thon";
@@ -536,8 +509,6 @@ val parsedNatlistCons =
     parseFile "/home/evan/thon/examples/natlistcons.thon";
 val true = (parsedNatlistCons = natlistCons);
 
-val () = print "2";
-
 val Arr (Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0)))),
          TyRec (Plus (Unit,Prod (Nat,TypVar 0)))) : Typ =
     typeof' Nil Nil natlistCons;
@@ -551,7 +522,6 @@ val true = (natlist = deducedNatlist);
 val Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))) : Typ =
     typeof' Nil Nil (Unfold(nilNatList));
 
-val () = print "3";
 val PlusLeft
     (Plus (Unit,Prod (Nat,TyRec (Plus (Unit,Prod (Nat,TypVar 0))))),TmUnit) : Exp = eval (Unfold(nilNatList));
 
@@ -605,7 +575,8 @@ val Use (Impl (Nat,Lam ("x",Nat,Zero),Arr (TypVar 0,TypVar 0)),
     parse "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as pkg in (pkg)";
 
 val Zero = run "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as pkg in (pkg)"
-           handle No (* TODO *)=> Zero;
+           handle ClientTypeCannotEscapeClientScope => Zero;
+
 
 val e1 = Impl(Nat, Lam("x", Nat, Var ("x", 0)), Arr(TypVar 0, TypVar 0));
 val Some(Arr(TypVar 0, TypVar 0)) = typeof' Nil Nil e1;
@@ -746,7 +717,13 @@ val Lam("x", Nat, Succ Zero) = subst (Succ Zero) (Lam("x", Nat, Var ("x", 1)));
 val Lam("x", Nat, Lam("x", Nat, Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Lam("x", Nat, Var ("z", 2))));
 val Lam("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
 
-val Lam("x", Nat, Rec(Zero, Var ("y", 0), "prev", Zero)) = subst Zero (Lam("x", Nat, Rec(Var ("x", 1), Var ("x", 0), "prev", Zero)));
+
+val Lam("x", Nat, Rec (Zero,
+                       Var ("x",0),
+                       "prev", Zero)) : Exp =
+    subst Zero (Lam("x", Nat, Rec(Var ("x", 1),
+                                  Var ("x", 0),
+                                  "prev", Zero)));
 val Lam("x", Nat, Rec(Zero, Var ("x", 1), "prev", Zero)) = subst Zero (Lam("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
 val Rec(Zero, Zero, "prev", Zero) = step (App(Lam("x", Nat, Rec(Var ("x", 0), Var ("x", 0), "prev", Zero)), Zero));
 
@@ -779,7 +756,6 @@ val Arr(Arr(Nat, Nat), Nat) =
 val Arr(Nat, Nat) = typeof' Nil Nil (Rec(Zero,
                                        Lam("x", Nat, Succ(Zero)),
                                        "prev", Lam("x", Nat, Succ(Var("x", 0)))));
-
 val Arr(Nat, Nat) = typeof' Nil Nil (Rec(Succ(Zero),
                                        Lam("x", Nat, Succ(Zero)),
                                        "prev", Lam("x", Nat, Succ(Var("x", 0)))));
@@ -826,7 +802,6 @@ val Succ Zero = step (App(Lam("x", Nat, Succ(Var("x", 0))), Zero));
 val Succ (Succ Zero) = step (App(Lam("x", Nat, Succ(Var("x", 0))), Succ Zero));
 val Succ (Succ (Succ Zero)) = step (App(Lam("x", Nat, Succ(Var("x", 0))), Succ (Succ Zero)));
 val Succ (Succ (Succ Zero)) = step (App(Lam("x", Nat, Succ(Succ(Var("x", 0)))), Succ Zero));
-
 (* Take in a nat -> nat and apply to zero. Input nat -> nat is Succ *)
 val App(Lam("x", Nat, Succ(Var("x", 0))), Zero) = step (App(Lam("x", Arr(Nat, Nat), App(Var("x", 0), Zero)),
                                                   Lam("x", Nat, Succ(Var("x", 0)))));
@@ -838,27 +813,26 @@ val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, "prev", S
 
 val multByThree = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ(Succ(Succ(Var("prev", 0))))));
 
-(* TODO this is wrong *)
-val Lam ("n", Nat,Rec (Var ("n",~1),Var ("n", 0), "prev", Succ (Succ Zero))) : Ast.Exp =
-    parse "\\ n : nat -> rec n ( Z -> 0 | S prev -> S S Z )";
+val Lam ("n",Nat,Rec (Var ("n",0),Var ("n",0),"prev",Succ (Succ Zero))) =
+    parse "\\ n : nat -> rec n ( Z -> n | S prev -> S S Z )";
 
-val App (Lam ("n", Nat,Rec (Var ("n",~1),Zero, "prev", Succ (Succ (Var ("n", 0))))),Succ Zero) : Ast.Exp =
-    parse "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S 0 )) (S Z))";
+val App (Lam ("n", Nat,Rec (Var ("n",0),Zero, "prev", Succ (Succ (Var ("prev", 0))))),Succ Zero) : Ast.Exp =
+    parse "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S prev )) (S Z))";
 
 val (Succ (Succ Zero)) =
-    run "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S Z))";
+    run "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S prev )) (S Z))";
 
 val Succ (Succ (Succ (Succ Zero))) : Ast.Exp =
-    run "((\\ nat -> rec 0 ( Z -> Z | S -> S S 0 )) (S S Z))";
+    run "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S prev )) (S S Z))";
 
 val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero));
 
 val TypAbs (Lam("x",TypVar 0,Var ("x", 0))) : Ast.Exp =
-    parse "poly \\ x : 0 -> 0";
+    parse "poly \\ x : 0 -> x";
 (* TODO also wrong *)
-val TypAbs (TypAbs (Lam("x",TypVar 1,Var ("x",~1)))) =
+val TypAbs (TypAbs (Lam("x",TypVar 1,Var ("x",0)))) : Exp =
     parse "poly poly \\ x : 1 -> x";
-val TypApp (Nat,TypAbs (Lam("x",TypVar 0,Var ("x",~1)))) =
+val TypApp (Nat,TypAbs (Lam("x",TypVar 0,Var ("x",0)))) =
     parse "((poly \\ x : 0 -> x) (nat))";
 val Lam ("x", Nat,Var ("x", 0)) : Ast.Exp =
     run "((poly \\ x : 0 -> x) (nat))";
@@ -866,7 +840,7 @@ val Lam ("x", Nat,Var ("x", 0)) : Ast.Exp =
 val TypApp
     (Nat,
      TypAbs
-       (TypAbs (Lam("f",Arr (TypVar 1,TypVar 0),Var ("f",~1)))))
+       (TypAbs (Lam("f",Arr (TypVar 1,TypVar 0),Var ("f",0)))))
   : Ast.Exp =
     parse "((poly poly \\ f : (1 -> 0) -> f) (nat))";
 val TypAbs (Lam ("x", Arr (Nat,TypVar 0),Var ("x", 0))) : Ast.Exp =
@@ -890,7 +864,7 @@ val Zero : Ast.Exp =
 val Succ Zero : Ast.Exp =
     run "fst snd (Z, (S Z, S S Z))";
 
-val TypAbs (Lam("x",All (TypVar 0),Var ("x",~1))) : Ast.Exp =
+val TypAbs (Lam("x",All (TypVar 0),Var ("x",0))) : Ast.Exp =
     parse "poly \\ x : (all 0) -> x"
 
 val Lam ("pkg", Some (TypVar 0),Var ("pkg",0)) : Ast.Exp =
@@ -900,18 +874,18 @@ val Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Var ("natOrFunc",0)) : Ast.Exp =
     parse "\\ natOrFunc : (nat | nat -> nat) -> natOrFunc"
 
 val Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Case (Var ("natOrFunc", 0),"l", Zero,"r", Succ Zero)) : Exp =
-    run "\\ natOrFunc : (nat | nat -> nat) -> case 0 of l -> Z | r -> S Z"
+    run "\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z"
 
 val App
-    (Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)), Case (Var ("natOrFunc",~1),"l", Zero,"r", Succ Zero)),
+    (Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)), Case (Var ("natOrFunc",0),"l", Zero,"r", Succ Zero)),
      PlusLeft (Plus (Nat,Arr (Nat,Nat)),Zero)) : Ast.Exp =
     parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
 
 val Zero : Exp =
-    run "((\\ (nat | nat -> nat) -> case 0 of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
+    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
 
 val Succ Zero: Exp =
-    run "((\\ (nat | nat -> nat) -> case 0 of l -> Z | r -> S Z) (right (\\ nat -> Z) : (nat | nat -> nat)))";
+    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (right (\\ nat -> Z) : (nat | nat -> nat)))";
 
 val Lam ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))), Var ("natOrFuncOrProd",0)) : Ast.Exp =
     parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"
@@ -921,19 +895,15 @@ val Some (Prod (TypVar 0,Arr (Prod (Nat,TypVar 0),TypVar 0))) : Typ =
 
 val natList = (parseFile "/home/evan/thon/examples/natlist.thon");
 
-(* (* TODO *) *)
-(* val thisIsABug = *)
 val Arr (Plus (Nat,Unit),Arr (Nat,Nat)) : Ast.Typ =
     typeof (parseFile "/home/evan/thon/examples/option.thon");
-(*   Lam *)
-(*     ("x",Plus (Nat,Unit), *)
-(*      Lam *)
-(*        ("y",Nat, *)
-(*         Case *)
-(*           (VarName ("x",~1), *)
-(*            App (App (VarName ("some_x",~1),Zero),VarName ("some_x",~1)), *)
-(*            VarName ("y",~1)))) : Ast.Exp = *)
-(*     parseFile "/home/evan/thon/examples/option.thon"; *)
+
+val Lam
+    ("x",Plus (Nat,Unit),
+     Lam
+       ("y",Nat,Case (Var ("x",1),"somex",Var ("somex",0),"none",Var ("y",1))))
+  : Exp =
+    parseFile "/home/evan/thon/examples/option.thon";
 
 in
 ()

@@ -5,7 +5,7 @@ impl (0 * ((nat * 0) -> 0)) with (u. (unit |  (nat * 0))) as
     with left unit : (unit |  (nat * (u . (unit | (nat * 0))))),
 
     (*cons*) \ natAndNatList : (nat * (u. (unit |  (nat * 0)))) -> fold u.(unit |  (nat * 0))
-    with right 0 : (unit | (nat * (u. (unit |  (nat * 0)))))
+    with right natAndNatList : (unit | (nat * (u. (unit |  (nat * 0)))))
 )
 (*
 data natlist = Nil | Cons of nat * natlist;
