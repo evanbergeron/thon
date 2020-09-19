@@ -128,7 +128,12 @@ fun typDecrVarIdxs e =
        | A.ProdRight e => (A.ProdRight (typDecrVarIdxs e))
        | A.PlusLeft(t, e) => (A.PlusLeft (t, typDecrVarIdxs e))
        | A.PlusRight(t, e) => (A.PlusRight (t, typDecrVarIdxs e))
-       | A.Case(c, l, r) => (A.Case(typDecrVarIdxs c, typDecrVarIdxs l, typDecrVarIdxs r))
+       | A.Case(c, lname, l, rname, r) =>
+         A.Case(typDecrVarIdxs c,
+                lname,
+                typDecrVarIdxs l,
+                rname,
+                typDecrVarIdxs r)
        | A.Lam (argName, argType, funcBody) => A.Lam(argName, typtypDecrVarIdxs argType, typDecrVarIdxs funcBody)
        | A.App (f, n) => A.App(typDecrVarIdxs f, typDecrVarIdxs n)
        | A.Tuple (l, r) => A.Tuple(typDecrVarIdxs l, typDecrVarIdxs r)
@@ -155,9 +160,12 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | A.ProdRight e => A.ProdRight (typSubstInExp' srcType e bindingDepth)
        | A.PlusLeft (t, e) => A.PlusLeft (t, typSubstInExp' srcType e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, typSubstInExp' srcType e bindingDepth)
-       | A.Case(c, l, r) => A.Case(typSubstInExp' srcType c bindingDepth,
-                               typSubstInExp' srcType l bindingDepth,
-                               typSubstInExp' srcType r bindingDepth)
+       | A.Case(c, lname, l, rname, r) =>
+            A.Case(typSubstInExp' srcType c bindingDepth,
+                   lname,
+                   typSubstInExp' srcType l bindingDepth,
+                   rname,
+                   typSubstInExp' srcType r bindingDepth)
        | A.Lam (argName, argType, funcBody) =>
             A.Lam(argName, (typsubst' srcType argType bindingDepth),
                 typSubstInExp' srcType funcBody bindingDepth)
@@ -197,7 +205,6 @@ fun setDeBruijnIndex e varnames typnames =
     case e
      of  A.Zero => e
        | A.TmUnit => e
-       | A.Var (name, i) => e (* TODO deprecate *)
        | A.Var (n, i) =>
          (case find n varnames of
              NONE => raise No
@@ -219,14 +226,17 @@ fun setDeBruijnIndex e varnames typnames =
                    prevCaseName, (setDeBruijnIndex recCase (prevCaseName::varnames) typnames))
        | A.Case (c, lname, l, rname, r) => A.Case(
             setDeBruijnIndex c varnames typnames,
+            lname,
             setDeBruijnIndex l (lname::varnames) typnames,
+            rname,
             setDeBruijnIndex r (rname::varnames) typnames)
-       | A.Use (pkg, clientName client) => A.Use (
+       | A.Use (pkg, clientName, client) => A.Use (
             setDeBruijnIndex pkg varnames typnames,
+            clientName,
             setDeBruijnIndex client (clientName::varnames) typnames) (* TODO need a type name still *)
        (* | A.TypApp (appType, e) => *)
        (* | A.TypAbs e => *)
-       | _ => e (* TODO *)
+       | _ => raise Unimplemented (* TODO *)
        (* | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) => *)
        (* | A.Unfold(e') => *)
        (* | A.Impl (reprType, pkgImpl, pkgType) => *)
@@ -898,6 +908,20 @@ val Some (Prod (TypVar 0,Arr (Prod (Nat,TypVar 0),TypVar 0))) : Typ =
     typeof (parseFile "/home/evan/thon/examples/natlist.thon");
 
 val natList = (parseFile "/home/evan/thon/examples/natlist.thon");
+
+(* (* TODO *) *)
+(* val thisIsABug = *)
+val Arr (Plus (Nat,Unit),Arr (Nat,Nat)) : Ast.Typ =
+    typeof (parseFile "/home/evan/thon/examples/option.thon");
+(*   Lam *)
+(*     ("x",Plus (Nat,Unit), *)
+(*      Lam *)
+(*        ("y",Nat, *)
+(*         Case *)
+(*           (VarName ("x",~1), *)
+(*            App (App (VarName ("some_x",~1),Zero),VarName ("some_x",~1)), *)
+(*            VarName ("y",~1)))) : Ast.Exp = *)
+(*     parseFile "/home/evan/thon/examples/option.thon"; *)
 
 in
 ()
