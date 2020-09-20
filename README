@@ -159,8 +159,7 @@ code for CMU's Fall 2016 compilers course.
  | || ' \(_-<  _/ _` | | |
 |___|_||_/__/\__\__,_|_|_|
 
-Sorry, but the code is not public yet. If you access to the code, this
-is how to get it running in Ubuntu 20:
+This works for me on ubuntu 20:
 
     $ git clone https://github.com/evanbergeron/thon.git
     $ sudo apt install smlnj ml-yaxx ml-lex ml-lpt
