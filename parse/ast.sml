@@ -7,10 +7,10 @@ sig
       | TypVar of string * int
       | Arr of Typ * Typ
       | All of string * Typ (* binds *)
-      | Some of Typ (* binds *)
+      | Some of string * Typ (* binds *)
       | Prod of Typ * Typ
       | Plus of Typ * Typ (* sum type *)
-      | TyRec of Typ (* binds *)
+      | TyRec of string * Typ (* binds *)
       | Unit (* nullary sum *)
 
     datatype Idx = int
@@ -56,10 +56,10 @@ struct
       | TypVar of string * int
       | Arr of Typ * Typ
       | All of string * Typ (* binds *)
-      | Some of Typ (* binds *)
+      | Some of string * Typ (* binds *)
       | Prod of Typ * Typ
       | Plus of Typ * Typ (* sum type *)
-      | TyRec of Typ (* binds *)
+      | TyRec of string * Typ (* binds *)
       | Unit (* nullary sum *)
 
     datatype Idx = int
