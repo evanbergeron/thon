@@ -1,0 +1,22 @@
+let isnonempty : (u. (unit |  (nat * 0))) -> nat =
+    \ natlist : (u. (unit |  (nat * 0))) ->
+        (case (unfold natlist) of
+           empty -> Z
+         | hdAndTl -> S Z)
+in let nil : (u. (unit |  (nat * 0))) =
+    fold u . (unit | (nat * 0))
+    with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
+in let cons :
+       (nat * (u. (unit |  (nat * 0)))) -> 
+       (u. (unit |  (nat * 0))) =
+    \ natAndNatList : (nat * (u. (unit |  (nat * 0)))) ->
+    fold u.(unit |  (nat * 0))
+    with right natAndNatList : (unit | (nat * (u. (unit |  (nat * 0)))))
+in let len : (u. (unit |  (nat * 0))) -> nat =
+    \ natlist : (u. (unit |  (nat * 0))) ->
+    rec (isnonempty natlist) (
+        Z -> Z
+      | S p -> S p
+    )
+in
+(len (cons (Z, nil)))

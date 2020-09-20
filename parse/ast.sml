@@ -4,7 +4,7 @@ sig
     (* TODO is there a way to dedupe this with the structure defn below? *)
     datatype Typ =
         Nat
-      | TypVar of int
+      | TypVar of string * int
       | Arr of Typ * Typ
       | All of Typ (* binds *)
       | Some of Typ (* binds *)
@@ -53,7 +53,7 @@ structure Ast :> AST =
 struct
     datatype Typ =
         Nat
-      | TypVar of int
+      | TypVar of string * int
       | Arr of Typ * Typ
       | All of Typ (* binds *)
       | Some of Typ (* binds *)
