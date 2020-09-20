@@ -162,6 +162,7 @@ code for CMU's Fall 2016 compilers course.
 Sorry, but the code is not public yet. If you access to the code, this
 is how to get it running in Ubuntu 20:
 
+    $ git clone https://github.com/evanbergeron/thon.git
     $ sudo apt install smlnj ml-yaxx ml-lex ml-lpt
     $ sml
     - CM.make "path/to/your/git/clone/thon.cm";
