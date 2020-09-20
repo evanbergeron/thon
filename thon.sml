@@ -157,7 +157,7 @@ fun typSubstInExp' srcType dstExp bindingDepth =
             A.Rec(typSubstInExp' srcType i bindingDepth,
                 typSubstInExp' srcType baseCase bindingDepth,
                 prevCaseName, typSubstInExp' srcType recCase bindingDepth)
-       | A.TypAbs e => A.TypAbs(typSubstInExp' srcType e (bindingDepth+1)) (* binds type var *)
+       | A.TypAbs (name, e) => A.TypAbs(name, typSubstInExp' srcType e (bindingDepth+1)) (* binds type var *)
        | A.TypApp (appType, e) =>
             A.TypApp(typsubst' srcType appType bindingDepth,
                    typSubstInExp' srcType e bindingDepth)
@@ -217,7 +217,7 @@ fun setDeBruijnIndex e varnames typnames =
             clientName,
             setDeBruijnIndex client (clientName::varnames) typnames) (* TODO need a type name still *)
        | A.TypApp (appType, e) => A.TypApp (appType, setDeBruijnIndex e varnames typnames)
-       | A.TypAbs e => A.TypAbs (setDeBruijnIndex e varnames typnames)
+       | A.TypAbs (name, e) => A.TypAbs (name, setDeBruijnIndex e varnames typnames)
        | A.Fold(A.TyRec(t) (*declared type*), e'(* binds a typ var *)) =>
             A.Fold (A.TyRec(t), setDeBruijnIndex e' varnames typnames)
        | A.Unfold(e') =>
@@ -286,7 +286,7 @@ fun typeof' ctx typCtx e =
             in
                 if t <> t2 then raise IllTyped else t
             end
-       | A.TypAbs e => A.All("t" (* TODO TODO TODO *), typeof' ctx (Cons(42, typCtx)) e)
+       | A.TypAbs (name, e) => A.All("t" (* TODO TODO TODO *), typeof' ctx (Cons(42, typCtx)) e)
        | A.TypApp (appType, e) =>
             if not (istype typCtx appType) then raise IllTyped else
             let val A.All(name, t) = typeof' ctx typCtx e
@@ -337,7 +337,7 @@ fun isval e =
       | A.Lam(_, _, _) => true
       | A.Let(_, _, _, _) => false
       | A.Tuple(l, r) => (isval l) andalso (isval r)
-      | A.TypAbs _  => true
+      | A.TypAbs (_, _)  => true
       | A.Impl(_, pkgImpl, _) => isval pkgImpl
       | A.PlusLeft(_, e') => isval e'
       | A.PlusRight(_, e') => isval e'
@@ -372,7 +372,7 @@ fun subst' src dst bindingDepth =
             A.Rec(subst' src i bindingDepth,
                 subst' src baseCase bindingDepth,
                 prevCaseName, subst' src recCase (bindingDepth+1))
-       | A.TypAbs e => A.TypAbs (subst' src e bindingDepth) (* abstracts over types, not exps *)
+       | A.TypAbs (name, e) => A.TypAbs (name, subst' src e bindingDepth) (* abstracts over types, not exps *)
        | A.TypApp (appType, e) => A.TypApp(appType, subst' src e bindingDepth)
        | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, subst' src pkgImpl bindingDepth, t)
        | A.Use (pkg, clientName, client) => A.Use(subst' src pkg bindingDepth, clientName, subst' src client (bindingDepth+1))
@@ -414,11 +414,11 @@ fun step e =
             if not (isval i) then
                 A.Rec(step i, baseCase, prevCaseName, recCase)
             else raise No
-      | A.TypAbs e' => raise No (* Already isval *)
+      | A.TypAbs (name, e') => raise No (* Already isval *)
       | A.TypApp (t, e') =>
             if not (isval e') then (A.TypApp (t, step e'))
             else
-                let val A.TypAbs(e'') = e' in
+                let val A.TypAbs(name, e'') = e' in
                     typSubstInExp t e''
                 end
       | A.Impl(reprType, pkgImpl, pkgType) =>
@@ -488,7 +488,7 @@ val Lam ("natlist", TyRec (Plus (Unit,Prod (Nat,TypVar ("t", 0)))),Var ("natlist
 (* id function on natlists *)
 val TypApp
     (TyRec (Plus (Unit,Prod (Nat,TypVar ("t", 0)))),
-     TypAbs (Lam("x",TypVar ("t", 0),Var ("x",0)))) : Ast.Exp =
+     TypAbs ("t", Lam("x",TypVar ("t", 0),Var ("x",0)))) : Ast.Exp =
     parse "((poly \\ x : 0 -> x) (u. (unit | (nat * 0))))";
 (* Unfolded Natlist type *)
 val nlbody : Typ = TyRec(Plus(Unit, Prod(Nat, natlist)));
@@ -656,20 +656,20 @@ val Some(Arr(TypVar ("t", 1), Nat)) = typAbstractOut (Arr(Nat, Nat)) (Some(Arr(A
 val All("t", Arr(TypVar ("t", 1), Nat)) = typAbstractOut (Arr(Nat, Nat)) (All("t", Arr(Arr(Nat, Nat), Nat)));
 val Some(All("t", Arr(TypVar ("t", 2), Nat))) = typAbstractOut (Arr(Nat, Nat)) (Some(All("t", Arr(Arr(Nat, Nat), Nat))));
 
-val polymorphicIdFn = TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0)));
+val polymorphicIdFn = TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0)));
 
 val Lam("x", Nat, Var ("x", 0)) = step (TypApp(Nat, polymorphicIdFn));
 val Lam("x", Arr(Nat, Nat), Var ("x", 0)) = step (TypApp(Arr(Nat, Nat), polymorphicIdFn));
-val TypAbs (Lam ("x", TypVar ("t", 0), Var ("x", 0))) = step (TypApp(Nat, TypAbs(polymorphicIdFn)))
-val TypApp(Nat, TypAbs((Lam ("x", TypVar ("t", 0), Var ("x", 0))))) = step (TypApp(Nat, TypApp(Nat, TypAbs(polymorphicIdFn))))
-val TypAbs(Lam("x", Arr(Nat, TypVar ("t", 0)), Var ("x", 0))) = step (TypApp(Nat, TypAbs(TypAbs(Lam("x", Arr(TypVar ("t", 1), TypVar ("t", 0)), Var ("x", 0))))));
-val Lam("x", Nat, Var ("x", 0)) = eval (TypApp(Nat, TypApp(Nat, TypAbs(polymorphicIdFn))));
+val TypAbs ("t", Lam ("x", TypVar ("t", 0), Var ("x", 0))) = step (TypApp(Nat, TypAbs("t", polymorphicIdFn)))
+val TypApp(Nat, TypAbs("t", (Lam ("x", TypVar ("t", 0), Var ("x", 0))))) = step (TypApp(Nat, TypApp(Nat, TypAbs("t", polymorphicIdFn))))
+val TypAbs("t", Lam("x", Arr(Nat, TypVar ("t", 0)), Var ("x", 0))) = step (TypApp(Nat, TypAbs("t", TypAbs("t", Lam("x", Arr(TypVar ("t", 1), TypVar ("t", 0)), Var ("x", 0))))));
+val Lam("x", Nat, Var ("x", 0)) = eval (TypApp(Nat, TypApp(Nat, TypAbs("t", polymorphicIdFn))));
 
 val Succ Zero = eval (App(TypApp(Nat, polymorphicIdFn), Succ(Zero)));
 
-val TypAbs(Zero) = step (TypAbs(Zero));
-val true = isval (Lam("x", Nat, TypAbs(Zero)));
-val (TypAbs Zero) = step (App(Lam("x", Nat, TypAbs(Zero)), Zero));
+val TypAbs("t", Zero) = step (TypAbs("t", Zero));
+val true = isval (Lam("x", Nat, TypAbs("t", Zero)));
+val (TypAbs ("t", Zero)) = step (App(Lam("x", Nat, TypAbs("t", Zero)), Zero));
 
 val Nat = typsubst Nat (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
 val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
@@ -683,24 +683,24 @@ val All("t", Arr(Nat, (All("t", Nat)))) = typsubst (All("t", Nat)) (All("t", Arr
 val All("t", Arr(Nat, (Some(Nat)))) = typsubst (Some(Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
 
 val Nat = typeof' Nil Nil (TypApp(TypVar ("t", 0), Zero)) handle IllTyped => Nat;
-val All("t", Arr(TypVar ("t", 0), Nat)) = typeof' Nil Nil (TypAbs(Lam("x", TypVar ("t", 0), Zero)));
-val Arr(Arr(Nat, Nat), Nat) = typeof' Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam("x", TypVar ("t", 0), Zero)))));
-val Nat = typeof' Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam("x", TypVar ("t", 1), Zero))))) handle IllTyped => Nat;
+val All("t", Arr(TypVar ("t", 0), Nat)) = typeof' Nil Nil (TypAbs("t", Lam("x", TypVar ("t", 0), Zero)));
+val Arr(Arr(Nat, Nat), Nat) = typeof' Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs("t", Lam("x", TypVar ("t", 0), Zero)))));
+val Nat = typeof' Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs("t", Lam("x", TypVar ("t", 1), Zero))))) handle IllTyped => Nat;
 
 
-val All("t", Nat) = typeof' Nil Nil (TypAbs(Zero)); (* polymorphic zero *)
+val All("t", Nat) = typeof' Nil Nil (TypAbs("t", Zero)); (* polymorphic zero *)
 (* polymorphic id function :) *)
 val All("t", Arr(TypVar ("t", 0), TypVar ("t", 0))) =
-    typeof' Nil Nil (TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0))));
+    typeof' Nil Nil (TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0))));
 val Arr(Nat, All("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
-    typeof' Nil Nil (Lam("x", Nat, TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0)))));
+    typeof' Nil Nil (Lam("x", Nat, TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0)))));
 val Arr(Nat, All("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
-    typeof' Nil Nil (Lam("x", Nat, TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0)))));
+    typeof' Nil Nil (Lam("x", Nat, TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0)))));
 (* Nested type variables *)
 val All("t", All("t", Arr(TypVar ("t", 1),Nat))) =
-    typeof' Nil Nil (TypAbs(TypAbs(Lam("x", TypVar ("t", 1), Zero))))
+    typeof' Nil Nil (TypAbs("t", TypAbs("t", Lam("x", TypVar ("t", 1), Zero))))
 val All("t", All("t", Arr(TypVar ("t", 1), TypVar ("t", 1)))) =
-    typeof' Nil Nil (TypAbs(TypAbs(Lam("x", TypVar ("t", 1), Var ("x", 0)))))
+    typeof' Nil Nil (TypAbs("t", TypAbs("t", Lam("x", TypVar ("t", 1), Var ("x", 0)))))
 
 val true = istype Nil Nat;
 val false = istype Nil (TypVar ("t", 0)); (* Unbound type variable *)
@@ -847,23 +847,23 @@ val Succ (Succ (Succ (Succ Zero))) : Ast.Exp =
 
 val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero));
 
-val TypAbs (Lam("x",TypVar ("t", 0),Var ("x", 0))) : Ast.Exp =
+val TypAbs ("t", Lam("x",TypVar ("t", 0),Var ("x", 0))) : Ast.Exp =
     parse "poly \\ x : 0 -> x";
 (* TODO also wrong *)
-val TypAbs (TypAbs (Lam("x",TypVar ("t", 1),Var ("x",0)))) : Exp =
+val TypAbs ("t", TypAbs ("t", Lam("x",TypVar ("t", 1),Var ("x",0)))) : Exp =
     parse "poly poly \\ x : 1 -> x";
-val TypApp (Nat,TypAbs (Lam("x",TypVar ("t", 0),Var ("x",0)))) =
+val TypApp (Nat,TypAbs ("t", Lam("x",TypVar ("t", 0),Var ("x",0)))) =
     parse "((poly \\ x : 0 -> x) (nat))";
 val Lam ("x", Nat,Var ("x", 0)) : Ast.Exp =
     run "((poly \\ x : 0 -> x) (nat))";
 
 val TypApp
     (Nat,
-     TypAbs
-       (TypAbs (Lam("f",Arr (TypVar ("t", 1),TypVar ("t", 0)),Var ("f",0)))))
+     TypAbs("t",
+       (TypAbs ("t", Lam("f",Arr (TypVar ("t", 1),TypVar ("t", 0)),Var ("f",0))))))
   : Ast.Exp =
     parse "((poly poly \\ f : (1 -> 0) -> f) (nat))";
-val TypAbs (Lam ("x", Arr (Nat,TypVar ("t", 0)),Var ("x", 0))) : Ast.Exp =
+val TypAbs ("t", Lam ("x", Arr (Nat,TypVar ("t", 0)),Var ("x", 0))) : Ast.Exp =
     run "((poly poly \\ x : (1 -> 0) -> x) (nat))";
 
 val Tuple (Zero,Succ Zero) : Ast.Exp =
@@ -884,7 +884,7 @@ val Zero : Ast.Exp =
 val Succ Zero : Ast.Exp =
     run "fst snd (Z, (S Z, S S Z))";
 
-val TypAbs (Lam("x",All ("t", TypVar ("t", 0)),Var ("x",0))) : Ast.Exp =
+val TypAbs ("t", Lam("x",All ("t", TypVar ("t", 0)),Var ("x",0))) : Ast.Exp =
     parse "poly \\ x : (all 0) -> x"
 
 val Lam ("pkg", Some (TypVar ("t", 0)),Var ("pkg",0)) : Ast.Exp =

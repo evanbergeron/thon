@@ -23,7 +23,7 @@ sig
       | Let of string * Typ (*vartype*) * Exp (*varval*) * Exp (*varscope*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
-      | TypAbs of Exp (* binds type variable *)
+      | TypAbs of string * Exp (* binds type variable *)
       | TypApp of Typ * Exp
       | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
       | Use of Exp (*package*) * string (*exp name*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
@@ -72,7 +72,7 @@ struct
       | Let of string * Typ (*vartype*) * Exp (*varval*) * Exp (*varscope*)
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
-      | TypAbs of Exp (* binds type variable *)
+      | TypAbs of string * Exp (* binds type variable *)
       | TypApp of Typ * Exp
       | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
       | Use of Exp (*package*) * string (*exp name*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
