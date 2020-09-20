@@ -6,7 +6,7 @@ sig
         Nat
       | TypVar of string * int
       | Arr of Typ * Typ
-      | All of Typ (* binds *)
+      | All of string * Typ (* binds *)
       | Some of Typ (* binds *)
       | Prod of Typ * Typ
       | Plus of Typ * Typ (* sum type *)
@@ -55,7 +55,7 @@ struct
         Nat
       | TypVar of string * int
       | Arr of Typ * Typ
-      | All of Typ (* binds *)
+      | All of string * Typ (* binds *)
       | Some of Typ (* binds *)
       | Prod of Typ * Typ
       | Plus of Typ * Typ (* sum type *)

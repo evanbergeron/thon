@@ -52,7 +52,7 @@ fun istype typeCtx t =
       | A.Arr(d, c) => (istype typeCtx d) andalso (istype typeCtx c)
       | A.Prod(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
       | A.Plus(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
-      | A.All t' => istype (Cons(42, typeCtx)) t'
+      | A.All (name, t') => istype (Cons(42, typeCtx)) t'
       | A.Some t' => istype (Cons(42, typeCtx)) t'
       | A.TyRec t' => istype (Cons(42, typeCtx)) t'
 
@@ -70,7 +70,7 @@ fun typsubst' src dst bindingDepth =
                            (typsubst' src r bindingDepth))
       | A.Plus(l, r) => A.Plus((typsubst' src l bindingDepth),
                            (typsubst' src r bindingDepth))
-      | A.All t => A.All(typsubst' src t (bindingDepth + 1))
+      | A.All (name, t) => A.All(name, typsubst' src t (bindingDepth + 1))
       | A.Some t => A.Some(typsubst' src t (bindingDepth + 1))
       | A.TyRec t => A.TyRec(typsubst' src t (bindingDepth + 1))
 
@@ -99,7 +99,7 @@ fun typAbstractOut' search t bindingDepth =
                            (typAbstractOut' search r bindingDepth))
       | A.Plus(l, r) => A.Plus((typAbstractOut' search l bindingDepth),
                            (typAbstractOut' search r bindingDepth))
-      | A.All t' => A.All(typAbstractOut' search t' (bindingDepth+1))
+      | A.All (name, t') => A.All(name, typAbstractOut' search t' (bindingDepth+1))
       | A.Some t' => A.Some(typAbstractOut' search t' (bindingDepth+1))
       | A.TyRec t' => A.TyRec(typAbstractOut' search t' (bindingDepth+1))
 
@@ -117,7 +117,7 @@ fun typtypDecrVarIdxs t =
       | A.Arr(d, c) => A.Arr(typtypDecrVarIdxs d, typtypDecrVarIdxs c)
       | A.Prod(l, r) => A.Prod(typtypDecrVarIdxs l, typtypDecrVarIdxs r)
       | A.Plus(l, r) => A.Plus(typtypDecrVarIdxs l, typtypDecrVarIdxs r)
-      | A.All t' => A.All(typtypDecrVarIdxs t')
+      | A.All (name, t') => A.All(name, typtypDecrVarIdxs t')
       | A.Some t' => A.Some(typtypDecrVarIdxs t')
       | A.TyRec t' => A.TyRec(typtypDecrVarIdxs t')
 
@@ -286,10 +286,10 @@ fun typeof' ctx typCtx e =
             in
                 if t <> t2 then raise IllTyped else t
             end
-       | A.TypAbs e => A.All(typeof' ctx (Cons(42, typCtx)) e)
+       | A.TypAbs e => A.All("t" (* TODO TODO TODO *), typeof' ctx (Cons(42, typCtx)) e)
        | A.TypApp (appType, e) =>
             if not (istype typCtx appType) then raise IllTyped else
-            let val A.All(t) = typeof' ctx typCtx e
+            let val A.All(name, t) = typeof' ctx typCtx e
             in
                 typsubst appType t
             end
@@ -573,7 +573,7 @@ val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), "l", Var ("l", 0)
 (* That's why we require an explicit type annotation from the programmer. *)
 val Arr(Nat, Nat) = typeof' Nil (Cons(42, Nil)) (Lam("x", Nat, Zero));
 val Arr(TypVar ("t", 0), TypVar ("t", 0)) = typAbstractOut Nat (Arr(Nat, Nat));
-val All(Arr(TypVar ("t", 0), Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(TypVar ("t", 0), Nat)));
+val All("t", Arr(TypVar ("t", 0), Nat)) = typAbstractOut (Arr(Nat, Nat)) (All("t", Arr(TypVar ("t", 0), Nat)));
 
 val e0 = Impl(Nat, Lam("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0)));
 val Some(Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' Nil Nil e0;
@@ -602,15 +602,15 @@ val e1 = Impl(Nat, Lam("x", Nat, Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t"
 val Some(Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' Nil Nil e1;
 val e2 = Impl(Arr(Nat, Nat), Lam("x", Arr(Nat, Nat), Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t", 0)));
 val Some(Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' Nil Nil e2;
-val e4 = Impl(All(Nat), Lam("x", All(Nat), Zero), Arr(TypVar ("t", 0), Nat));
+val e4 = Impl(All("t", Nat), Lam("x", All("t", Nat), Zero), Arr(TypVar ("t", 0), Nat));
 val Some(Arr(TypVar ("t", 0), Nat)) = typeof' Nil Nil e4
 
-val e5 = Impl(Nat, Lam("x", All(Nat), Zero), Arr(All (TypVar ("t", 1)), TypVar ("t", 0)));
-val Some(Arr(All (TypVar ("t", 1)), TypVar ("t", 0))) = typeof' Nil Nil e5
+val e5 = Impl(Nat, Lam("x", All("t", Nat), Zero), Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)));
+val Some(Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0))) = typeof' Nil Nil e5
 
-val t5 = typeof' Nil Nil (Lam("x", All(Nat), Zero));
-val (Arr(All Nat, Nat)) = t5;
-val Arr(All (TypVar ("t", 1)), TypVar ("t", 0)) = typAbstractOut Nat (Arr(All Nat, Nat));
+val t5 = typeof' Nil Nil (Lam("x", All("t", Nat), Zero));
+val (Arr(All ("t", Nat), Nat)) = t5;
+val Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)) = typAbstractOut Nat (Arr(All ("t", Nat), Nat));
 
 val f = Lam("x", Arr(Nat, Nat), Zero);
 val g = Lam ("x", Nat,Succ (Var ("x", 0)));
@@ -649,12 +649,12 @@ val Zero = eval (Use(inoutpkg2, "pkg", App(ProdRight(Var ("x", 0)), App(ProdLeft
 val double = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ (Succ (Var ("x", 0)))));
 val Succ (Succ Zero) = eval (App(double, (Succ Zero)));
 
-val All(TypVar ("t", 1)) = typAbstractOut Nat (All(Nat));
+val All("t", TypVar ("t", 1)) = typAbstractOut Nat (All("t", Nat));
 val TypVar ("t", 0) = typAbstractOut Nat Nat;
 val Arr(TypVar ("t", 0), Nat)= typAbstractOut (Arr(Nat, Nat)) (Arr(Arr(Nat, Nat), Nat));
 val Some(Arr(TypVar ("t", 1), Nat)) = typAbstractOut (Arr(Nat, Nat)) (Some(Arr(Arr(Nat, Nat), Nat)));
-val All(Arr(TypVar ("t", 1), Nat)) = typAbstractOut (Arr(Nat, Nat)) (All(Arr(Arr(Nat, Nat), Nat)));
-val Some(All(Arr(TypVar ("t", 2), Nat))) = typAbstractOut (Arr(Nat, Nat)) (Some(All(Arr(Arr(Nat, Nat), Nat))));
+val All("t", Arr(TypVar ("t", 1), Nat)) = typAbstractOut (Arr(Nat, Nat)) (All("t", Arr(Arr(Nat, Nat), Nat)));
+val Some(All("t", Arr(TypVar ("t", 2), Nat))) = typAbstractOut (Arr(Nat, Nat)) (Some(All("t", Arr(Arr(Nat, Nat), Nat))));
 
 val polymorphicIdFn = TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0)));
 
@@ -674,44 +674,44 @@ val (TypAbs Zero) = step (App(Lam("x", Nat, TypAbs(Zero)), Zero));
 val Nat = typsubst Nat (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
 val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
 val false = istype Nil (TypVar ("t", 0));
-val All(Nat) = typsubst Nat (All(TypVar ("t", 1)));
+val All("t", Nat) = typsubst Nat (All("t", TypVar ("t", 1)));
 val Some(Nat) = typsubst Nat (Some(TypVar ("t", 1)));
 val Some(Some(TypVar ("t", 1))) = typsubst Nat (Some(Some(TypVar ("t", 1))));
-val true = istype Nil (All(TypVar ("t", 0)));
+val true = istype Nil (All("t", TypVar ("t", 0)));
 val true = istype Nil (Some(TypVar ("t", 0)));
-val All(Arr(Nat, (All(Nat)))) = typsubst (All(Nat)) (All(Arr(Nat, TypVar ("t", 1))));
-val All(Arr(Nat, (Some(Nat)))) = typsubst (Some(Nat)) (All(Arr(Nat, TypVar ("t", 1))));
+val All("t", Arr(Nat, (All("t", Nat)))) = typsubst (All("t", Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
+val All("t", Arr(Nat, (Some(Nat)))) = typsubst (Some(Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
 
 val Nat = typeof' Nil Nil (TypApp(TypVar ("t", 0), Zero)) handle IllTyped => Nat;
-val All(Arr(TypVar ("t", 0), Nat)) = typeof' Nil Nil (TypAbs(Lam("x", TypVar ("t", 0), Zero)));
+val All("t", Arr(TypVar ("t", 0), Nat)) = typeof' Nil Nil (TypAbs(Lam("x", TypVar ("t", 0), Zero)));
 val Arr(Arr(Nat, Nat), Nat) = typeof' Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam("x", TypVar ("t", 0), Zero)))));
 val Nat = typeof' Nil Nil (TypApp(Arr(Nat, Nat), (TypAbs(Lam("x", TypVar ("t", 1), Zero))))) handle IllTyped => Nat;
 
 
-val All(Nat) = typeof' Nil Nil (TypAbs(Zero)); (* polymorphic zero *)
+val All("t", Nat) = typeof' Nil Nil (TypAbs(Zero)); (* polymorphic zero *)
 (* polymorphic id function :) *)
-val All(Arr(TypVar ("t", 0), TypVar ("t", 0))) =
+val All("t", Arr(TypVar ("t", 0), TypVar ("t", 0))) =
     typeof' Nil Nil (TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0))));
-val Arr(Nat, All(Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
+val Arr(Nat, All("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
     typeof' Nil Nil (Lam("x", Nat, TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0)))));
-val Arr(Nat, All(Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
+val Arr(Nat, All("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
     typeof' Nil Nil (Lam("x", Nat, TypAbs(Lam("x", TypVar ("t", 0), Var ("x", 0)))));
 (* Nested type variables *)
-val All(All(Arr(TypVar ("t", 1),Nat))) =
+val All("t", All("t", Arr(TypVar ("t", 1),Nat))) =
     typeof' Nil Nil (TypAbs(TypAbs(Lam("x", TypVar ("t", 1), Zero))))
-val All(All(Arr(TypVar ("t", 1), TypVar ("t", 1)))) =
+val All("t", All("t", Arr(TypVar ("t", 1), TypVar ("t", 1)))) =
     typeof' Nil Nil (TypAbs(TypAbs(Lam("x", TypVar ("t", 1), Var ("x", 0)))))
 
 val true = istype Nil Nat;
 val false = istype Nil (TypVar ("t", 0)); (* Unbound type variable *)
 val false = istype Nil (Arr(TypVar ("t", 0), Nat)); (* Unbound type variable *)
 val false = istype Nil (Arr(Nat, TypVar ("t", 0))); (* Unbound type variable *)
-val true = istype Nil (All(Nat));
-val true = istype Nil (All(TypVar ("t", 0)));
-val true = istype Nil (All(Arr(TypVar ("t", 0), Nat)));
-val true = istype Nil (All(Arr(Nat, TypVar ("t", 0))));
-val false = istype Nil (All(Arr(Nat, TypVar ("t", 1)))); (* Unbound *)
-val true = istype Nil (All(All(Arr(Nat, TypVar ("t", 1))))); (* Bound *)
+val true = istype Nil (All("t", Nat));
+val true = istype Nil (All("t", TypVar ("t", 0)));
+val true = istype Nil (All("t", Arr(TypVar ("t", 0), Nat)));
+val true = istype Nil (All("t", Arr(Nat, TypVar ("t", 0))));
+val false = istype Nil (All("t", Arr(Nat, TypVar ("t", 1)))); (* Unbound *)
+val true = istype Nil (All("t", All("t", Arr(Nat, TypVar ("t", 1))))); (* Bound *)
 
 val 0 = len Nil;
 val 1 = len (Cons(1, Nil));
@@ -884,7 +884,7 @@ val Zero : Ast.Exp =
 val Succ Zero : Ast.Exp =
     run "fst snd (Z, (S Z, S S Z))";
 
-val TypAbs (Lam("x",All (TypVar ("t", 0)),Var ("x",0))) : Ast.Exp =
+val TypAbs (Lam("x",All ("t", TypVar ("t", 0)),Var ("x",0))) : Ast.Exp =
     parse "poly \\ x : (all 0) -> x"
 
 val Lam ("pkg", Some (TypVar ("t", 0)),Var ("pkg",0)) : Ast.Exp =
