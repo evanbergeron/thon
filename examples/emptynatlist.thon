@@ -1,2 +1,2 @@
-fold u . (unit | (nat * 0))
-with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
+fold u natlist. (unit | (nat * natlist))
+with left unit : (unit |  (nat * (u natlist. (unit | (nat * natlist)))))

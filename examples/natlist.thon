@@ -1,15 +1,15 @@
-impl (0 * (((nat * 0) -> 0) * (0 -> nat))) with (u. (unit |  (nat * 0))) as
+impl (0 * (((nat * 0) -> 0) * (0 -> nat))) with (u l. (unit |  (nat * l))) as
 (
     (*nil*)
-    fold u . (unit | (nat * 0))
-    with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
+    fold u l. (unit | (nat * l))
+    with left unit : (unit |  (nat * (u l . (unit | (nat * l)))))
     ,
     ((*cons*)
-    \ natAndNatList : (nat * (u. (unit |  (nat * 0)))) -> fold u.(unit |  (nat * 0))
-    with right natAndNatList : (unit | (nat * (u. (unit |  (nat * 0)))))
+    \ natAndNatList : (nat * (u l. (unit |  (nat * l)))) -> fold u l.(unit |  (nat * l))
+    with right natAndNatList : (unit | (nat * (u l. (unit |  (nat * l)))))
     ,
     (*isempty*)
-    \ natlist : (u. (unit |  (nat * 0))) ->
+    \ natlist : (u l. (unit |  (nat * l))) ->
         (case (unfold natlist) of
            empty -> Z
          | hdAndTl -> S Z))
