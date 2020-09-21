@@ -1,0 +1,20 @@
+let decr : nat -> nat =
+  \ x : nat ->
+    ifz x of
+      Z -> Z
+    | S p -> p
+in let sub : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+    rec y of
+      Z -> x
+    | prevRec -> (decr prevRec)
+in let eq : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+  ifz (sub x y) of
+    Z -> (ifz (sub y x) of
+            Z -> S Z (*true*)
+          | S p -> Z (*false*))
+  | S p -> Z
+in (eq (S Z) (S S Z))
