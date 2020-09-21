@@ -1006,6 +1006,8 @@ val Succ (Succ Zero) : Ast.Exp = runFile "/home/evan/thon/examples/add.thon";
 val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/sub.thon";
 val Zero : Ast.Exp = runFile "/home/evan/thon/examples/eq.thon";
 
+val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/len.thon";
+
 in
 ()
 end
