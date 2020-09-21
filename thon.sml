@@ -896,16 +896,16 @@ val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, "prev", S
 val multByThree = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ(Succ(Succ(Var("prev", 0))))));
 
 val Lam ("n",Nat,Rec (Var ("n",0),Var ("n",0),"prev",Succ (Succ Zero))) =
-    parse "\\ n : nat -> rec n ( Z -> n | S prev -> S S Z )";
+    parse "\\ n : nat -> rec n of Z -> n | prev -> S S Z ";
 
 val App (Lam ("n", Nat,Rec (Var ("n",0),Zero, "prev", Succ (Succ (Var ("prev", 0))))),Succ Zero) : Ast.Exp =
-    parse "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S prev )) (S Z))";
+    parse "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
 
 val (Succ (Succ Zero)) =
-    run "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S prev )) (S Z))";
+    run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
 
 val Succ (Succ (Succ (Succ Zero))) : Ast.Exp =
-    run "((\\ n : nat -> rec n ( Z -> Z | S prev -> S S prev )) (S S Z))";
+    run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S S Z))";
 
 val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero));
 
@@ -1001,6 +1001,9 @@ val Succ Zero : Ast.Exp = run "ifz Z of Z -> S Z | S prev -> Z";
 val Zero : Ast.Exp = run "ifz S Z of Z -> S Z | S prev -> prev";
 
 val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/decr.thon";
+
+val Succ (Succ Zero) : Ast.Exp = runFile "/home/evan/thon/examples/add.thon";
+val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/sub.thon";
 
 in
 ()
