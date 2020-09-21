@@ -244,7 +244,7 @@ fun setDeBruijnIndex e varnames typnames =
        | A.Ifz (i, t, prev, e) => A.Ifz (setDeBruijnIndex i varnames typnames,
                                    setDeBruijnIndex t varnames typnames,
                                    prev,
-                                   setDeBruijnIndex e varnames typnames)
+                                   setDeBruijnIndex e (prev::varnames) typnames)
        | A.Tuple (l, r) => A.Tuple (setDeBruijnIndex l varnames typnames,
                                     setDeBruijnIndex r varnames typnames)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
@@ -999,6 +999,8 @@ val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/nilisempty.thon";
 
 val Succ Zero : Ast.Exp = run "ifz Z of Z -> S Z | S prev -> Z";
 val Zero : Ast.Exp = run "ifz S Z of Z -> S Z | S prev -> prev";
+
+val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/decr.thon";
 
 in
 ()
