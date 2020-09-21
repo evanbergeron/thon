@@ -43,6 +43,9 @@ structure A = Ast
  | OF
  | LET
  | EQ
+ | IFZ
+ | THEN
+ | ELSE
 
 %nonterm
    exp of A.Exp
@@ -60,7 +63,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ THEN ELSE
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -81,6 +84,7 @@ exp:
    * not until we manage to turn names into binding site indexes *)
   | LAM ID COLON typ SARROW exp (A.Lam (ID, typ, exp))
   | LET ID COLON typ EQ exp IN exp (A.Let (ID, typ, exp1, exp2))
+  | IFZ exp THEN exp ELSE exp (A.Ifz (exp1, exp2, exp3))
   | REC exp LPAREN ZERO SARROW exp PIPE SUCC ID SARROW exp RPAREN (A.Rec (exp1, exp2, ID, exp3))
   | POLY ID SARROW exp (A.TypAbs (ID, exp))
   | LPAREN exp COMMA exp RPAREN (A.Tuple(exp1, exp2))
