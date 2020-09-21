@@ -1,0 +1,8 @@
+let add : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+    rec y (
+      Z -> x
+    | S prevRec -> S prevRec
+    )
+in (add (S Z) (S Z))

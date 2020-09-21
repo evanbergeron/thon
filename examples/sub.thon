@@ -1,0 +1,13 @@
+let decr : nat -> nat =
+  \ n : nat ->
+    ifz n of
+      Z -> Z
+    | S p -> p
+in let sub : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+    rec y (
+      Z -> x
+    | S prevRec -> (decr prevRec)
+    )
+in (sub (S Z) (S Z))
