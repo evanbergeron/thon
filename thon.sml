@@ -52,9 +52,9 @@ fun istype typeCtx t =
       | A.Arr(d, c) => (istype typeCtx d) andalso (istype typeCtx c)
       | A.Prod(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
       | A.Plus(l, r) => (istype typeCtx l) andalso (istype typeCtx r)
-      | A.All (name, t') => istype (Cons(42, typeCtx)) t'
-      | A.Some (name, t') => istype (Cons(42, typeCtx)) t'
-      | A.TyRec (name, t') => istype (Cons(42, typeCtx)) t'
+      | A.All (name, t') => istype (Cons(NONE, typeCtx)) t'
+      | A.Some (name, t') => istype (Cons(NONE, typeCtx)) t'
+      | A.TyRec (name, t') => istype (Cons(NONE, typeCtx)) t'
 
 
 fun typsubst' src dst bindingDepth =
@@ -341,7 +341,7 @@ fun typeof' ctx typCtx e =
                 if t <> t2 then raise IllTyped else t
             end
        (* TODO need to build a type equality func that ignores names *)
-       | A.TypAbs (name, e) => A.All(name, typeof' ctx (Cons(42, typCtx)) e)
+       | A.TypAbs (name, e) => A.All(name, typeof' ctx (Cons(NONE, typCtx)) e)
        | A.TypApp (appType, e) =>
             if not (istype typCtx appType) then raise IllTyped else
             let val A.All(name, t) = typeof' ctx typCtx e
@@ -351,7 +351,7 @@ fun typeof' ctx typCtx e =
        | A.Impl (reprType, pkgImpl, pkgType) =>
             if not (istype Nil reprType) then raise IllTyped else
             (* pkgType : [reprType/A.TypVar 0](t') *)
-            let val deducedPkgType = typeof' ctx (Cons(42, typCtx)) pkgImpl
+            let val deducedPkgType = typeof' ctx (Cons(NONE, typCtx)) pkgImpl
             in
                 if (typAbstractOut "t" (*TODO TODO TODO*) reprType deducedPkgType) <>
                    (typAbstractOut "t" (*TODO TODO TODO*) reprType pkgType) then
@@ -362,7 +362,7 @@ fun typeof' ctx typCtx e =
        | A.Use (pkg, clientName, client) =>
             let val A.Some(name, r) = typeof' ctx typCtx pkg
                 (* binds BOTH a A.TypVar and a Exp A.Var *)
-                val clientType = typeof' (Cons(r, ctx)) (Cons(42, typCtx)) client
+                val clientType = typeof' (Cons(r, ctx)) (Cons(NONE, typCtx)) client
                 (* shift indices of free vars and typevars in clientType down by one *)
                 val resType = typtypDecrVarIdxs clientType
             in
@@ -370,7 +370,7 @@ fun typeof' ctx typCtx e =
                 resType
             end
        | A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *)) =>
-            let val deduced = typeof' ctx (Cons(42, typCtx)) e'
+            let val deduced = typeof' ctx (Cons(NONE, typCtx)) e'
                 val absDeduced = A.TyRec(name, typAbstractOut name (A.TyRec(name, t)) (deduced))
                 val absT = typAbstractOut name (A.TyRec(name, t)) (A.TyRec(name, t))
             in
@@ -633,7 +633,7 @@ val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), "l", Var ("l", 0)
 (* but the chapter on existential types in TAPL suggests otherwise. *)
 
 (* That's why we require an explicit type annotation from the programmer. *)
-val Arr(Nat, Nat) = typeof' Nil (Cons(42, Nil)) (Lam("x", Nat, Zero));
+val Arr(Nat, Nat) = typeof' Nil (Cons(NONE, Nil)) (Lam("x", Nat, Zero));
 val Arr(TypVar ("t", 0), TypVar ("t", 0)) = typAbstractOut "t" Nat (Arr(Nat, Nat));
 val All("t", Arr(TypVar ("t", 0), Nat)) = typAbstractOut "t" (Arr(Nat, Nat)) (All("t", Arr(TypVar ("t", 0), Nat)));
 
