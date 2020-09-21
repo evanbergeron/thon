@@ -150,9 +150,10 @@ fun typSubstInExp' srcType dstExp bindingDepth =
        | A.App (f, n) =>
             A.App (typSubstInExp' srcType f bindingDepth,
                  typSubstInExp' srcType n bindingDepth)
-       | A.Ifz (i, t, e) =>
+       | A.Ifz (i, t, prev, e) =>
             A.Ifz(typSubstInExp' srcType i bindingDepth,
                   typSubstInExp' srcType t bindingDepth,
+                  prev,
                   typSubstInExp' srcType e bindingDepth)
        | A.Tuple (l, r) =>
             A.Tuple (typSubstInExp' srcType l bindingDepth,
@@ -240,8 +241,9 @@ fun setDeBruijnIndex e varnames typnames =
                         setDeBruijnIndex e varnames typnames)
        | A.App (f, n) => A.App (setDeBruijnIndex f varnames typnames,
                                 setDeBruijnIndex n varnames typnames)
-       | A.Ifz (i, t, e) => A.Ifz (setDeBruijnIndex i varnames typnames,
+       | A.Ifz (i, t, prev, e) => A.Ifz (setDeBruijnIndex i varnames typnames,
                                    setDeBruijnIndex t varnames typnames,
+                                   prev,
                                    setDeBruijnIndex e varnames typnames)
        | A.Tuple (l, r) => A.Tuple (setDeBruijnIndex l varnames typnames,
                                     setDeBruijnIndex r varnames typnames)
@@ -322,10 +324,10 @@ fun typeof' ctx typCtx e =
                 if d <> argType then raise IllTyped
                 else c
             end
-       | A.Ifz (i, t, e) =>
+       | A.Ifz (i, t, prev, e) =>
             let val Nat = typeof' ctx typCtx i
                 val thenType = typeof' ctx typCtx t
-                val elseType = typeof' ctx typCtx e
+                val elseType = typeof' (Cons(Nat, ctx)) typCtx e
             in
                 if thenType <> elseType then raise IllTyped
                 else thenType
@@ -421,9 +423,10 @@ fun subst' src dst bindingDepth =
                   (subst' src varval (bindingDepth)),
                   (subst' src varscope (bindingDepth+1)))
        | A.App (f, n) => A.App((subst' src f bindingDepth), (subst' src n bindingDepth))
-       | A.Ifz (i, t, e) => A.Ifz(subst' src i bindingDepth,
+       | A.Ifz (i, t, prev, e) => A.Ifz(subst' src i bindingDepth,
                                   subst' src t bindingDepth,
-                                  subst' src e bindingDepth)
+                                  prev,
+                                  subst' src e (bindingDepth+1)) (* binds *)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec(subst' src i bindingDepth,
                 subst' src baseCase bindingDepth,
@@ -460,9 +463,11 @@ fun step e =
                                subst n f'
                            end
                           )
-      | A.Ifz(i, t, e) =>
-            if not (isval i) then A.Ifz(step i, t, e)
-            else if A.Zero = i then t else e
+      | A.Ifz(i, t, prev, e) =>
+            if not (isval i) then A.Ifz(step i, t, prev, e)
+            else (case i of
+                     A.Zero => t
+                   | A.Succ i' => subst i' e)
       | A.Let (varname, vartype, varval, varscope) => subst varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
@@ -992,7 +997,8 @@ val Zero : Ast.Exp = run "let x : nat = Z in x";
 
 val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/nilisempty.thon";
 
-val Succ Zero : Ast.Exp = run "ifz Z then S Z else Z";
+val Succ Zero : Ast.Exp = run "ifz Z of Z -> S Z | S prev -> Z";
+val Zero : Ast.Exp = run "ifz S Z of Z -> S Z | S prev -> prev";
 
 in
 ()
