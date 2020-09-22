@@ -1051,6 +1051,8 @@ val true = (bstType = bstType2);
 val loop = parse "fix loop : nat in loop";
 val true = (loop) = (step loop);
 val Nat = typeof loop;
+(* 2 is even *)
+val Succ Zero = runFile "/home/evan/thon/examples/iseven.thon";;
 
 in
 ()
