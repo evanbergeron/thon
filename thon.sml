@@ -146,6 +146,10 @@ fun substTypeInExp' srcType dstExp bindingDepth =
             A.Rec(substTypeInExp' srcType i bindingDepth,
                 substTypeInExp' srcType baseCase bindingDepth,
                 prevCaseName, substTypeInExp' srcType recCase bindingDepth)
+       | A.Fix (name, t, e) =>
+         A.Fix(name,
+               substType' srcType t bindingDepth,
+               substTypeInExp' srcType e bindingDepth)
        | A.TypAbs (name, e) => A.TypAbs(name, substTypeInExp' srcType e (bindingDepth+1)) (* binds type var *)
        | A.TypApp (appType, e) =>
             A.TypApp(substType' srcType appType bindingDepth,
@@ -237,6 +241,10 @@ fun setDeBruijnIndex e varnames typnames =
             A.Rec (setDeBruijnIndex i varnames typnames,
                    setDeBruijnIndex baseCase varnames typnames,
                    prevCaseName, (setDeBruijnIndex recCase (prevCaseName::varnames) typnames))
+       | A.Fix(name, t, e) =>
+         A.Fix(name,
+               setDeBruijnIndexInType t varnames typnames,
+               setDeBruijnIndex e (name::varnames) typnames)
        | A.Case (c, lname, l, rname, r) => A.Case(
             setDeBruijnIndex c varnames typnames,
             lname,
@@ -334,6 +342,7 @@ fun typeof' ctx typCtx e =
          in
              if t <> t2 then raise IllTyped else t
          end
+       | A.Fix (name, typ, e) => typeof' (typ::ctx) typCtx e
        (* BUG need to build a type equality func that ignores names *)
        | A.TypAbs (name, e) => A.All(name, typeof' ctx (NONE::typCtx) e)
        | A.TypApp (appType, e) =>
@@ -428,6 +437,8 @@ fun subst' src dst bindingDepth =
             A.Rec(subst' src i bindingDepth,
                 subst' src baseCase bindingDepth,
                 prevCaseName, subst' src recCase (bindingDepth+1))
+       | A.Fix (name, t, e) =>
+         A.Fix(name, t, subst' src e (bindingDepth+1)) (* binds *)
        | A.TypAbs (name, e) => A.TypAbs (name, subst' src e bindingDepth) (* abstracts over types, not exps *)
        | A.TypApp (appType, e) => A.TypApp(appType, subst' src e bindingDepth)
        | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, subst' src pkgImpl bindingDepth, t)
@@ -476,6 +487,7 @@ fun step e =
             if not (isval i) then
                 A.Rec(step i, baseCase, prevCaseName, recCase)
             else raise No
+      | A.Fix(name, t, body) => subst e body
       | A.TypAbs (name, e') => raise No (* Already isval *)
       | A.TypApp (t, e') =>
             if not (isval e') then (A.TypApp (t, step e'))
@@ -1033,7 +1045,12 @@ val TyRec
 val bstInsertType : Ast.Typ = typeof (parseFile "/home/evan/thon/examples/bst.thon");
 val Arr(Nat, (Arr(bstType1, bstType2))) = bstInsertType;
 val true = (bstType = bstType1);
+
 val true = (bstType = bstType2);
+
+val loop = parse "fix loop : nat in loop";
+val true = (loop) = (step loop);
+val Nat = typeof loop;
 
 in
 ()

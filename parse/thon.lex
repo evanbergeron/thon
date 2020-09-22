@@ -48,6 +48,7 @@ ws = [\ \t];
 <INITIAL> "S"      => (Tokens.SUCC(!pos,!pos));
 <INITIAL> "\\"     => (Tokens.LAM(!pos,!pos));
 <INITIAL> "let"    => (Tokens.LET(!pos,!pos));
+<INITIAL> "fix"    => (Tokens.FIX(!pos,!pos));
 <INITIAL> "ifz"    => (Tokens.IFZ(!pos,!pos));
 <INITIAL> "->"     => (Tokens.SARROW(!pos,!pos));
 <INITIAL> "nat"    => (Tokens.NAT(!pos,!pos));
