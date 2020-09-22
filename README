@@ -10,14 +10,14 @@ thon is a small programming language. Here's an example program that
 verifies the empty list is empty.
 
 
-    let isempty : (u. (unit |  (nat * 0))) -> nat =
-        \ natlist : (u. (unit |  (nat * 0))) ->
+    let isempty : (u l. (unit |  (nat * l))) -> nat =
+        \ natlist : (u l. (unit |  (nat * l))) ->
             (case (unfold natlist) of
               empty -> S Z
             | hdAndTl -> Z)
-    in let nil : (u. (unit |  (nat * 0))) =
-        fold u . (unit | (nat * 0))
-        with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
+    in let nil : (u l. (unit |  (nat * l))) =
+        fold u l. (unit | (nat * l))
+        with left unit : (unit |  (nat * (u l. (unit | (nat * l)))))
     in
     (isempty nil)
 
