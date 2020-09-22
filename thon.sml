@@ -1008,6 +1008,28 @@ val Zero : Ast.Exp = runFile "/home/evan/thon/examples/eq.thon";
 
 val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/len.thon";
 
+val Fold
+    (TyRec
+       ("node",
+        Plus (Unit,Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0))))),
+     PlusLeft
+       (Plus
+          (Unit, (*empty base or... *)
+           Prod (* a nat and... *)
+             (Nat,
+              Prod (* a node and... *)
+                (TyRec
+                   ("node",
+                    Plus
+                      (Unit,
+                       Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0))))),
+                 TyRec (* a another node. *)
+                   ("node",
+                    Plus
+                      (Unit,
+                       Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))))),
+        TmUnit)) : Ast.Exp = runFile "/home/evan/thon/examples/emptybst.thon";
+
 in
 ()
 end
