@@ -1,4 +1,4 @@
-(* A system FE interpreter - System F with existential packages *)
+(* thon - a small functional language *)
 structure Thon : sig
                    val parse : string -> Ast.Exp
                    val parseFile : string -> Ast.Exp
@@ -22,8 +22,6 @@ exception VarWithNegativeDeBruijinIndex of string * int
 exception ClientTypeCannotEscapeClientScope
 exception Unimplemented
 
-datatype Idx = int
-
 
 fun get ctx i =
     case (List.findi (fn (j, _) => j = i) ctx) of
@@ -44,25 +42,25 @@ fun istype typeCtx t =
       | A.TyRec (name, t') => istype (NONE::typeCtx) t'
 
 
-fun typsubst' src dst bindingDepth =
+fun substType' src dst bindingDepth =
     case dst
      of A.Nat => A.Nat
       | A.Unit => A.Unit
       | A.TypVar (name, n)  => if n = bindingDepth then src else
                      if n > bindingDepth then A.TypVar (name, n-1) else
                      dst
-      | A.Arr(t, t') => A.Arr((typsubst' src t bindingDepth),
-                          (typsubst' src t' bindingDepth))
-      | A.Prod(l, r) => A.Prod((typsubst' src l bindingDepth),
-                           (typsubst' src r bindingDepth))
-      | A.Plus(l, r) => A.Plus((typsubst' src l bindingDepth),
-                           (typsubst' src r bindingDepth))
-      | A.All (name, t) => A.All(name, typsubst' src t (bindingDepth + 1))
-      | A.Some (name, t) => A.Some(name, typsubst' src t (bindingDepth + 1))
-      | A.TyRec (name, t) => A.TyRec(name, typsubst' src t (bindingDepth + 1))
+      | A.Arr(t, t') => A.Arr((substType' src t bindingDepth),
+                          (substType' src t' bindingDepth))
+      | A.Prod(l, r) => A.Prod((substType' src l bindingDepth),
+                           (substType' src r bindingDepth))
+      | A.Plus(l, r) => A.Plus((substType' src l bindingDepth),
+                           (substType' src r bindingDepth))
+      | A.All (name, t) => A.All(name, substType' src t (bindingDepth + 1))
+      | A.Some (name, t) => A.Some(name, substType' src t (bindingDepth + 1))
+      | A.TyRec (name, t) => A.TyRec(name, substType' src t (bindingDepth + 1))
 
 
-fun typsubst src dst = typsubst' src dst 0
+fun substType src dst = substType' src dst 0
 
 
 (* Turns search to A.Var bindingDepth
@@ -70,104 +68,104 @@ fun typsubst src dst = typsubst' src dst 0
  * DEVNOTE: assumes the caller will place the result underneath a type
  * variable binding site.
  *
- * Remarkably similar to typSubst - might be able to dedup. This needs
+ * Remarkably similar to substType - might be able to dedup. This needs
  * to track bindingDepth though and subst in A.TypVar of the appropriate
  * depth.
  *)
-fun typAbstractOut' name search t bindingDepth =
+fun abstractOutType' name search t bindingDepth =
     if t = search then (A.TypVar (name, bindingDepth)) else
     case t
      of A.Nat => A.Nat
       | A.Unit => A.Unit
       | A.TypVar (name, n)  => A.TypVar (name, n)
-      | A.Arr(d, c) => A.Arr((typAbstractOut' name search d bindingDepth),
-                          (typAbstractOut' name search c bindingDepth))
-      | A.Prod(l, r) => A.Prod((typAbstractOut' name search l bindingDepth),
-                           (typAbstractOut' name search r bindingDepth))
-      | A.Plus(l, r) => A.Plus((typAbstractOut' name search l bindingDepth),
-                           (typAbstractOut' name search r bindingDepth))
-      | A.All (name, t') => A.All(name, typAbstractOut' name search t' (bindingDepth+1))
-      | A.Some (name, t') => A.Some(name, typAbstractOut' name search t' (bindingDepth+1))
-      | A.TyRec (name, t') => A.TyRec(name, typAbstractOut' name search t' (bindingDepth+1))
+      | A.Arr(d, c) => A.Arr((abstractOutType' name search d bindingDepth),
+                          (abstractOutType' name search c bindingDepth))
+      | A.Prod(l, r) => A.Prod((abstractOutType' name search l bindingDepth),
+                           (abstractOutType' name search r bindingDepth))
+      | A.Plus(l, r) => A.Plus((abstractOutType' name search l bindingDepth),
+                           (abstractOutType' name search r bindingDepth))
+      | A.All (name, t') => A.All(name, abstractOutType' name search t' (bindingDepth+1))
+      | A.Some (name, t') => A.Some(name, abstractOutType' name search t' (bindingDepth+1))
+      | A.TyRec (name, t') => A.TyRec(name, abstractOutType' name search t' (bindingDepth+1))
 
 
-fun typAbstractOut name search t = typAbstractOut' name search t 0
+fun abstractOutType name search t = abstractOutType' name search t 0
 
 
-(* TODO Figure something better out... *)
-fun typtypDecrVarIdxs t =
+fun decrDeBruijinIndices t =
     case t of
         A.Nat => A.Nat
       | A.Unit => A.Unit
       | A.TypVar (name, i) => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                     else A.TypVar (name, i -1)
-      | A.Arr(d, c) => A.Arr(typtypDecrVarIdxs d, typtypDecrVarIdxs c)
-      | A.Prod(l, r) => A.Prod(typtypDecrVarIdxs l, typtypDecrVarIdxs r)
-      | A.Plus(l, r) => A.Plus(typtypDecrVarIdxs l, typtypDecrVarIdxs r)
-      | A.All (name, t') => A.All(name, typtypDecrVarIdxs t')
-      | A.Some (name, t') => A.Some(name, typtypDecrVarIdxs t')
-      | A.TyRec (name, t') => A.TyRec(name, typtypDecrVarIdxs t')
+      | A.Arr(d, c) => A.Arr(decrDeBruijinIndices d, decrDeBruijinIndices c)
+      | A.Prod(l, r) => A.Prod(decrDeBruijinIndices l, decrDeBruijinIndices r)
+      | A.Plus(l, r) => A.Plus(decrDeBruijinIndices l, decrDeBruijinIndices r)
+      | A.All (name, t') => A.All(name, decrDeBruijinIndices t')
+      | A.Some (name, t') => A.Some(name, decrDeBruijinIndices t')
+      | A.TyRec (name, t') => A.TyRec(name, decrDeBruijinIndices t')
 
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
-fun typSubstInExp' srcType dstExp bindingDepth =
+fun substTypeInExp' srcType dstExp bindingDepth =
     case dstExp
      of  A.Zero => A.Zero
        | A.Var (name, i) => A.Var (name, i)
        | A.TmUnit => A.TmUnit
-       | A.Succ e2 => A.Succ (typSubstInExp' srcType e2 bindingDepth)
-       | A.ProdLeft e => A.ProdLeft (typSubstInExp' srcType e bindingDepth)
-       | A.ProdRight e => A.ProdRight (typSubstInExp' srcType e bindingDepth)
-       | A.PlusLeft (t, e) => A.PlusLeft (t, typSubstInExp' srcType e bindingDepth)
-       | A.PlusRight (t, e) => A.PlusRight (t, typSubstInExp' srcType e bindingDepth)
+       | A.Succ e2 => A.Succ (substTypeInExp' srcType e2 bindingDepth)
+       | A.ProdLeft e => A.ProdLeft (substTypeInExp' srcType e bindingDepth)
+       | A.ProdRight e => A.ProdRight (substTypeInExp' srcType e bindingDepth)
+       | A.PlusLeft (t, e) => A.PlusLeft (t, substTypeInExp' srcType e bindingDepth)
+       | A.PlusRight (t, e) => A.PlusRight (t, substTypeInExp' srcType e bindingDepth)
        | A.Case(c, lname, l, rname, r) =>
-            A.Case(typSubstInExp' srcType c bindingDepth,
+            A.Case(substTypeInExp' srcType c bindingDepth,
                    lname,
-                   typSubstInExp' srcType l bindingDepth,
+                   substTypeInExp' srcType l bindingDepth,
                    rname,
-                   typSubstInExp' srcType r bindingDepth)
+                   substTypeInExp' srcType r bindingDepth)
        | A.Lam (argName, argType, funcBody) =>
-            A.Lam(argName, (typsubst' srcType argType bindingDepth),
-                typSubstInExp' srcType funcBody bindingDepth)
+            A.Lam(argName, (substType' srcType argType bindingDepth),
+                substTypeInExp' srcType funcBody bindingDepth)
        | A.Let (varname, vartype, varval, varscope) =>
-            A.Let(varname, (typsubst' srcType vartype bindingDepth),
-                  typSubstInExp' srcType varval bindingDepth,
-                  typSubstInExp' srcType varscope bindingDepth
+            A.Let(varname, (substType' srcType vartype bindingDepth),
+                  substTypeInExp' srcType varval bindingDepth,
+                  substTypeInExp' srcType varscope bindingDepth
                  )
        | A.App (f, n) =>
-            A.App (typSubstInExp' srcType f bindingDepth,
-                 typSubstInExp' srcType n bindingDepth)
+            A.App (substTypeInExp' srcType f bindingDepth,
+                 substTypeInExp' srcType n bindingDepth)
        | A.Ifz (i, t, prev, e) =>
-            A.Ifz(typSubstInExp' srcType i bindingDepth,
-                  typSubstInExp' srcType t bindingDepth,
+            A.Ifz(substTypeInExp' srcType i bindingDepth,
+                  substTypeInExp' srcType t bindingDepth,
                   prev,
-                  typSubstInExp' srcType e bindingDepth)
+                  substTypeInExp' srcType e bindingDepth)
        | A.Tuple (l, r) =>
-            A.Tuple (typSubstInExp' srcType l bindingDepth,
-                   typSubstInExp' srcType r bindingDepth)
+            A.Tuple (substTypeInExp' srcType l bindingDepth,
+                   substTypeInExp' srcType r bindingDepth)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
-            A.Rec(typSubstInExp' srcType i bindingDepth,
-                typSubstInExp' srcType baseCase bindingDepth,
-                prevCaseName, typSubstInExp' srcType recCase bindingDepth)
-       | A.TypAbs (name, e) => A.TypAbs(name, typSubstInExp' srcType e (bindingDepth+1)) (* binds type var *)
+            A.Rec(substTypeInExp' srcType i bindingDepth,
+                substTypeInExp' srcType baseCase bindingDepth,
+                prevCaseName, substTypeInExp' srcType recCase bindingDepth)
+       | A.TypAbs (name, e) => A.TypAbs(name, substTypeInExp' srcType e (bindingDepth+1)) (* binds type var *)
        | A.TypApp (appType, e) =>
-            A.TypApp(typsubst' srcType appType bindingDepth,
-                   typSubstInExp' srcType e bindingDepth)
+            A.TypApp(substType' srcType appType bindingDepth,
+                   substTypeInExp' srcType e bindingDepth)
        | A.Impl(reprType, pkgImpl, pkgType) =>
-            A.Impl(typsubst' srcType reprType bindingDepth,
-                 typSubstInExp' srcType pkgImpl bindingDepth,
-                 typsubst' srcType pkgType bindingDepth)
+            A.Impl(substType' srcType reprType bindingDepth,
+                 substTypeInExp' srcType pkgImpl bindingDepth,
+                 substType' srcType pkgType bindingDepth)
        | A.Use (pkg, clientName, client) =>
-            A.Use(typSubstInExp' srcType pkg bindingDepth,
+            A.Use(substTypeInExp' srcType pkg bindingDepth,
                   clientName,
-                  typSubstInExp' srcType client (bindingDepth+1))
-       | A.Fold(t, e') => A.Fold(typsubst' srcType t bindingDepth,
-                             typSubstInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
-       | A.Unfold(e') => A.Unfold(typSubstInExp' srcType e' bindingDepth)
+                  substTypeInExp' srcType client (bindingDepth+1))
+       | A.Fold(t, e') => A.Fold(substType' srcType t bindingDepth,
+                             substTypeInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
+       | A.Unfold(e') => A.Unfold(substTypeInExp' srcType e' bindingDepth)
+
 
 fun setDeBruijnIndexInType t varnames typnames =
     let fun find name names =
-        (case List.findi (fn (_, n) => n = name) names
+        (case List.findi (fn (_, n : string) => n = name) names
          of NONE => NONE
           | SOME (i, _) => SOME i)
     in
@@ -176,7 +174,7 @@ fun setDeBruijnIndexInType t varnames typnames =
        | A.Unit => A.Unit
        | A.TypVar (name, i) =>
          (case find name typnames of
-             NONE => (print ("unknown type var: "^ name); raise No)
+             NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
            | SOME i => A.TypVar (name, i))
        | A.Arr(d, c) => 
             A.Arr(setDeBruijnIndexInType d varnames typnames,
@@ -195,9 +193,10 @@ fun setDeBruijnIndexInType t varnames typnames =
             A.TyRec(name, setDeBruijnIndexInType t' varnames (name::typnames))
        end
 
+
 fun setDeBruijnIndex e varnames typnames =
     let fun find name names =
-        (case List.findi (fn (_, n) => n = name) names
+        (case List.findi (fn (_, n : string) => n = name) names
          of NONE => NONE
           | SOME (i, _) => SOME i)
     in
@@ -206,7 +205,7 @@ fun setDeBruijnIndex e varnames typnames =
        | A.TmUnit => e
        | A.Var (n, i) =>
          (case find n varnames of
-             NONE => (print ("unknown var: "^ n); raise No)
+             NONE => (print ("unknown var: "^ n); raise VarNotInContext)
            | SOME i => A.Var (n, i))
        | A.Lam(name, argType, funcBody) =>
          A.Lam(name,
@@ -265,111 +264,122 @@ fun setDeBruijnIndex e varnames typnames =
 end
 
 
-fun typSubstInExp srcType dstExp = typSubstInExp' srcType dstExp 0
+fun substTypeInExp srcType dstExp = substTypeInExp' srcType dstExp 0
+
 
 fun typeof' ctx typCtx e =
     case e
      of  A.Zero => A.Nat
        | A.TmUnit => A.Unit
-       | A.Var (name, i) => (if i < 0 then raise VarWithNegativeDeBruijinIndex(name, i) else get ctx i)
+       | A.Var (name, i) =>
+         if i < 0 then raise VarWithNegativeDeBruijinIndex(name, i) else get ctx i
        | A.Succ e2 => (typeof' ctx typCtx e2)
        | A.ProdLeft e => let val A.Prod(l, r) = (typeof' ctx typCtx e) in l end
        | A.ProdRight e => let val A.Prod(l, r) = (typeof' ctx typCtx e) in r end
-       | A.PlusLeft (t, e) => let val A.Plus(l, r) = t in
-                                if l <> typeof' ctx typCtx e then
-                                    raise IllTypedMsg "Sum type annotation does not match deduced type"
-                                else
-                                    A.Plus(l, r)
-                            end
-       | A.PlusRight (t, e) => let val A.Plus(l, r) = t in
-                                if r <> typeof' ctx typCtx e then
-                                    raise IllTypedMsg "Sum type annotation does not match deduced type"
-                                else
-                                    A.Plus(l, r)
-                            end
-       | A.Case (c, lname, l, rname, r) => let val A.Plus(lt, rt) = typeof' ctx typCtx c
-                               (* both bind a term var *)
-                               val typeof'LeftBranch = typeof' (lt::ctx) typCtx l
-                               val typeof'RightBranch= typeof' (rt::ctx) typCtx r
-                           in
-                               if typeof'LeftBranch <> typeof'RightBranch then
-                                   raise IllTyped
-                               else
-                                   typeof'LeftBranch
-                               end
+       | A.PlusLeft (t, e) =>
+         let val A.Plus(l, r) = t in
+             if l <> typeof' ctx typCtx e then
+                 raise IllTypedMsg "Sum type annotation does not match deduced type"
+             else
+                 A.Plus(l, r)
+         end
+       | A.PlusRight (t, e) =>
+         let val A.Plus(l, r) = t in
+             if r <> typeof' ctx typCtx e then
+                 raise IllTypedMsg "Sum type annotation does not match deduced type"
+             else
+                 A.Plus(l, r)
+         end
+       | A.Case (c, lname, l, rname, r) =>
+         let val A.Plus(lt, rt) = typeof' ctx typCtx c
+             (* both bind a term var *)
+             val typeof'LeftBranch = typeof' (lt::ctx) typCtx l
+             val typeof'RightBranch= typeof' (rt::ctx) typCtx r
+         in
+             if typeof'LeftBranch <> typeof'RightBranch then
+                 raise IllTypedMsg "Case statement branches types do not agree"
+             else
+                 typeof'LeftBranch
+         end
        | A.Lam (argName, argType, funcBody) =>
-            if not (istype typCtx argType) then raise IllTyped else
-            A.Arr (argType, typeof' (argType::ctx) typCtx funcBody)
+         if not (istype typCtx argType) then raise IllTypedMsg "Function arg type is not a type."
+         else A.Arr (argType, typeof' (argType::ctx) typCtx funcBody)
        | A.Let (varname, vartype, varval, varscope) =>
-            if not (istype typCtx vartype) then raise IllTyped else
-            if (typeof' ctx typCtx varval) <> vartype then raise IllTyped else
+         if not (istype typCtx vartype) then
+             raise IllTypedMsg "Let var type is not a type"
+         else if (typeof' ctx typCtx varval) <> vartype then
+             raise IllTypedMsg "Let var type is not equal to deduced var value type."
+         else
             typeof' (vartype::ctx) typCtx varscope
        | A.App (f, n) =>
-            let val A.Arr (d, c) = typeof' ctx typCtx f
-                val argType = typeof' ctx typCtx n
-            in
-                if d <> argType then raise IllTyped
-                else c
-            end
+         let val A.Arr (d, c) = typeof' ctx typCtx f
+             val argType = typeof' ctx typCtx n
+         in
+             if d <> argType then raise IllTyped
+             else c
+         end
        | A.Ifz (i, t, prev, e) =>
-            let val Nat = typeof' ctx typCtx i
-                val thenType = typeof' ctx typCtx t
-                val elseType = typeof' (Nat::ctx) typCtx e
-            in
-                if thenType <> elseType then raise IllTyped
-                else thenType
-            end
+         let val Nat = typeof' ctx typCtx i
+             val thenType = typeof' ctx typCtx t
+             val elseType = typeof' (Nat::ctx) typCtx e
+         in
+             if thenType <> elseType then raise IllTyped
+             else thenType
+         end
        | A.Tuple (l, r) => A.Prod(typeof' ctx typCtx l, typeof' ctx typCtx r)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
-            let val A.Nat = typeof' ctx typCtx i
-                val t = typeof' ctx typCtx baseCase
-                val t2 = typeof' (t::ctx) typCtx recCase
-            in
-                if t <> t2 then raise IllTyped else t
-            end
-       (* TODO need to build a type equality func that ignores names *)
+         let val A.Nat = typeof' ctx typCtx i
+             val t = typeof' ctx typCtx baseCase
+             val t2 = typeof' (t::ctx) typCtx recCase
+         in
+             if t <> t2 then raise IllTyped else t
+         end
+       (* BUG need to build a type equality func that ignores names *)
        | A.TypAbs (name, e) => A.All(name, typeof' ctx (NONE::typCtx) e)
        | A.TypApp (appType, e) =>
-            if not (istype typCtx appType) then raise IllTyped else
-            let val A.All(name, t) = typeof' ctx typCtx e
-            in
-                typsubst appType t
-            end
+         if not (istype typCtx appType) then raise IllTyped else
+         let val A.All(name, t) = typeof' ctx typCtx e
+         in
+             substType appType t
+         end
        | A.Impl (reprType, pkgImpl, pkgType) =>
-            if not (istype [] reprType) then raise IllTyped else
-            (* pkgType : [reprType/A.TypVar 0](t') *)
-            let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
-            in
-                if (typAbstractOut "t" (*TODO TODO TODO*) reprType deducedPkgType) <>
-                   (typAbstractOut "t" (*TODO TODO TODO*) reprType pkgType) then
-                    raise IllTyped
-                else
-                    A.Some("t" (*TODO TODO TODO*), pkgType)
-            end
+         if not (istype [] reprType) then raise IllTyped else
+         (* pkgType : [reprType/A.TypVar 0](t') *)
+         let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
+         in
+             if (abstractOutType "t" (* BUG *) reprType deducedPkgType) <>
+                (abstractOutType "t" (* BUG *) reprType pkgType) then
+                 raise IllTyped
+             else
+                 A.Some("t" (* BUG *), pkgType)
+         end
        | A.Use (pkg, clientName, client) =>
-            let val A.Some(name, r) = typeof' ctx typCtx pkg
-                (* binds BOTH a A.TypVar and a Exp A.Var *)
-                val clientType = typeof' (r::ctx) (NONE::typCtx) client
-                (* shift indices of free vars and typevars in clientType down by one *)
-                val resType = typtypDecrVarIdxs clientType
-            in
-                if not (istype typCtx resType) then raise IllTyped else
-                resType
-            end
+         let val A.Some(name, r) = typeof' ctx typCtx pkg
+             (* binds BOTH a A.TypVar and a Exp A.Var *)
+             val clientType = typeof' (r::ctx) (NONE::typCtx) client
+             val resType = decrDeBruijinIndices clientType
+         in
+             if not (istype typCtx resType) then raise IllTyped else
+             resType
+         end
        | A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *)) =>
-            let val deduced = typeof' ctx (NONE::typCtx) e'
-                val absDeduced = A.TyRec(name, typAbstractOut name (A.TyRec(name, t)) (deduced))
-                val absT = typAbstractOut name (A.TyRec(name, t)) (A.TyRec(name, t))
-            in
-                if absDeduced <> A.TyRec(name, t) then raise IllTyped
-                else A.TyRec(name, t)
-            end
+         let val deduced = typeof' ctx (NONE::typCtx) e'
+             val absDeduced = A.TyRec(name, abstractOutType name (A.TyRec(name, t)) (deduced))
+             val absT = abstractOutType name (A.TyRec(name, t)) (A.TyRec(name, t))
+         in
+             if absDeduced <> A.TyRec(name, t) then raise IllTyped
+             else A.TyRec(name, t)
+         end
+       | A.Fold(_ , e'(* binds a typ var *)) =>
+         raise IllTypedMsg "Fold type argument must be a recursive type"
        | A.Unfold(e') =>
-            let val A.TyRec(name, t) = typeof' ctx typCtx e' in
-                typsubst (A.TyRec(name, t)) t
-            end
+         let val A.TyRec(name, t) = typeof' ctx typCtx e' in
+             substType (A.TyRec(name, t)) t
+         end
+
 
 fun typeof e = typeof' [] [] e
+
 
 fun isval e =
     case e of
@@ -453,8 +463,9 @@ fun step e =
       | A.Ifz(i, t, prev, e) =>
             if not (isval i) then A.Ifz(step i, t, prev, e)
             else (case i of
-                     A.Zero => t
-                   | A.Succ i' => subst i' e)
+                      A.Zero => t
+                    | A.Succ i' => subst i' e
+                    | _ => raise IllTypedMsg "ifz conditional must be an integer")
       | A.Let (varname, vartype, varval, varscope) => subst varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
@@ -470,7 +481,7 @@ fun step e =
             if not (isval e') then (A.TypApp (t, step e'))
             else
                 let val A.TypAbs(name, e'') = e' in
-                    typSubstInExp t e''
+                    substTypeInExp t e''
                 end
       | A.Impl(reprType, pkgImpl, pkgType) =>
             if not (isval pkgImpl) then A.Impl(reprType, step pkgImpl, pkgType) else
@@ -481,7 +492,7 @@ fun step e =
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 A.Impl(reprType', pkgImpl', _) =>
-                    subst pkgImpl' (typSubstInExp reprType' client)
+                    subst pkgImpl' (substTypeInExp reprType' client)
               | _ => raise No
            )
       | A.PlusLeft (t, e') =>
@@ -507,11 +518,10 @@ fun step e =
 
 
 fun parse s =
-    (print ("parse " ^ s ^ "\n");
     let val ast : A.Exp = Parse.parse s
     in
         setDeBruijnIndex ast [] []
-    end)
+    end
 
 fun parseFile filename =
     let val ast : A.Exp = Parse.parseFile filename
@@ -621,8 +631,8 @@ val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), "l", Var ("l", 0)
 
 (* That's why we require an explicit type annotation from the programmer. *)
 val Arr(Nat, Nat) = typeof' [] [NONE] (Lam("x", Nat, Zero));
-val Arr(TypVar ("t", 0), TypVar ("t", 0)) = typAbstractOut "t" Nat (Arr(Nat, Nat));
-val All("t", Arr(TypVar ("t", 0), Nat)) = typAbstractOut "t" (Arr(Nat, Nat)) (All("t", Arr(TypVar ("t", 0), Nat)));
+val Arr(TypVar ("t", 0), TypVar ("t", 0)) = abstractOutType "t" Nat (Arr(Nat, Nat));
+val All("t", Arr(TypVar ("t", 0), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (All("t", Arr(TypVar ("t", 0), Nat)));
 
 val e0 = Impl(Nat, Lam("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0)));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e0;
@@ -659,7 +669,7 @@ val Some("t",Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0))) = typeof' [] [] e
 
 val t5 = typeof' [] [] (Lam("x", All("t", Nat), Zero));
 val (Arr(All ("t", Nat), Nat)) = t5;
-val Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)) = typAbstractOut "t" Nat (Arr(All ("t", Nat), Nat));
+val Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)) = abstractOutType "t" Nat (Arr(All ("t", Nat), Nat));
 
 val f = Lam("x", Arr(Nat, Nat), Zero);
 val g = Lam ("x", Nat,Succ (Var ("x", 0)));
@@ -698,12 +708,12 @@ val Zero = eval (Use(inoutpkg2, "pkg", App(ProdRight(Var ("x", 0)), App(ProdLeft
 val double = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ (Succ (Var ("x", 0)))));
 val Succ (Succ Zero) = eval (App(double, (Succ Zero)));
 
-val All("t", TypVar ("t", 1)) = typAbstractOut "t" Nat (All("t", Nat));
-val TypVar ("t", 0) = typAbstractOut "t" Nat Nat;
-val Arr(TypVar ("t", 0), Nat)= typAbstractOut "t" (Arr(Nat, Nat)) (Arr(Arr(Nat, Nat), Nat));
-val Some("t",Arr(TypVar ("t", 1), Nat)) = typAbstractOut "t" (Arr(Nat, Nat)) (Some("t",Arr(Arr(Nat, Nat), Nat)));
-val All("t", Arr(TypVar ("t", 1), Nat)) = typAbstractOut "t" (Arr(Nat, Nat)) (All("t", Arr(Arr(Nat, Nat), Nat)));
-val Some("t",All("t", Arr(TypVar ("t", 2), Nat))) = typAbstractOut "t" (Arr(Nat, Nat)) (Some("t",All("t", Arr(Arr(Nat, Nat), Nat))));
+val All("t", TypVar ("t", 1)) = abstractOutType "t" Nat (All("t", Nat));
+val TypVar ("t", 0) = abstractOutType "t" Nat Nat;
+val Arr(TypVar ("t", 0), Nat)= abstractOutType "t" (Arr(Nat, Nat)) (Arr(Arr(Nat, Nat), Nat));
+val Some("t",Arr(TypVar ("t", 1), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (Some("t",Arr(Arr(Nat, Nat), Nat)));
+val All("t", Arr(TypVar ("t", 1), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (All("t", Arr(Arr(Nat, Nat), Nat)));
+val Some("t",All("t", Arr(TypVar ("t", 2), Nat))) = abstractOutType "t" (Arr(Nat, Nat)) (Some("t",All("t", Arr(Arr(Nat, Nat), Nat))));
 
 val polymorphicIdFn = TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0)));
 
@@ -720,21 +730,21 @@ val TypAbs("t", Zero) = step (TypAbs("t", Zero));
 val true = isval (Lam("x", Nat, TypAbs("t", Zero)));
 val (TypAbs ("t", Zero)) = step (App(Lam("x", Nat, TypAbs("t", Zero)), Zero));
 
-val Nat = typsubst Nat (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
-val Arr(Nat, Nat) = typsubst (Arr(Nat, Nat)) (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
+val Nat = substType Nat (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
+val Arr(Nat, Nat) = substType (Arr(Nat, Nat)) (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
 val false = istype [] (TypVar ("t", 0));
-val All("t", Nat) = typsubst Nat (All("t", TypVar ("t", 1)));
-val Some("t",Nat) = typsubst Nat (Some("t",TypVar ("t", 1)));
-val Some("t",Some("t",TypVar ("t", 1))) = typsubst Nat (Some("t",Some("t",TypVar ("t", 1))));
+val All("t", Nat) = substType Nat (All("t", TypVar ("t", 1)));
+val Some("t",Nat) = substType Nat (Some("t",TypVar ("t", 1)));
+val Some("t",Some("t",TypVar ("t", 1))) = substType Nat (Some("t",Some("t",TypVar ("t", 1))));
 val true = istype [] (All("t", TypVar ("t", 0)));
 val true = istype [] (Some("t",TypVar ("t", 0)));
-val All("t", Arr(Nat, (All("t", Nat)))) = typsubst (All("t", Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
-val All("t", Arr(Nat, (Some("t",Nat)))) = typsubst (Some("t",Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
+val All("t", Arr(Nat, (All("t", Nat)))) = substType (All("t", Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
+val All("t", Arr(Nat, (Some("t",Nat)))) = substType (Some("t",Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
 
 val Nat = typeof' [] [] (TypApp(TypVar ("t", 0), Zero)) handle IllTyped => Nat;
 val All("t", Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (TypAbs("t", Lam("x", TypVar ("t", 0), Zero)));
 val Arr(Arr(Nat, Nat), Nat) = typeof' [] [] (TypApp(Arr(Nat, Nat), (TypAbs("t", Lam("x", TypVar ("t", 0), Zero)))));
-val Nat = typeof' [] [] (TypApp(Arr(Nat, Nat), (TypAbs("t", Lam("x", TypVar ("t", 1), Zero))))) handle IllTyped => Nat;
+val Nat = typeof' [] [] (TypApp(Arr(Nat, Nat), (TypAbs("t", Lam("x", TypVar ("t", 1), Zero))))) handle IllTypedMsg _ => Nat;
 
 
 val All("t", Nat) = typeof' [] [] (TypAbs("t", Zero)); (* polymorphic zero *)
@@ -844,7 +854,7 @@ val Nat = (typeof' [] [] (Rec(Zero,
                                 "prev", Lam("x", Nat, Succ(Zero))))
           handle IllTyped => Nat);
 
-val Arr(Nat, Nat) = typeof' [] [] (Lam("x", (TypVar ("t", 0)), Zero)) handle IllTyped => Arr(Nat, Nat);
+val Arr(Nat, Nat) = typeof' [] [] (Lam("x", (TypVar ("t", 0)), Zero)) handle IllTypedMsg _ => Arr(Nat, Nat);
 
 val Succ(Rec(Zero, Zero, "prev", Succ(Var("prev", 0)))) = step (Rec(Succ(Zero), Zero, "prev", Succ(Var ("prev", 0))));
 
