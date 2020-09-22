@@ -1030,6 +1030,17 @@ val Fold
                        Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))))),
         TmUnit)) : Ast.Exp = runFile "/home/evan/thon/examples/emptybst.thon";
 
+val bstType : Ast.Typ = typeof (parseFile "/home/evan/thon/examples/singletonbst.thon");
+
+val TyRec
+    ("node",Plus (Unit,Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))
+    : Ast.Typ = bstType;
+
+val bstInsertType : Ast.Typ = typeof (parseFile "/home/evan/thon/examples/bst.thon");
+val Arr(Nat, (Arr(bstType1, bstType2))) = bstInsertType;
+val true = (bstType = bstType1);
+val true = (bstType = bstType2);
+
 in
 ()
 end

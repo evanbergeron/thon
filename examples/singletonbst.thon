@@ -1,0 +1,31 @@
+fold u node. (unit | (nat * (node * node)))
+with right
+(Z,
+    (
+        (*nil node*)
+        fold u node. (unit | (nat * (node * node)))
+        with left unit : (
+            unit
+          | (nat * ((u node. (unit | (nat * (node * node)))) *
+                    (u node. (unit | (nat * (node * node))))
+                   )
+            )
+        )
+        ,
+        (*nil node*)
+        fold u node. (unit | (nat * (node * node)))
+        with left unit : (
+            unit
+          | (nat * ((u node. (unit | (nat * (node * node)))) *
+                    (u node. (unit | (nat * (node * node))))
+                   )
+            )
+        )
+    )
+) : (
+    unit
+  | (nat * ((u node. (unit | (nat * (node * node)))) *
+            (u node. (unit | (nat * (node * node))))
+           )
+    )
+)

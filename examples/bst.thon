@@ -1,0 +1,68 @@
+let decr : nat -> nat =
+  \ x : nat ->
+    ifz x of
+      Z -> Z
+    | S p -> p
+in let sub : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+    rec y of
+      Z -> x
+    | prevRec -> (decr prevRec)
+in let lt : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+  ifz (sub y x) of
+    Z -> Z
+  | S p -> S Z
+in let nil : u node. (unit | (nat * (node * node))) =
+  fold u node. (unit | (nat * (node * node)))
+  with left unit : (unit | (nat * ((u node. (unit | (nat * (node * node)))) * (u node. (unit | (nat * (node * node)))))))
+in let insert : nat -> (u node. (unit | (nat * (node * node)))) ->  (u node. (unit | (nat * (node * node)))) =
+    \ n : nat ->
+    \ bst : (u node. (unit | (nat * (node * node)))) ->
+    case (unfold bst) of
+        empty -> (
+            fold u node. (unit | (nat * (node * node)))
+            with right
+            (n, (* put the number in the tree *)
+                (
+                    (*nil node*)
+                    fold u node. (unit | (nat * (node * node)))
+                    with left unit : (
+                        unit
+                    | (nat * ((u node. (unit | (nat * (node * node)))) *
+                                (u node. (unit | (nat * (node * node))))
+                            )
+                        )
+                    )
+                    ,
+                    (*nil node*)
+                    fold u node. (unit | (nat * (node * node)))
+                    with left unit : (
+                        unit
+                    | (nat * ((u node. (unit | (nat * (node * node)))) *
+                                (u node. (unit | (nat * (node * node))))
+                            )
+                        )
+                    )
+                )
+            ) : (
+                unit
+            | (nat * ((u node. (unit | (nat * (node * node)))) *
+                        (u node. (unit | (nat * (node * node))))
+                    )
+                )
+            )
+        )
+    | natAndNodeAndNode -> (
+        let thisNode : nat = fst natAndNodeAndNode in
+        let leftNode : (u node. (unit | (nat * (node * node)))) = fst (snd natAndNodeAndNode) in
+        let rightNode : (u node. (unit | (nat * (node * node)))) = snd (snd natAndNodeAndNode) in
+        (* OK so this program is not done yet - in the recursive case we just return the empty bst...
+         * need to ponder how to recurse in this case. *)
+        fold u node. (unit | (nat * (node * node)))
+        (* take the left case (is empty) *)
+        with left unit : (unit | (nat * ((u node. (unit | (nat * (node * node)))) * (u node. (unit | (nat * (node * node)))))))
+    )
+in insert
