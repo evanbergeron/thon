@@ -1,0 +1,30 @@
+let isone : nat -> nat = 
+  \ n : nat ->
+    ifz n of
+      Z -> Z (*false*)
+    | S p -> ifz p of Z -> S Z | S p -> Z
+in let iseven : nat -> nat = fix rc : nat -> nat in
+  \ n : nat ->
+    ifz n of
+      Z -> S Z (*true*)
+    | S p -> ifz (rc p) of Z -> S Z | S p -> Z
+in let divbytwo : nat -> nat = fix rc : nat -> nat in
+  \ n : nat ->
+    ifz n of
+      Z -> Z
+    | S p -> ifz p of Z -> Z | S p' -> (S (rc p'))
+in let multbythree : nat -> nat =
+  \ n : nat ->
+    rec n of
+      Z -> Z
+   | prevRec -> S S S prevRec
+in let collatz : nat -> nat = fix rc : nat -> nat in
+  \ n : nat ->
+    ifz (isone n) of
+      Z -> (
+        ifz (iseven n) of
+          Z -> rc (S (multbythree n))
+        | S p -> (rc (divbytwo n))
+      )
+    | S p -> (S Z)
+in (collatz (S S Z))
