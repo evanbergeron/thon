@@ -10,7 +10,7 @@ structure Thon : sig
                    val subst : A.Exp -> A.Exp -> A.Exp
                    val run : string -> A.Exp
                    val runFile : string -> A.Exp
-                   (* TODO val repl : () -> () *)
+                   val findParseErrors : string -> unit
                  end =
 struct
 
@@ -541,6 +541,12 @@ fun parseFile filename =
         setDeBruijnIndex ast [] []
     end
 
+fun findParseErrors filename =
+    let val _ = parseFile filename
+    in
+        ()
+    end
+
 fun eval e = if isval e then e else eval (step e)
 
 fun run s = let val e = parse s in if isval e then e else eval (step e) end
@@ -1053,6 +1059,8 @@ val true = (loop) = (step loop);
 val Nat = typeof loop;
 (* 2 is even *)
 val Succ Zero = runFile "/home/evan/thon/examples/iseven.thon";;
+
+val bstinsert = parseFile "/home/evan/thon/examples/bst.thon";
 
 in
 ()
