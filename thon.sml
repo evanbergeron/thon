@@ -275,6 +275,9 @@ end
 fun substTypeInExp srcType dstExp = substTypeInExp' srcType dstExp 0
 
 
+(* BUG this doesn't respect alpha equivalence (shouldn't care about type var names) *)
+fun typeEq (t : A.Typ) (t' : A.Typ) = (t = t')
+
 fun typeof' ctx typCtx e =
     case e
      of  A.Zero => A.Nat
@@ -286,14 +289,14 @@ fun typeof' ctx typCtx e =
        | A.ProdRight e => let val A.Prod(l, r) = (typeof' ctx typCtx e) in r end
        | A.PlusLeft (t, e) =>
          let val A.Plus(l, r) = t in
-             if l <> typeof' ctx typCtx e then
+             if not (typeEq l (typeof' ctx typCtx e)) then
                  raise IllTypedMsg "Sum type annotation does not match deduced type"
              else
                  A.Plus(l, r)
          end
        | A.PlusRight (t, e) =>
          let val A.Plus(l, r) = t in
-             if r <> typeof' ctx typCtx e then
+             if not (typeEq r (typeof' ctx typCtx e)) then
                  raise IllTypedMsg "Sum type annotation does not match deduced type"
              else
                  A.Plus(l, r)
@@ -301,13 +304,13 @@ fun typeof' ctx typCtx e =
        | A.Case (c, lname, l, rname, r) =>
          let val A.Plus(lt, rt) = typeof' ctx typCtx c
              (* both bind a term var *)
-             val typeof'LeftBranch = typeof' (lt::ctx) typCtx l
-             val typeof'RightBranch= typeof' (rt::ctx) typCtx r
+             val typeofLeftBranch = typeof' (lt::ctx) typCtx l
+             val typeofRightBranch= typeof' (rt::ctx) typCtx r
          in
-             if typeof'LeftBranch <> typeof'RightBranch then
+             if not (typeEq (typeofLeftBranch) (typeofRightBranch)) then
                  raise IllTypedMsg "Case statement branches types do not agree"
              else
-                 typeof'LeftBranch
+                 typeofLeftBranch
          end
        | A.Lam (argName, argType, funcBody) =>
          if not (istype typCtx argType) then raise IllTypedMsg "Function arg type is not a type."
@@ -315,7 +318,7 @@ fun typeof' ctx typCtx e =
        | A.Let (varname, vartype, varval, varscope) =>
          if not (istype typCtx vartype) then
              raise IllTypedMsg "Let var type is not a type"
-         else if (typeof' ctx typCtx varval) <> vartype then
+         else if not (typeEq (typeof' ctx typCtx varval) vartype) then
              raise IllTypedMsg "Let var type is not equal to deduced var value type."
          else
             typeof' (vartype::ctx) typCtx varscope
@@ -323,7 +326,7 @@ fun typeof' ctx typCtx e =
          let val A.Arr (d, c) = typeof' ctx typCtx f
              val argType = typeof' ctx typCtx n
          in
-             if d <> argType then raise IllTyped
+             if not (typeEq d argType) then raise IllTyped
              else c
          end
        | A.Ifz (i, t, prev, e) =>
@@ -331,7 +334,7 @@ fun typeof' ctx typCtx e =
              val thenType = typeof' ctx typCtx t
              val elseType = typeof' (Nat::ctx) typCtx e
          in
-             if thenType <> elseType then raise IllTyped
+             if not (typeEq thenType elseType) then raise IllTyped
              else thenType
          end
        | A.Tuple (l, r) => A.Prod(typeof' ctx typCtx l, typeof' ctx typCtx r)
@@ -340,7 +343,7 @@ fun typeof' ctx typCtx e =
              val t = typeof' ctx typCtx baseCase
              val t2 = typeof' (t::ctx) typCtx recCase
          in
-             if t <> t2 then raise IllTyped else t
+             if not (typeEq t t2) then raise IllTyped else t
          end
        | A.Fix (name, typ, e) => typeof' (typ::ctx) typCtx e
        (* BUG need to build a type equality func that ignores names *)
@@ -356,8 +359,8 @@ fun typeof' ctx typCtx e =
          (* pkgType : [reprType/A.TypVar 0](t') *)
          let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
          in
-             if (abstractOutType "t" (* BUG *) reprType deducedPkgType) <>
-                (abstractOutType "t" (* BUG *) reprType pkgType) then
+             if not (typeEq (abstractOutType "t" (* BUG *) reprType deducedPkgType)
+                            (abstractOutType "t" (* BUG *) reprType pkgType)) then
                  raise IllTyped
              else
                  A.Some("t" (* BUG *), pkgType)
@@ -376,7 +379,7 @@ fun typeof' ctx typCtx e =
              val absDeduced = A.TyRec(name, abstractOutType name (A.TyRec(name, t)) (deduced))
              val absT = abstractOutType name (A.TyRec(name, t)) (A.TyRec(name, t))
          in
-             if absDeduced <> A.TyRec(name, t) then raise IllTyped
+             if not (typeEq absDeduced (A.TyRec(name, t))) then raise IllTyped
              else A.TyRec(name, t)
          end
        | A.Fold(_ , e'(* binds a typ var *)) =>
