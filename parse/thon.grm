@@ -45,6 +45,7 @@ structure A = Ast
  | EQ
  | IFZ
  | FIX
+ | FUN
 
 %nonterm
    exp of A.Exp
@@ -62,7 +63,7 @@ structure A = Ast
 (* If the rule has the higher precedence, the reduction is chosen. *)
 
 (* The precedence grows down *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX FUN
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -79,12 +80,11 @@ exp:
   | ZERO (A.Zero)
   | SUCC exp (A.Succ exp)
   | UNIT (A.TmUnit)
-  (* eventually would rather this be LAM ID COLON typ SARROW exp but
-   * not until we manage to turn names into binding site indexes *)
   | LAM ID COLON typ SARROW exp (A.Lam (ID, typ, exp))
   | LET ID COLON typ EQ exp IN exp (A.Let (ID, typ, exp1, exp2))
   | IFZ exp OF ZERO SARROW exp PIPE SUCC ID SARROW exp (A.Ifz (exp1, exp2, ID, exp3))
   | REC exp OF ZERO SARROW exp PIPE ID SARROW exp (A.Rec (exp1, exp2, ID, exp3))
+  | FUN ID COLON typ EQ exp IN exp (A.Let(ID1, typ1, A.Fix(ID1, typ1, exp1), exp2))
   | FIX ID COLON typ IN exp (A.Fix (ID, typ, exp))
   | POLY ID SARROW exp (A.TypAbs (ID, exp))
   | LPAREN exp COMMA exp RPAREN (A.Tuple(exp1, exp2))

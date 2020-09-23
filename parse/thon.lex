@@ -50,6 +50,7 @@ ws = [\ \t];
 <INITIAL> "let"    => (Tokens.LET(!pos,!pos));
 <INITIAL> "fix"    => (Tokens.FIX(!pos,!pos));
 <INITIAL> "ifz"    => (Tokens.IFZ(!pos,!pos));
+<INITIAL> "fun"    => (Tokens.FUN(!pos,!pos));
 <INITIAL> "->"     => (Tokens.SARROW(!pos,!pos));
 <INITIAL> "nat"    => (Tokens.NAT(!pos,!pos));
 <INITIAL> "rec"    => (Tokens.REC(!pos,!pos));
