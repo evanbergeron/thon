@@ -17,8 +17,16 @@ in let lt : nat -> nat -> nat =
   | S p -> S Z
 in let nil : u node. (unit | (nat * (node * node))) =
   fold u node. (unit | (nat * (node * node)))
-  with left unit : (unit | (nat * ((u node. (unit | (nat * (node * node)))) * (u node. (unit | (nat * (node * node)))))))
-in let insert : nat -> (u node. (unit | (nat * (node * node)))) ->  (u node. (unit | (nat * (node * node)))) =
+  with left unit : (unit
+                 | (nat * ((u node. (unit | (nat * (node * node)))) *
+                           (u node. (unit | (nat * (node * node)))))))
+in let insert : nat
+                -> (u node. (unit | (nat * (node * node))))
+                -> (u node. (unit | (nat * (node * node)))) =
+    fix rc : nat
+             -> (u node. (unit | (nat * (node * node))))
+             -> (u node. (unit | (nat * (node * node)))) =
+    in
     \ n : nat ->
     \ bst : (u node. (unit | (nat * (node * node)))) ->
     case (unfold bst) of
@@ -59,10 +67,32 @@ in let insert : nat -> (u node. (unit | (nat * (node * node)))) ->  (u node. (un
         let thisNode : nat = fst natAndNodeAndNode in
         let leftNode : (u node. (unit | (nat * (node * node)))) = fst (snd natAndNodeAndNode) in
         let rightNode : (u node. (unit | (nat * (node * node)))) = snd (snd natAndNodeAndNode) in
-        (* OK so this program is not done yet - in the recursive case we just return the empty bst...
-         * need to ponder how to recurse in this case. *)
-        fold u node. (unit | (nat * (node * node)))
-        (* take the left case (is empty) *)
-        with left unit : (unit | (nat * ((u node. (unit | (nat * (node * node)))) * (u node. (unit | (nat * (node * node)))))))
+        ifz (lt n thisNode) of
+            Z -> (
+                fold u node. (unit | (nat * (node * node)))
+                with right (thisNode,
+                (
+                    (* recurse insert right *)
+                    leftNode, rc n rightNode
+                )) : (unit
+                | (nat * ((u node. (unit | (nat * (node * node)))) *
+                            (u node. (unit | (nat * (node * node))))
+                        )
+                    )
+                )
+            )
+        S p -> (
+                fold u node. (unit | (nat * (node * node)))
+                with right (thisNode,
+                (
+                    (* recurse insert left *)
+                    rc n leftNode, rightNode
+                )) : (unit
+                | (nat * ((u node. (unit | (nat * (node * node)))) *
+                            (u node. (unit | (nat * (node * node))))
+                        )
+                    )
+                )
+        )
     )
 in insert
