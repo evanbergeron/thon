@@ -1061,6 +1061,11 @@ val Nat = typeof loop;
 val Succ Zero = runFile "/home/evan/thon/examples/iseven.thon";;
 
 val bstinsert = parseFile "/home/evan/thon/examples/bst.thon";
+val emptybst = parseFile "/home/evan/thon/examples/emptybst.thon";
+val zerobst = parseFile "/home/evan/thon/examples/singletonbst.thon";
+
+val appbst = eval (A.App(A.App(bstinsert, A.Zero), emptybst));
+val true = (zerobst = appbst);
 
 in
 ()
