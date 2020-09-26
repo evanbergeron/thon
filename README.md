@@ -22,25 +22,23 @@ interfaces), and recursive types.
 
 `Z` is the natural number 0. `S Z` is 1 (the succesor of one). `S S Z` is 2, and so on.
 
-## functions are values
+## functions
 
-In thon, functions are expressions just like numbers are.
+In thon, functions are expressions just like numbers are. thon
+supports anonymous functions and named, recursive functions.
 
-`\ x : nat -> x` is the identity function on natural numbers.
-
-`\ x : nat -> (\ y : nat -> y)` is a function returning a
-function that returns whatever was fed to the first function.
-
-`((\ x : nat -> x) Z)` applies the identity function to the natural number Zero.
-
-## variables make code more readable
+Here are some example anonymous functions.
 
 ```
-let x : nat = Z in x
+\ x : nat -> x
+\ x : nat -> (\ y : nat -> y)
 ```
-binds the name `x` in the expression following the `in` keyword.
 
-## recursive functions are fixed points
+Functions are applied to their arguments by juxtaposition.
+
+```
+((\ x : nat -> x) Z)
+```
 
 Here's a divide-by-two function:
 
@@ -65,6 +63,13 @@ any expression. Here's an amusing way to loop forever:
 ```
 fix loop : nat in loop
 ```
+
+## variables
+
+```
+let x : nat = Z in x
+```
+binds the name `x` in the expression following the `in` keyword.
 
 ## parametric polymorphism
 
@@ -133,21 +138,21 @@ impl (nat -> t, t -> nat) with (nat * nat) as
 )
 ```
 
-Both of these expression have type `((nat -> T) * (T -> nat))` for some type `T`. Note this is an existential claim, hence the name existential packages.
+Both of these expression have type `((nat -> T) * (T -> nat))` for
+some type `T`. Note this is an existential claim, hence the name
+existential packages.
 
 These implementations can be used interchangably by saying
 
 ```
-use (...either implementation...) as pkg in
+use (...either implementation...) as (pkg, t) in
 (... some use of pkg ...)
 ```
 
-Still TODO for me - the `use` expression needs to introduce a type
-name for the abstract implementation type. And the `impl` expression
-need to be clear about what the abstracted-over type name is. This was
-fine back when we just specified De Bruijin indices in the
-typename... but now we need to define a type variable name, just like
-we do for functions.
+Still TODO for me - the `impl` expression need to be clear about what
+the abstracted-over type name is. This was fine back when we just
+specified De Bruijin indices in the typename... but now we need to
+define a type variable name, just like we do for functions.
 
 ## recursive types
 
