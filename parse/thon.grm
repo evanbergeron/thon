@@ -97,7 +97,7 @@ exp:
   (* impl reprType in pkgImpl as pkgType *)
   (* Impl (reprType, pkgImpl, pkgType) *)
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
-  | USE exp AS ID IN exp (A.Use(exp1, ID, exp2)) (* TODO still need type name *)
+  | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
   | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
 
 typ:
