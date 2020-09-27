@@ -3,16 +3,19 @@
 thon is a small programming language. Here's an example program that
 verifies the empty list is empty.
 
-    let isempty : (u l. (unit |  (nat * l))) -> nat =
-        \ natlist : (u l. (unit |  (nat * l))) ->
-            (case (unfold natlist) of
-              empty -> S Z
-            | hdAndTl -> Z)
-    in let nil : (u l. (unit |  (nat * l))) =
-        fold u l. (unit | (nat * l))
-        with left unit : (unit |  (nat * (u l. (unit | (nat * l)))))
-    in
-    (isempty nil)
+```
+fun isempty : (data l = (unit | nat * l)) -> nat =
+  \ natlist : (data l = (unit | nat * l)) ->
+        (case (unfold natlist) of
+           empty -> S Z
+         | not -> Z)
+in let nil : (data l = (unit | nat * l)) =
+    fold data l = (unit | nat * l) with
+    left unit : (unit
+               | nat * (data l = (unit | nat * l)))
+in
+(isempty nil)
+```
 
 thon has natural numbers, functions, recursion, binary product and sum
 types, parametric polymorphism, existential packages (a formalization of
