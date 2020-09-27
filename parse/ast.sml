@@ -24,6 +24,7 @@ sig
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
       | Fix of string (*x*) * Typ (*: t*) * Exp (*x's scope*)
+      | Data of string (*x*) * Typ (*= t*) * Exp (*x's scope*)
       | TypAbs of string * Exp (* binds type variable *)
       | Ifz of Exp * Exp * string * Exp
       | TypApp of Typ * Exp
@@ -75,6 +76,7 @@ struct
       | App of Exp * Exp
       | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
       | Fix of string (*x*) * Typ (*: t*) * Exp (*x's scope*)
+      | Data of string (*x*) * Typ (*= t*) * Exp (*x's scope*)
       | TypAbs of string * Exp (* binds type variable *)
       | Ifz of Exp * Exp * string * Exp
       | TypApp of Typ * Exp

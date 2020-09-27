@@ -69,6 +69,7 @@ ws = [\ \t];
 <INITIAL> "impl"   => (Tokens.IMPL(!pos,!pos));
 <INITIAL> "use"    => (Tokens.USE(!pos,!pos));
 <INITIAL> "case"   => (Tokens.CASE(!pos,!pos));
+<INITIAL> "data"   => (Tokens.DATA(!pos,!pos));
 <INITIAL> "as"     => (Tokens.AS(!pos,!pos));
 <INITIAL> "in"     => (Tokens.IN(!pos,!pos));
 <INITIAL> "of"     => (Tokens.OF(!pos,!pos));
