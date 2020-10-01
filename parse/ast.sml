@@ -2,51 +2,51 @@ signature AST =
 sig
 
     (* TODO is there a way to dedupe this with the structure defn below? *)
-    datatype Typ =
+    datatype typ =
         Nat
       | TypVar of string * int
-      | Arr of Typ * Typ
-      | All of string * Typ (* binds *)
-      | Some of string * Typ (* binds *)
-      | Prod of Typ * Typ
-      | Plus of Typ * Typ (* sum type *)
-      | TyRec of string * Typ (* binds *)
+      | Arr of typ * typ
+      | All of string * typ (* binds *)
+      | Some of string * typ (* binds *)
+      | Prod of typ * typ
+      | Plus of typ * typ (* sum type *)
+      | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
 
     datatype Idx = int
 
-    datatype Exp =
+    datatype exp =
         Zero
       | Var of string * int (* idx into ctx *)
-      | Succ of Exp
-      | Lam of string * Typ (*argType*) * Exp (*funcBody*)
-      | Let of string * Typ (*vartype*) * Exp (*varval*) * Exp (*varscope*)
-      | App of Exp * Exp
-      | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
-      | Fix of string (*x*) * Typ (*: t*) * Exp (*x's scope*)
-      | Data of string (*x*) * Typ (*= t*) * Exp (*x's scope*)
-      | TypAbs of string * Exp (* binds type variable *)
-      | Ifz of Exp * Exp * string * Exp
-      | TypApp of Typ * Exp
-      | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
-      | Use of Exp (*package*) * string (*exp name*) * string (*type name*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
-      | Tuple of Exp * Exp
+      | Succ of exp
+      | Fn of string * typ (*argType*) * exp (*funcBody*)
+      | Let of string * typ (*vartype*) * exp (*varval*) * exp (*varscope*)
+      | App of exp * exp
+      | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * string * exp (*recCase - binds*)
+      | Fix of string (*x*) * typ (*: t*) * exp (*x's scope*)
+      | Data of string (*x*) * typ (*= t*) * exp (*x's scope*)
+      | TypFn of string * exp (* binds type variable *)
+      | Ifz of exp * exp * string * exp
+      | TypApp of typ * exp
+      | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
+      | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
+      | Pair of exp * exp
       (* Elimination forms for terms of Prod type *)
-      | ProdLeft of Exp
-      | ProdRight of Exp
+      | ProdLeft of exp
+      | ProdRight of exp
       (* Elimination forms for terms of Plus type *)
-      | PlusLeft of Typ * Exp
-      | PlusRight of Typ * Exp
-      | Case of Exp (* thing being cased on*) *
-                string * Exp (* Left binds term var *) *
-                string * Exp (* Right binds term var *)
-      | Fold of Typ (*binds*) * Exp
-      | Unfold of Exp
+      | PlusLeft of typ * exp
+      | PlusRight of typ * exp
+      | Case of exp (* thing being cased on*) *
+                string * exp (* Left binds term var *) *
+                string * exp (* Right binds term var *)
+      | Fold of typ (*binds*) * exp
+      | Unfold of exp
       | TmUnit
 
   structure Print :
   sig
-    val pp : Exp -> string
+    val pp : exp -> string
   end
 
 end
@@ -54,46 +54,46 @@ end
 
 structure Ast :> AST =
 struct
-    datatype Typ =
+    datatype typ =
         Nat
       | TypVar of string * int
-      | Arr of Typ * Typ
-      | All of string * Typ (* binds *)
-      | Some of string * Typ (* binds *)
-      | Prod of Typ * Typ
-      | Plus of Typ * Typ (* sum type *)
-      | TyRec of string * Typ (* binds *)
+      | Arr of typ * typ
+      | All of string * typ (* binds *)
+      | Some of string * typ (* binds *)
+      | Prod of typ * typ
+      | Plus of typ * typ (* sum type *)
+      | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
 
     datatype Idx = int
 
-    datatype Exp =
+    datatype exp =
         Zero
       | Var of string * int (* idx into ctx *)
-      | Succ of Exp
-      | Lam of string * Typ (*argType*) * Exp (*funcBody*)
-      | Let of string * Typ (*vartype*) * Exp (*varval*) * Exp (*varscope*)
-      | App of Exp * Exp
-      | Rec of Exp (*i : Nat*) * Exp (*baseCase: t*) * string * Exp (*recCase - binds*)
-      | Fix of string (*x*) * Typ (*: t*) * Exp (*x's scope*)
-      | Data of string (*x*) * Typ (*= t*) * Exp (*x's scope*)
-      | TypAbs of string * Exp (* binds type variable *)
-      | Ifz of Exp * Exp * string * Exp
-      | TypApp of Typ * Exp
-      | Impl of Typ (*reprType*)* Exp (*pkgImpl*)* Typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
-      | Use of Exp (*package*) * string (*exp name*) * string (*type name*) * Exp (* client that binds BOTH a TypVar and a Exp Var *)
-      | Tuple of Exp * Exp
+      | Succ of exp
+      | Fn of string * typ (*argType*) * exp (*funcBody*)
+      | Let of string * typ (*vartype*) * exp (*varval*) * exp (*varscope*)
+      | App of exp * exp
+      | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * string * exp (*recCase - binds*)
+      | Fix of string (*x*) * typ (*: t*) * exp (*x's scope*)
+      | Data of string (*x*) * typ (*= t*) * exp (*x's scope*)
+      | TypFn of string * exp (* binds type variable *)
+      | Ifz of exp * exp * string * exp
+      | TypApp of typ * exp
+      | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
+      | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
+      | Pair of exp * exp
       (* Elimination forms for terms of Prod type *)
-      | ProdLeft of Exp
-      | ProdRight of Exp
+      | ProdLeft of exp
+      | ProdRight of exp
       (* Elimination forms for terms of Plus type *)
-      | PlusLeft of Typ * Exp
-      | PlusRight of Typ * Exp
-      | Case of Exp (* thing being cased on*) *
-                string * Exp (* Left binds term var *) *
-                string * Exp (* Right binds term var *)
-      | Fold of Typ (*binds*) * Exp
-      | Unfold of Exp
+      | PlusLeft of typ * exp
+      | PlusRight of typ * exp
+      | Case of exp (* thing being cased on*) *
+                string * exp (* Left binds term var *) *
+                string * exp (* Right binds term var *)
+      | Fold of typ (*binds*) * exp
+      | Unfold of exp
       | TmUnit
 
   structure Print =

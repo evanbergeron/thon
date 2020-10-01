@@ -1,15 +1,15 @@
 (* thon - a small functional language *)
 structure Thon : sig
-                   val parse : string -> Ast.Exp
-                   val parseFile : string -> Ast.Exp
-                   val typeof : A.Exp -> A.Typ
+                   val parse : string -> Ast.exp
+                   val parseFile : string -> Ast.exp
+                   val typeof : A.exp -> A.typ
                    val test : unit -> unit
-                   val eval : A.Exp -> A.Exp
-                   val isval : A.Exp -> bool
-                   val step : A.Exp -> A.Exp
-                   val subst : A.Exp -> A.Exp -> A.Exp
-                   val run : string -> A.Exp
-                   val runFile : string -> A.Exp
+                   val eval : A.exp -> A.exp
+                   val isval : A.exp -> bool
+                   val step : A.exp -> A.exp
+                   val subst : A.exp -> A.exp -> A.exp
+                   val run : string -> A.exp
+                   val runFile : string -> A.exp
                    val findParseErrors : string -> unit
                  end =
 struct
@@ -123,8 +123,8 @@ fun substTypeInExp' srcType dstExp bindingDepth =
                    substTypeInExp' srcType l bindingDepth,
                    rname,
                    substTypeInExp' srcType r bindingDepth)
-       | A.Lam (argName, argType, funcBody) =>
-            A.Lam(argName, (substType' srcType argType bindingDepth),
+       | A.Fn (argName, argType, funcBody) =>
+            A.Fn(argName, (substType' srcType argType bindingDepth),
                 substTypeInExp' srcType funcBody bindingDepth)
        | A.Let (varname, vartype, varval, varscope) =>
             A.Let(varname, (substType' srcType vartype bindingDepth),
@@ -139,8 +139,8 @@ fun substTypeInExp' srcType dstExp bindingDepth =
                   substTypeInExp' srcType t bindingDepth,
                   prev,
                   substTypeInExp' srcType e bindingDepth)
-       | A.Tuple (l, r) =>
-            A.Tuple (substTypeInExp' srcType l bindingDepth,
+       | A.Pair (l, r) =>
+            A.Pair (substTypeInExp' srcType l bindingDepth,
                    substTypeInExp' srcType r bindingDepth)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec(substTypeInExp' srcType i bindingDepth,
@@ -150,7 +150,7 @@ fun substTypeInExp' srcType dstExp bindingDepth =
          A.Fix(name,
                substType' srcType t bindingDepth,
                substTypeInExp' srcType e bindingDepth)
-       | A.TypAbs (name, e) => A.TypAbs(name, substTypeInExp' srcType e (bindingDepth+1)) (* binds type var *)
+       | A.TypFn (name, e) => A.TypFn(name, substTypeInExp' srcType e (bindingDepth+1)) (* binds type var *)
        | A.TypApp (appType, e) =>
             A.TypApp(substType' srcType appType bindingDepth,
                    substTypeInExp' srcType e bindingDepth)
@@ -212,8 +212,8 @@ fun setDeBruijnIndex e varnames typnames =
          (case find n varnames of
              NONE => (print ("unknown var: "^ n); raise VarNotInContext)
            | SOME i => A.Var (n, i))
-       | A.Lam(name, argType, funcBody) =>
-         A.Lam(name,
+       | A.Fn(name, argType, funcBody) =>
+         A.Fn(name,
                setDeBruijnIndexInType argType varnames typnames,
                setDeBruijnIndex funcBody (name::varnames) typnames)
        | A.Let (varname, vartype, varval, varscope) =>
@@ -236,7 +236,7 @@ fun setDeBruijnIndex e varnames typnames =
                                    setDeBruijnIndex t varnames typnames,
                                    prev,
                                    setDeBruijnIndex e (prev::varnames) typnames)
-       | A.Tuple (l, r) => A.Tuple (setDeBruijnIndex l varnames typnames,
+       | A.Pair (l, r) => A.Pair (setDeBruijnIndex l varnames typnames,
                                     setDeBruijnIndex r varnames typnames)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec (setDeBruijnIndex i varnames typnames,
@@ -260,7 +260,7 @@ fun setDeBruijnIndex e varnames typnames =
        | A.TypApp (appType, e) =>
             A.TypApp (setDeBruijnIndexInType appType varnames typnames,
                       setDeBruijnIndex e varnames typnames)
-       | A.TypAbs (name, e) => A.TypAbs (name, setDeBruijnIndex e varnames (name::typnames))
+       | A.TypFn (name, e) => A.TypFn (name, setDeBruijnIndex e varnames (name::typnames))
        | A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *)) =>
          A.Fold (A.TyRec(name, setDeBruijnIndexInType t varnames (name::typnames)),
                  setDeBruijnIndex e' varnames typnames)
@@ -278,7 +278,7 @@ fun substTypeInExp srcType dstExp = substTypeInExp' srcType dstExp 0
 
 
 (* BUG this doesn't respect alpha equivalence (shouldn't care about type var names) *)
-fun typeEq (t : A.Typ) (t' : A.Typ) = (t = t')
+fun typeEq (t : A.typ) (t' : A.typ) = (t = t')
 
 fun typeof' ctx typCtx e =
     case e
@@ -314,7 +314,7 @@ fun typeof' ctx typCtx e =
              else
                  typeofLeftBranch
          end
-       | A.Lam (argName, argType, funcBody) =>
+       | A.Fn (argName, argType, funcBody) =>
          if not (istype typCtx argType) then raise IllTypedMsg "Function arg type is not a type."
          else A.Arr (argType, typeof' (argType::ctx) typCtx funcBody)
        | A.Let (varname, vartype, varval, varscope) =>
@@ -339,7 +339,7 @@ fun typeof' ctx typCtx e =
              if not (typeEq thenType elseType) then raise IllTyped
              else thenType
          end
-       | A.Tuple (l, r) => A.Prod(typeof' ctx typCtx l, typeof' ctx typCtx r)
+       | A.Pair (l, r) => A.Prod(typeof' ctx typCtx l, typeof' ctx typCtx r)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
          let val A.Nat = typeof' ctx typCtx i
              val t = typeof' ctx typCtx baseCase
@@ -349,7 +349,7 @@ fun typeof' ctx typCtx e =
          end
        | A.Fix (name, typ, e) => typeof' (typ::ctx) typCtx e
        (* BUG need to build a type equality func that ignores names *)
-       | A.TypAbs (name, e) => A.All(name, typeof' ctx (NONE::typCtx) e)
+       | A.TypFn (name, e) => A.All(name, typeof' ctx (NONE::typCtx) e)
        | A.TypApp (appType, e) =>
          if not (istype typCtx appType) then raise IllTyped else
          let val A.All(name, t) = typeof' ctx typCtx e
@@ -369,7 +369,7 @@ fun typeof' ctx typCtx e =
          end
        | A.Use (pkg, clientName, typeName, client) =>
          let val A.Some(name, r) = typeof' ctx typCtx pkg
-             (* binds BOTH a A.TypVar and a Exp A.Var *)
+             (* binds BOTH a A.TypVar and a exp A.Var *)
              val clientType = typeof' (r::ctx) (NONE::typCtx) client
              val resType = decrDeBruijinIndices clientType
          in
@@ -400,10 +400,10 @@ fun isval e =
         A.Zero => true
       | A.TmUnit => true
       | A.Succ(n) => isval n
-      | A.Lam(_, _, _) => true
+      | A.Fn(_, _, _) => true
       | A.Let(_, _, _, _) => false
-      | A.Tuple(l, r) => (isval l) andalso (isval r)
-      | A.TypAbs (_, _)  => true
+      | A.Pair(l, r) => (isval l) andalso (isval r)
+      | A.TypFn (_, _)  => true
       | A.Impl(_, pkgImpl, _) => isval pkgImpl
       | A.PlusLeft(_, e') => isval e'
       | A.PlusRight(_, e') => isval e'
@@ -427,7 +427,7 @@ fun subst' src dst bindingDepth =
             A.Case(subst' src c bindingDepth,
                    lname, subst' src l (bindingDepth+1),
                    rname, subst' src r (bindingDepth+1))
-       | A.Lam (argName, t, f) => A.Lam(argName, t, (subst' src f (bindingDepth+1)))
+       | A.Fn (argName, t, f) => A.Fn(argName, t, (subst' src f (bindingDepth+1)))
        | A.Let (varname, vartype, varval, varscope) =>
             A.Let(varname,
                   vartype,
@@ -444,7 +444,7 @@ fun subst' src dst bindingDepth =
                 prevCaseName, subst' src recCase (bindingDepth+1))
        | A.Fix (name, t, e) =>
          A.Fix(name, t, subst' src e (bindingDepth+1)) (* binds *)
-       | A.TypAbs (name, e) => A.TypAbs (name, subst' src e bindingDepth) (* abstracts over types, not exps *)
+       | A.TypFn (name, e) => A.TypFn (name, subst' src e bindingDepth) (* abstracts over types, not exps *)
        | A.TypApp (appType, e) => A.TypApp(appType, subst' src e bindingDepth)
        | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, subst' src pkgImpl bindingDepth, t)
        | A.Use (pkg, clientName, typeName, client) =>
@@ -452,7 +452,7 @@ fun subst' src dst bindingDepth =
                clientName,
                typeName,
                subst' src client (bindingDepth+1))
-       | A.Tuple (l, r) => A.Tuple (subst' src l bindingDepth, subst' src r bindingDepth)
+       | A.Pair (l, r) => A.Pair (subst' src l bindingDepth, subst' src r bindingDepth)
        | A.Fold(t, e') => A.Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
        | A.Unfold(e') => A.Unfold(subst' src e' (bindingDepth))
 
@@ -466,15 +466,15 @@ fun step e =
     case e of
         A.Succ(n) => if not (isval n) then A.Succ(step n) else e
       | A.ProdLeft n  => if not (isval n) then A.ProdLeft(step n) else
-                   let val A.Tuple(l, r) = n in l end
+                   let val A.Pair(l, r) = n in l end
       | A.ProdRight n  => if not (isval n) then A.ProdRight(step n) else
-                    let val A.Tuple(l, r) = n in r end
-      | A.Tuple(l, r) => if not (isval l) then A.Tuple(step l, r) else
-                       if not (isval r) then A.Tuple(l, step r) else
+                    let val A.Pair(l, r) = n in r end
+      | A.Pair(l, r) => if not (isval l) then A.Pair(step l, r) else
+                       if not (isval r) then A.Pair(l, step r) else
                        e
       | A.App(f, n) => if not (isval f) then A.App(step f, n)
                      else (if not (isval n) then A.App(f, step n)
-                           else let val A.Lam(argName, t, f') = f
+                           else let val A.Fn(argName, t, f') = f
                            in
                                (* plug `n` into `f'` *)
                                subst n f'
@@ -497,11 +497,11 @@ fun step e =
                 A.Rec(step i, baseCase, prevCaseName, recCase)
             else raise No
       | A.Fix(name, t, body) => subst e body
-      | A.TypAbs (name, e') => raise No (* Already isval *)
+      | A.TypFn (name, e') => raise No (* Already isval *)
       | A.TypApp (t, e') =>
             if not (isval e') then (A.TypApp (t, step e'))
             else
-                let val A.TypAbs(name, e'') = e' in
+                let val A.TypFn(name, e'') = e' in
                     substTypeInExp t e''
                 end
       | A.Impl(reprType, pkgImpl, pkgType) =>
@@ -539,13 +539,13 @@ fun step e =
 
 
 fun parse s =
-    let val ast : A.Exp = Parse.parse s
+    let val ast : A.exp = Parse.parse s
     in
         setDeBruijnIndex ast [] []
     end
 
 fun parseFile filename =
-    let val ast : A.Exp = Parse.parseFile filename
+    let val ast : A.exp = Parse.parseFile filename
     in
         setDeBruijnIndex ast [] []
     end
@@ -569,14 +569,14 @@ fun runFile s = let val e = parseFile s in if isval e then e else eval (step e) 
 fun test() = let
 open A;
 (* Data Natlist = None | Some(Nat, Natlist) *)
-val natlist : Typ = TyRec("natlist",Plus(Unit, Prod(Nat, TypVar ("natlist", 0))));
-val Lam ("natlist", TyRec ("l",Plus (Unit,Prod (Nat,TypVar ("l", 0)))),Var ("natlist",0)) =
+val natlist : typ = TyRec("natlist",Plus(Unit, Prod(Nat, TypVar ("natlist", 0))));
+val Fn ("natlist", TyRec ("l",Plus (Unit,Prod (Nat,TypVar ("l", 0)))),Var ("natlist",0)) =
     parse "\\ natlist : (u l. (unit |  (nat * l))) -> natlist";
 
 (* id function on natlists *)
 val TypApp
     (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-     TypAbs ("s",Lam ("x",TypVar ("s",0),Var ("x",0)))) : Ast.Exp =
+     TypFn ("s",Fn ("x",TypVar ("s",0),Var ("x",0)))) : Ast.exp =
     parse "((poly s -> \\ x : s -> x) (u natlist. (unit | (nat * natlist))))";
 val nilNatList =
     Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
@@ -586,16 +586,16 @@ val parsedConsNatList = parseFile "/home/evan/thon/examples/emptynatlist.thon";
 
 val true = (nilNatList = parsedConsNatList);
 
-val TmUnit : Ast.Exp = parse "unit";
+val TmUnit : Ast.exp = parse "unit";
 
 val singletonList =
-    Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Tuple(Zero,
+    Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Pair(Zero,
     Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit)))));
 
 val TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))) = typeof' [] [] singletonList;
 
 val natlistCons =
-    Lam("natAndNatlist", Prod(Nat, natlist),
+    Fn("natAndNatlist", Prod(Nat, natlist),
         Fold(natlist,
              PlusRight(
                  Plus(Unit, Prod(Nat, natlist)),
@@ -604,11 +604,11 @@ val natlistCons =
             )
        );
 
-val Lam("natAndNatlist",Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))),
+val Fn("natAndNatlist",Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))),
      Fold (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))),
         PlusRight
           (Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))),
-           Var ("natAndNatlist", 0)))) : Ast.Exp =
+           Var ("natAndNatlist", 0)))) : Ast.exp =
     parseFile "/home/evan/thon/examples/natlistcons.thon";
 
 val parsedNatlistCons =
@@ -616,22 +616,22 @@ val parsedNatlistCons =
 val true = (parsedNatlistCons = natlistCons);
 
 val Arr (Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))),
-         TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))) : Typ =
+         TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))) : typ =
     typeof' [] [] natlistCons;
 
-val deducedSingleListAppResType = typeof' [] [] (App(natlistCons, Tuple(Zero, nilNatList)));
+val deducedSingleListAppResType = typeof' [] [] (App(natlistCons, Pair(Zero, nilNatList)));
 val true = (deducedSingleListAppResType = natlist);
 
 val deducedNatlist = typeof' [] [] nilNatList;
 val true = (natlist = deducedNatlist);
 
-val Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))) : Typ =
+val Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))) : typ =
     typeof' [] [] (Unfold(nilNatList));
 
 val PlusLeft
-    (Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))),TmUnit) : Exp = eval (Unfold(nilNatList));
+    (Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))),TmUnit) : exp = eval (Unfold(nilNatList));
 
-val isnil = Lam("x", natlist, Case(Unfold(Var ("x", 0)), "l", Succ Zero, "r", Zero));
+val isnil = Fn("x", natlist, Case(Unfold(Var ("x", 0)), "l", Succ Zero, "r", Zero));
 val Nat = typeof' [] [] (App(isnil, nilNatList));
 (* isnil nilNatList == 1. *)
 val Succ Zero = eval (App(isnil, nilNatList));
@@ -657,61 +657,61 @@ val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), "l", Var ("l", 0)
 (* but the chapter on existential types in TAPL suggests otherwise. *)
 
 (* That's why we require an explicit type annotation from the programmer. *)
-val Arr(Nat, Nat) = typeof' [] [NONE] (Lam("x", Nat, Zero));
+val Arr(Nat, Nat) = typeof' [] [NONE] (Fn("x", Nat, Zero));
 val Arr(TypVar ("t", 0), TypVar ("t", 0)) = abstractOutType "t" Nat (Arr(Nat, Nat));
 val All("t", Arr(TypVar ("t", 0), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (All("t", Arr(TypVar ("t", 0), Nat)));
 
-val e0 = Impl(Nat, Lam("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0)));
+val e0 = Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0)));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e0;
 
-val Impl (Nat,Lam("x",Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))) : Exp =
+val Impl (Nat,Fn("x",Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))) : exp =
     parse "impl (0 -> 0) with nat as \\ x : nat -> Z";
 
-val Impl (Nat,Lam ("x", Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))) : Exp =
+val Impl (Nat,Fn ("x", Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))) : exp =
     run "impl (0 -> 0) with nat as \\ x : nat -> Z";
 
 val Impl
     (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-     Lam("l",TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-        Zero),Arr (TypVar ("t",0),TypVar ("t",0))) : Ast.Exp =
+     Fn("l",TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
+        Zero),Arr (TypVar ("t",0),TypVar ("t",0))) : Ast.exp =
     parse "impl (0 -> 0) with (u natlist. (unit |  (nat * natlist))) as \\ l : (u natlist. (unit |  (nat * natlist))) -> Z";
 
-val Use (Impl (Nat,Lam ("x",Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))),
-         "pkg", "s", Var ("pkg",0)) : Exp =
+val Use (Impl (Nat,Fn ("x",Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))),
+         "pkg", "s", Var ("pkg",0)) : exp =
     parse "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)";
 
 val Zero = run "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)"
            handle ClientTypeCannotEscapeClientScope => Zero;
 
 
-val e1 = Impl(Nat, Lam("x", Nat, Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t", 0)));
+val e1 = Impl(Nat, Fn("x", Nat, Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t", 0)));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e1;
-val e2 = Impl(Arr(Nat, Nat), Lam("x", Arr(Nat, Nat), Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t", 0)));
+val e2 = Impl(Arr(Nat, Nat), Fn("x", Arr(Nat, Nat), Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t", 0)));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e2;
-val e4 = Impl(All("t", Nat), Lam("x", All("t", Nat), Zero), Arr(TypVar ("t", 0), Nat));
+val e4 = Impl(All("t", Nat), Fn("x", All("t", Nat), Zero), Arr(TypVar ("t", 0), Nat));
 val Some("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] e4
 
-val e5 = Impl(Nat, Lam("x", All("t", Nat), Zero), Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)));
+val e5 = Impl(Nat, Fn("x", All("t", Nat), Zero), Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)));
 val Some("t",Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0))) = typeof' [] [] e5
 
-val t5 = typeof' [] [] (Lam("x", All("t", Nat), Zero));
+val t5 = typeof' [] [] (Fn("x", All("t", Nat), Zero));
 val (Arr(All ("t", Nat), Nat)) = t5;
 val Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)) = abstractOutType "t" Nat (Arr(All ("t", Nat), Nat));
 
-val f = Lam("x", Arr(Nat, Nat), Zero);
-val g = Lam ("x", Nat,Succ (Var ("x", 0)));
+val f = Fn("x", Arr(Nat, Nat), Zero);
+val g = Fn ("x", Nat,Succ (Var ("x", 0)));
 val pkg = Impl(Arr(Nat, Nat), f, Arr(TypVar ("t", 0), Nat));
 val Some ("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] pkg;
 
-val Some("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (Impl(Nat, Lam("x", Nat, Zero), Arr(TypVar ("t", 0), Nat)));
-val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] (Impl(Nat, Lam("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0))));
-val Nat = typeof' [] [] (Impl(Nat, Lam("x", Nat, Zero), TypVar ("t", 0))) handle IllTyped => Nat;
+val Some("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), Nat)));
+val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0))));
+val Nat = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), TypVar ("t", 0))) handle IllTyped => Nat;
 
-val zeroFnPkg = Impl(Nat, Lam("x", Nat, Zero), Arr(TypVar ("t", 0), Nat));
-val zeroFnPkg2 = Impl(Nat, Lam("x", Nat, Zero), Arr(Nat, TypVar ("t", 0)));
+val zeroFnPkg = Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), Nat));
+val zeroFnPkg2 = Impl(Nat, Fn("x", Nat, Zero), Arr(Nat, TypVar ("t", 0)));
 
 (* Define identity package; can convert Nat to internal repr type and back. *)
-val idid = Tuple(Lam("x", Nat, Var ("x", 0)), Lam("x", Nat, Var ("x", 0)));
+val idid = Pair(Fn("x", Nat, Var ("x", 0)), Fn("x", Nat, Var ("x", 0)));
 val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typeof' [] [] idid;
 val inoutpkg = Impl(Nat, idid, Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat)));
 val Some("t",Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))) = typeof' [] [] inoutpkg;
@@ -719,20 +719,20 @@ val Nat = typeof' [] [] (Use(inoutpkg, "pkg", "s", App(ProdRight(Var ("x", 0)), 
 val true = isval inoutpkg;
 (* Dynamics *)
 val App
-    (ProdRight (Tuple (Lam ("x", Nat,Var ("x", 0)),Lam ("x", Nat,Var ("x", 0)))),
-     App (ProdLeft (Tuple (Lam ("x", Nat,Var ("x", 0)),Lam ("x", Nat,Var ("x", 0)))),Zero))
+    (ProdRight (Pair (Fn ("x", Nat,Var ("x", 0)),Fn ("x", Nat,Var ("x", 0)))),
+     App (ProdLeft (Pair (Fn ("x", Nat,Var ("x", 0)),Fn ("x", Nat,Var ("x", 0)))),Zero))
     = step (Use(inoutpkg, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 
 val Zero = eval (Use(inoutpkg, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 
-val leftandback = Tuple(Lam("x", Nat, Tuple(Var ("x", 0), Zero)), Lam("x", Prod(Nat, Nat), ProdLeft (Var ("x", 0))));
+val leftandback = Pair(Fn("x", Nat, Pair(Var ("x", 0), Zero)), Fn("x", Prod(Nat, Nat), ProdLeft (Var ("x", 0))));
 val Prod (Arr (Nat,Prod (Nat, Nat)),Arr (Prod (Nat, Nat),Nat)) = typeof' [] [] leftandback;
 val inoutpkg2 = Impl(Prod(Nat, Nat), leftandback, Prod (Arr (Nat,TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)));
 val Some("t",Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))) = typeof' [] [] inoutpkg2;
 val Nat = typeof' [] [] (Use(inoutpkg2, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 val Zero = eval (Use(inoutpkg2, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 
-val double = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ (Succ (Var ("x", 0)))));
+val double = Fn("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ (Succ (Var ("x", 0)))));
 val Succ (Succ Zero) = eval (App(double, (Succ Zero)));
 
 val All("t", TypVar ("t", 1)) = abstractOutType "t" Nat (All("t", Nat));
@@ -742,20 +742,20 @@ val Some("t",Arr(TypVar ("t", 1), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (S
 val All("t", Arr(TypVar ("t", 1), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (All("t", Arr(Arr(Nat, Nat), Nat)));
 val Some("t",All("t", Arr(TypVar ("t", 2), Nat))) = abstractOutType "t" (Arr(Nat, Nat)) (Some("t",All("t", Arr(Arr(Nat, Nat), Nat))));
 
-val polymorphicIdFn = TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0)));
+val polymorphicIdFn = TypFn("t", Fn("x", TypVar ("t", 0), Var ("x", 0)));
 
-val Lam("x", Nat, Var ("x", 0)) = step (TypApp(Nat, polymorphicIdFn));
-val Lam("x", Arr(Nat, Nat), Var ("x", 0)) = step (TypApp(Arr(Nat, Nat), polymorphicIdFn));
-val TypAbs ("t", Lam ("x", TypVar ("t", 0), Var ("x", 0))) = step (TypApp(Nat, TypAbs("t", polymorphicIdFn)))
-val TypApp(Nat, TypAbs("t", (Lam ("x", TypVar ("t", 0), Var ("x", 0))))) = step (TypApp(Nat, TypApp(Nat, TypAbs("t", polymorphicIdFn))))
-val TypAbs("t", Lam("x", Arr(Nat, TypVar ("t", 0)), Var ("x", 0))) = step (TypApp(Nat, TypAbs("t", TypAbs("t", Lam("x", Arr(TypVar ("t", 1), TypVar ("t", 0)), Var ("x", 0))))));
-val Lam("x", Nat, Var ("x", 0)) = eval (TypApp(Nat, TypApp(Nat, TypAbs("t", polymorphicIdFn))));
+val Fn("x", Nat, Var ("x", 0)) = step (TypApp(Nat, polymorphicIdFn));
+val Fn("x", Arr(Nat, Nat), Var ("x", 0)) = step (TypApp(Arr(Nat, Nat), polymorphicIdFn));
+val TypFn ("t", Fn ("x", TypVar ("t", 0), Var ("x", 0))) = step (TypApp(Nat, TypFn("t", polymorphicIdFn)))
+val TypApp(Nat, TypFn("t", (Fn ("x", TypVar ("t", 0), Var ("x", 0))))) = step (TypApp(Nat, TypApp(Nat, TypFn("t", polymorphicIdFn))))
+val TypFn("t", Fn("x", Arr(Nat, TypVar ("t", 0)), Var ("x", 0))) = step (TypApp(Nat, TypFn("t", TypFn("t", Fn("x", Arr(TypVar ("t", 1), TypVar ("t", 0)), Var ("x", 0))))));
+val Fn("x", Nat, Var ("x", 0)) = eval (TypApp(Nat, TypApp(Nat, TypFn("t", polymorphicIdFn))));
 
 val Succ Zero = eval (App(TypApp(Nat, polymorphicIdFn), Succ(Zero)));
 
-val TypAbs("t", Zero) = step (TypAbs("t", Zero));
-val true = isval (Lam("x", Nat, TypAbs("t", Zero)));
-val (TypAbs ("t", Zero)) = step (App(Lam("x", Nat, TypAbs("t", Zero)), Zero));
+val TypFn("t", Zero) = step (TypFn("t", Zero));
+val true = isval (Fn("x", Nat, TypFn("t", Zero)));
+val (TypFn ("t", Zero)) = step (App(Fn("x", Nat, TypFn("t", Zero)), Zero));
 
 val Nat = substType Nat (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
 val Arr(Nat, Nat) = substType (Arr(Nat, Nat)) (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
@@ -769,24 +769,24 @@ val All("t", Arr(Nat, (All("t", Nat)))) = substType (All("t", Nat)) (All("t", Ar
 val All("t", Arr(Nat, (Some("t",Nat)))) = substType (Some("t",Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
 
 val Nat = typeof' [] [] (TypApp(TypVar ("t", 0), Zero)) handle IllTyped => Nat;
-val All("t", Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (TypAbs("t", Lam("x", TypVar ("t", 0), Zero)));
-val Arr(Arr(Nat, Nat), Nat) = typeof' [] [] (TypApp(Arr(Nat, Nat), (TypAbs("t", Lam("x", TypVar ("t", 0), Zero)))));
-val Nat = typeof' [] [] (TypApp(Arr(Nat, Nat), (TypAbs("t", Lam("x", TypVar ("t", 1), Zero))))) handle IllTypedMsg _ => Nat;
+val All("t", Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (TypFn("t", Fn("x", TypVar ("t", 0), Zero)));
+val Arr(Arr(Nat, Nat), Nat) = typeof' [] [] (TypApp(Arr(Nat, Nat), (TypFn("t", Fn("x", TypVar ("t", 0), Zero)))));
+val Nat = typeof' [] [] (TypApp(Arr(Nat, Nat), (TypFn("t", Fn("x", TypVar ("t", 1), Zero))))) handle IllTypedMsg _ => Nat;
 
 
-val All("t", Nat) = typeof' [] [] (TypAbs("t", Zero)); (* polymorphic zero *)
+val All("t", Nat) = typeof' [] [] (TypFn("t", Zero)); (* polymorphic zero *)
 (* polymorphic id function :) *)
 val All("t", Arr(TypVar ("t", 0), TypVar ("t", 0))) =
-    typeof' [] [] (TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0))));
+    typeof' [] [] (TypFn("t", Fn("x", TypVar ("t", 0), Var ("x", 0))));
 val Arr(Nat, All("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
-    typeof' [] [] (Lam("x", Nat, TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0)))));
+    typeof' [] [] (Fn("x", Nat, TypFn("t", Fn("x", TypVar ("t", 0), Var ("x", 0)))));
 val Arr(Nat, All("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))) =
-    typeof' [] [] (Lam("x", Nat, TypAbs("t", Lam("x", TypVar ("t", 0), Var ("x", 0)))));
+    typeof' [] [] (Fn("x", Nat, TypFn("t", Fn("x", TypVar ("t", 0), Var ("x", 0)))));
 (* Nested type variables *)
 val All("t", All("t", Arr(TypVar ("t", 1),Nat))) =
-    typeof' [] [] (TypAbs("t", TypAbs("t", Lam("x", TypVar ("t", 1), Zero))))
+    typeof' [] [] (TypFn("t", TypFn("t", Fn("x", TypVar ("t", 1), Zero))))
 val All("t", All("t", Arr(TypVar ("t", 1), TypVar ("t", 1)))) =
-    typeof' [] [] (TypAbs("t", TypAbs("t", Lam("x", TypVar ("t", 1), Var ("x", 0)))))
+    typeof' [] [] (TypFn("t", TypFn("t", Fn("x", TypVar ("t", 1), Var ("x", 0)))))
 
 val true = istype [] Nat;
 val false = istype [] (TypVar ("t", 0)); (* Unbound type variable *)
@@ -801,34 +801,34 @@ val true = istype [] (All("t", All("t", Arr(Nat, TypVar ("t", 1))))); (* Bound *
 
 val true = isval Zero;
 val true = isval (Succ(Zero));
-val true = isval (Lam("x", Nat, Succ(Zero)));
-val true = isval (Lam("x", Nat, Zero));
-val true = isval (Lam("x", Nat, Succ(Var("x", 0))));
-val false = isval (App(Lam("x", Nat, Zero), Zero));
+val true = isval (Fn("x", Nat, Succ(Zero)));
+val true = isval (Fn("x", Nat, Zero));
+val true = isval (Fn("x", Nat, Succ(Var("x", 0))));
+val false = isval (App(Fn("x", Nat, Zero), Zero));
 
 val Zero = subst Zero Zero;
 val Succ Zero = subst Zero (Succ Zero);
-val (Lam("x", Nat, Var ("x", 0))) = subst (Succ Zero) (Lam("x", Nat, Var ("x", 0)));
+val (Fn("x", Nat, Var ("x", 0))) = subst (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
 val (Var ("y", 0)) = subst (Succ Zero) (Var ("y", 1));
-val Lam("x", Nat, Var ("x", 0)) = subst (Succ Zero) (Lam("x", Nat, Var ("x", 0)));
-val Lam("x", Nat, (Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Var("y", 1)));
-val App(Lam("x", Nat, Succ Zero), (Succ Zero)) =
-    subst (Succ Zero) (App(Lam("x", Nat, Var ("y", 1)), (Var ("x", 0))));
+val Fn("x", Nat, Var ("x", 0)) = subst (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
+val Fn("x", Nat, (Succ Zero)) = subst (Succ Zero) (Fn("x", Nat, Var("y", 1)));
+val App(Fn("x", Nat, Succ Zero), (Succ Zero)) =
+    subst (Succ Zero) (App(Fn("x", Nat, Var ("y", 1)), (Var ("x", 0))));
 
-val Lam("y", Nat, Zero) = subst Zero (Lam("y", Nat, Var ("x", 1)));
-val Lam("x", Nat, Succ Zero) = subst (Succ Zero) (Lam("x", Nat, Var ("x", 1)));
-val Lam("x", Nat, Lam("x", Nat, Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Lam("x", Nat, Var ("z", 2))));
-val Lam("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = subst (Succ Zero) (Lam("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
+val Fn("y", Nat, Zero) = subst Zero (Fn("y", Nat, Var ("x", 1)));
+val Fn("x", Nat, Succ Zero) = subst (Succ Zero) (Fn("x", Nat, Var ("x", 1)));
+val Fn("x", Nat, Fn("x", Nat, Succ Zero)) = subst (Succ Zero) (Fn("x", Nat, Fn("x", Nat, Var ("z", 2))));
+val Fn("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = subst (Succ Zero) (Fn("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
 
 
-val Lam("x", Nat, Rec (Zero,
+val Fn("x", Nat, Rec (Zero,
                        Var ("x",0),
-                       "prev", Zero)) : Exp =
-    subst Zero (Lam("x", Nat, Rec(Var ("x", 1),
+                       "prev", Zero)) : exp =
+    subst Zero (Fn("x", Nat, Rec(Var ("x", 1),
                                   Var ("x", 0),
                                   "prev", Zero)));
-val Lam("x", Nat, Rec(Zero, Var ("x", 1), "prev", Zero)) = subst Zero (Lam("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
-val Rec(Zero, Zero, "prev", Zero) = step (App(Lam("x", Nat, Rec(Var ("x", 0), Var ("x", 0), "prev", Zero)), Zero));
+val Fn("x", Nat, Rec(Zero, Var ("x", 1), "prev", Zero)) = subst Zero (Fn("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
+val Rec(Zero, Zero, "prev", Zero) = step (App(Fn("x", Nat, Rec(Var ("x", 0), Var ("x", 0), "prev", Zero)), Zero));
 
 val Nat = get [Nat] 0;
 val Arr(Nat, Nat) = get [Nat, Arr(Nat, Nat)] 1;
@@ -842,46 +842,46 @@ val Arr(Nat, Nat) = typeof' [Arr(Nat, Nat)] [] (Var("x", 0));
 val Arr(Nat, Nat) = typeof' [Arr(Nat, Nat), Nat] [] (Var("x", 0));
 val Nat = typeof' [Arr(Nat, Nat), Nat] [] (Var("x", 1));
 
-val Arr(Nat, Nat) = typeof' [] [] (Lam("x", Nat, Zero));
-val Arr(Nat, Nat) = typeof' [] [] (Lam("x", Nat, Succ(Zero)));
+val Arr(Nat, Nat) = typeof' [] [] (Fn("x", Nat, Zero));
+val Arr(Nat, Nat) = typeof' [] [] (Fn("x", Nat, Succ(Zero)));
 
-val Nat = typeof' [] [] (App(Lam("x", Nat, Zero), Zero));
+val Nat = typeof' [] [] (App(Fn("x", Nat, Zero), Zero));
 
-val Nat = typeof' [] [] (App(Lam("x", Nat, Succ(Zero)), Lam("x", Nat, Zero)))
+val Nat = typeof' [] [] (App(Fn("x", Nat, Succ(Zero)), Fn("x", Nat, Zero)))
           handle IllTyped => Nat;
 
 val timesTwo = Rec(Succ(Zero), Zero, "prev", Succ(Succ(Var("prev", 0))));
 val Nat = typeof' [] [] timesTwo;
 
 val Arr(Arr(Nat, Nat), Nat) =
-    typeof' [] [] (Lam("f", Arr(Nat, Nat), App(Var("f", 0), Zero)));
+    typeof' [] [] (Fn("f", Arr(Nat, Nat), App(Var("f", 0), Zero)));
 
 val Arr(Nat, Nat) = typeof' [] [] (Rec(Zero,
-                                       Lam("x", Nat, Succ(Zero)),
-                                       "prev", Lam("x", Nat, Succ(Var("x", 0)))));
+                                       Fn("x", Nat, Succ(Zero)),
+                                       "prev", Fn("x", Nat, Succ(Var("x", 0)))));
 val Arr(Nat, Nat) = typeof' [] [] (Rec(Succ(Zero),
-                                       Lam("x", Nat, Succ(Zero)),
-                                       "prev", Lam("x", Nat, Succ(Var("x", 0)))));
+                                       Fn("x", Nat, Succ(Zero)),
+                                       "prev", Fn("x", Nat, Succ(Var("x", 0)))));
 
 val Arr(Nat, Nat) = typeof' [Nat] [] (Rec(Var("dne", 0),
-                                       Lam("x", Nat, Succ(Zero)),
-                                       "prev", Lam("x", Nat, Succ(Var("x", 0)))));
+                                       Fn("x", Nat, Succ(Zero)),
+                                       "prev", Fn("x", Nat, Succ(Var("x", 0)))));
 
 
-val Nat = typeof' [] [] (App(Lam("f", Arr(Nat, Nat), App(Var("f", 0), Zero)), Zero)) handle IllTyped => Nat;
+val Nat = typeof' [] [] (App(Fn("f", Arr(Nat, Nat), App(Var("f", 0), Zero)), Zero)) handle IllTyped => Nat;
 
 (* Ill-formed; first param must be Nat. *)
-val Nat = typeof' [] [] (Rec(Lam("x", Nat, Zero),
-                               Lam("x", Nat, Succ(Zero)),
-                               "prev", Lam("x", Nat, Succ(Var("x", 0))))) handle Bind => Nat;
+val Nat = typeof' [] [] (Rec(Fn("x", Nat, Zero),
+                               Fn("x", Nat, Succ(Zero)),
+                               "prev", Fn("x", Nat, Succ(Var("x", 0))))) handle Bind => Nat;
 
 (* Ill-formed; base case type does not match rec case type. *)
 val Nat = (typeof' [] [] (Rec(Zero,
                                 Succ(Zero),
-                                "prev", Lam("x", Nat, Succ(Zero))))
+                                "prev", Fn("x", Nat, Succ(Zero))))
           handle IllTyped => Nat);
 
-val Arr(Nat, Nat) = typeof' [] [] (Lam("x", (TypVar ("t", 0)), Zero)) handle IllTypedMsg _ => Arr(Nat, Nat);
+val Arr(Nat, Nat) = typeof' [] [] (Fn("x", (TypVar ("t", 0)), Zero)) handle IllTypedMsg _ => Arr(Nat, Nat);
 
 val Succ(Rec(Zero, Zero, "prev", Succ(Var("prev", 0)))) = step (Rec(Succ(Zero), Zero, "prev", Succ(Var ("prev", 0))));
 
@@ -894,140 +894,140 @@ val Succ(Succ(Succ(Succ(Zero)))) =
     eval (Rec(Succ(Succ(Zero)), Zero, "prev", Succ(Succ(Var ("prev", 0)))));
 
 val Succ(Succ(Succ(Succ(Zero)))) =
-    eval (Rec(App(Lam("x", Nat, Succ(Var ("x", 0))), Succ(Zero)),
+    eval (Rec(App(Fn("x", Nat, Succ(Var ("x", 0))), Succ(Zero)),
               Zero, "prev", Succ(Succ(Var ("prev", 0)))));
 
 val Zero = step Zero;
 val Succ(Zero) = step (Succ(Zero));
-val Lam("x", Nat, Zero) = step (Lam("x", Nat, Zero));
-val Succ Zero = step (App(Lam("x", Nat, Succ(Zero)), Zero));
-val Succ Zero = step (App(Lam("x", Nat, Succ(Var("x", 0))), Zero));
-val Succ (Succ Zero) = step (App(Lam("x", Nat, Succ(Var("x", 0))), Succ Zero));
-val Succ (Succ (Succ Zero)) = step (App(Lam("x", Nat, Succ(Var("x", 0))), Succ (Succ Zero)));
-val Succ (Succ (Succ Zero)) = step (App(Lam("x", Nat, Succ(Succ(Var("x", 0)))), Succ Zero));
+val Fn("x", Nat, Zero) = step (Fn("x", Nat, Zero));
+val Succ Zero = step (App(Fn("x", Nat, Succ(Zero)), Zero));
+val Succ Zero = step (App(Fn("x", Nat, Succ(Var("x", 0))), Zero));
+val Succ (Succ Zero) = step (App(Fn("x", Nat, Succ(Var("x", 0))), Succ Zero));
+val Succ (Succ (Succ Zero)) = step (App(Fn("x", Nat, Succ(Var("x", 0))), Succ (Succ Zero)));
+val Succ (Succ (Succ Zero)) = step (App(Fn("x", Nat, Succ(Succ(Var("x", 0)))), Succ Zero));
 (* Take in a nat -> nat and apply to zero. Input nat -> nat is Succ *)
-val App(Lam("x", Nat, Succ(Var("x", 0))), Zero) = step (App(Lam("x", Arr(Nat, Nat), App(Var("x", 0), Zero)),
-                                                  Lam("x", Nat, Succ(Var("x", 0)))));
-val Succ Zero = step (App(Lam("x", Nat, Succ(Var("x", 0))), Zero));
+val App(Fn("x", Nat, Succ(Var("x", 0))), Zero) = step (App(Fn("x", Arr(Nat, Nat), App(Var("x", 0), Zero)),
+                                                  Fn("x", Nat, Succ(Var("x", 0)))));
+val Succ Zero = step (App(Fn("x", Nat, Succ(Var("x", 0))), Zero));
 
-val Succ Zero = eval (App(Lam("x", Arr(Nat, Nat), App(Var("x", 0), Zero)),
-                          Lam("x", Nat, Succ(Var("x", 0)))));
+val Succ Zero = eval (App(Fn("x", Arr(Nat, Nat), App(Var("x", 0), Zero)),
+                          Fn("x", Nat, Succ(Var("x", 0)))));
 val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, "prev", Succ(Succ(Var ("prev", 0)))));
 
-val multByThree = Lam("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ(Succ(Succ(Var("prev", 0))))));
+val multByThree = Fn("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ(Succ(Succ(Var("prev", 0))))));
 
-val Lam ("n",Nat,Rec (Var ("n",0),Var ("n",0),"prev",Succ (Succ Zero))) =
+val Fn ("n",Nat,Rec (Var ("n",0),Var ("n",0),"prev",Succ (Succ Zero))) =
     parse "\\ n : nat -> rec n of Z -> n | prev -> S S Z ";
 
-val App (Lam ("n", Nat,Rec (Var ("n",0),Zero, "prev", Succ (Succ (Var ("prev", 0))))),Succ Zero) : Ast.Exp =
+val App (Fn ("n", Nat,Rec (Var ("n",0),Zero, "prev", Succ (Succ (Var ("prev", 0))))),Succ Zero) : Ast.exp =
     parse "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
 
 val (Succ (Succ Zero)) =
     run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
 
-val Succ (Succ (Succ (Succ Zero))) : Ast.Exp =
+val Succ (Succ (Succ (Succ Zero))) : Ast.exp =
     run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S S Z))";
 
 val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero));
 
-val TypAbs ("s", Lam("x",TypVar ("s", 0),Var ("x", 0))) : Ast.Exp =
+val TypFn ("s", Fn("x",TypVar ("s", 0),Var ("x", 0))) : Ast.exp =
     parse "poly s -> \\ x : s -> x";
 (* TODO also wrong *)
-val TypAbs("t", TypAbs ("t'",Lam ("x",Arr (TypVar ("t",1),TypVar ("t'",0)),Var ("x",0)))) = 
+val TypFn("t", TypFn ("t'",Fn ("x",Arr (TypVar ("t",1),TypVar ("t'",0)),Var ("x",0)))) = 
     parse "poly t -> poly t' -> \\ x : (t -> t') -> x";
-val TypApp (Nat,TypAbs ("s", Lam("x",TypVar ("s", 0),Var ("x",0)))) =
+val TypApp (Nat,TypFn ("s", Fn("x",TypVar ("s", 0),Var ("x",0)))) =
     parse "((poly s -> \\ x : s -> x) (nat))";
-val Lam ("x", Nat,Var ("x", 0)) : Ast.Exp =
+val Fn ("x", Nat,Var ("x", 0)) : Ast.exp =
     run "((poly s -> \\ x : s -> x) (nat))";
 
 val TypApp
     (Nat,
-     TypAbs("t",
-       (TypAbs ("t'", Lam("f",Arr (TypVar ("t", 1),TypVar ("t'", 0)),Var ("f",0))))))
-  : Ast.Exp =
+     TypFn("t",
+       (TypFn ("t'", Fn("f",Arr (TypVar ("t", 1),TypVar ("t'", 0)),Var ("f",0))))))
+  : Ast.exp =
     parse "((poly t -> poly t' -> \\ f : (t -> t') -> f) (nat))";
-val TypAbs ("t'", Lam ("f",Arr (Nat,TypVar ("t'",0)),Var ("f",0))) =
+val TypFn ("t'", Fn ("f",Arr (Nat,TypVar ("t'",0)),Var ("f",0))) =
     run "((poly t -> poly t' -> \\ f : (t -> t') -> f) (nat))";
 
-val Tuple (Zero,Succ Zero) : Ast.Exp =
+val Pair (Zero,Succ Zero) : Ast.exp =
     parse "(Z, S Z)";
 
-val Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero))) : Ast.Exp =
+val Pair (Zero,Pair (Succ Zero,Succ (Succ Zero))) : Ast.exp =
     parse "(Z, (S Z, S S Z))";
 
-val Lam ("x", Prod (Nat,Nat),Var("x", 0)) : Ast.Exp =
+val Fn ("x", Prod (Nat,Nat),Var("x", 0)) : Ast.exp =
     parse "\\ x : (nat * nat) -> x";
 
-val ProdLeft (Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero)))) : Ast.Exp =
+val ProdLeft (Pair (Zero,Pair (Succ Zero,Succ (Succ Zero)))) : Ast.exp =
     parse "fst (Z, (S Z, S S Z))";
-val ProdRight (Tuple (Zero,Tuple (Succ Zero,Succ (Succ Zero)))) : Ast.Exp =
+val ProdRight (Pair (Zero,Pair (Succ Zero,Succ (Succ Zero)))) : Ast.exp =
     parse "snd (Z, (S Z, S S Z))";
-val Zero : Ast.Exp =
+val Zero : Ast.exp =
     run "fst (Z, (S Z, S S Z))";
-val Succ Zero : Ast.Exp =
+val Succ Zero : Ast.exp =
     run "fst snd (Z, (S Z, S S Z))";
 
-val TypAbs ("s",Lam("x",All ("t'", TypVar ("t'",0)),Var ("x",0))) : Ast.Exp =
+val TypFn ("s",Fn("x",All ("t'", TypVar ("t'",0)),Var ("x",0))) : Ast.exp =
     parse "poly s -> \\ x : (all t'. t') -> x"
 
-val Lam ("pkg", Some ("t'",TypVar ("t'", 0)),Var ("pkg",0)) : Ast.Exp =
+val Fn ("pkg", Some ("t'",TypVar ("t'", 0)),Var ("pkg",0)) : Ast.exp =
     parse "\\ pkg : (some t'. t') -> pkg"
 
-val Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Var ("natOrFunc",0)) : Ast.Exp =
+val Fn ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Var ("natOrFunc",0)) : Ast.exp =
     parse "\\ natOrFunc : (nat | nat -> nat) -> natOrFunc"
 
-val Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Case (Var ("natOrFunc", 0),"l", Zero,"r", Succ Zero)) : Exp =
+val Fn ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Case (Var ("natOrFunc", 0),"l", Zero,"r", Succ Zero)) : exp =
     run "\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z"
 
 val App
-    (Lam ("natOrFunc", Plus (Nat,Arr (Nat,Nat)), Case (Var ("natOrFunc",0),"l", Zero,"r", Succ Zero)),
-     PlusLeft (Plus (Nat,Arr (Nat,Nat)),Zero)) : Ast.Exp =
+    (Fn ("natOrFunc", Plus (Nat,Arr (Nat,Nat)), Case (Var ("natOrFunc",0),"l", Zero,"r", Succ Zero)),
+     PlusLeft (Plus (Nat,Arr (Nat,Nat)),Zero)) : Ast.exp =
     parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
 
-val Zero : Exp =
+val Zero : exp =
     run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
 
-val Succ Zero: Exp =
+val Succ Zero: exp =
     run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (right (\\ x : nat -> Z) : (nat | nat -> nat)))";
 
-val Lam ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))), Var ("natOrFuncOrProd",0)) : Ast.Exp =
+val Fn ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))), Var ("natOrFuncOrProd",0)) : Ast.exp =
     parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"
 
-val Some ("t",Prod (TypVar ("t", 0),Prod (Arr (Prod (Nat,TypVar ("t", 0)),TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)))) : Typ =
+val Some ("t",Prod (TypVar ("t", 0),Prod (Arr (Prod (Nat,TypVar ("t", 0)),TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)))) : typ =
     typeof (parseFile "/home/evan/thon/examples/natlist.thon");
 
 val natList = (parseFile "/home/evan/thon/examples/natlist.thon");
 
-val Arr (Plus (Nat,Unit),Arr (Nat,Nat)) : Ast.Typ =
+val Arr (Plus (Nat,Unit),Arr (Nat,Nat)) : Ast.typ =
     typeof (parseFile "/home/evan/thon/examples/option.thon");
 
-val Lam
+val Fn
     ("x",Plus (Nat,Unit),
-     Lam
+     Fn
        ("y",Nat,Case (Var ("x",1),"somex",Var ("somex",0),"none",Var ("y",1))))
-  : Exp =
+  : exp =
     parseFile "/home/evan/thon/examples/option.thon";
 
-val Let ("x",Nat,Zero,Var ("x",0)) : Ast.Exp = parse "let x : nat = Z in x";
-val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.Exp =
+val Let ("x",Nat,Zero,Var ("x",0)) : Ast.exp = parse "let x : nat = Z in x";
+val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.exp =
     parse "let x : nat = Z in (let y : nat = S Z in x)";
-val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.Exp =
+val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.exp =
     parse "let x : nat = Z in let y : nat = S Z in x";
 
-val Zero : Ast.Exp = run "let x : nat = Z in x";
+val Zero : Ast.exp = run "let x : nat = Z in x";
 
-val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/nilisempty.thon";
+val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/nilisempty.thon";
 
-val Succ Zero : Ast.Exp = run "ifz Z of Z -> S Z | S prev -> Z";
-val Zero : Ast.Exp = run "ifz S Z of Z -> S Z | S prev -> prev";
+val Succ Zero : Ast.exp = run "ifz Z of Z -> S Z | S prev -> Z";
+val Zero : Ast.exp = run "ifz S Z of Z -> S Z | S prev -> prev";
 
-val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/decr.thon";
+val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/decr.thon";
 
-val Succ (Succ Zero) : Ast.Exp = runFile "/home/evan/thon/examples/add.thon";
-val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/sub.thon";
-val Zero : Ast.Exp = runFile "/home/evan/thon/examples/eq.thon";
+val Succ (Succ Zero) : Ast.exp = runFile "/home/evan/thon/examples/add.thon";
+val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/sub.thon";
+val Zero : Ast.exp = runFile "/home/evan/thon/examples/eq.thon";
 
-val Succ Zero : Ast.Exp = runFile "/home/evan/thon/examples/len.thon";
+val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/len.thon";
 
 val Fold
     (TyRec
@@ -1049,15 +1049,15 @@ val Fold
                     Plus
                       (Unit,
                        Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))))),
-        TmUnit)) : Ast.Exp = runFile "/home/evan/thon/examples/emptybst.thon";
+        TmUnit)) : Ast.exp = runFile "/home/evan/thon/examples/emptybst.thon";
 
-val bstType : Ast.Typ = typeof (parseFile "/home/evan/thon/examples/singletonbst.thon");
+val bstType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/singletonbst.thon");
 
 val TyRec
     ("node",Plus (Unit,Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))
-    : Ast.Typ = bstType;
+    : Ast.typ = bstType;
 
-val bstInsertType : Ast.Typ = typeof (parseFile "/home/evan/thon/examples/bst.thon");
+val bstInsertType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/bst.thon");
 val Arr(Nat, (Arr(bstType1, bstType2))) = bstInsertType;
 val true = (bstType = bstType1);
 

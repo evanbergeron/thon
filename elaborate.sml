@@ -1,5 +1,5 @@
 structure Elaborate : sig
-              val elaborate : Ast.Exp -> Ast.Exp
+              val elaborate : Ast.exp -> Ast.exp
           end =
 struct
 fun elaborate ast =
