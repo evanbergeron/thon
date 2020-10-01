@@ -1,0 +1,5 @@
+(* BUG currently parses as f (g (h Z)), should parse as f (g (h Z)) *)
+fun f : nat -> nat = \ x : nat -> x in
+fun g : nat -> nat = \ x : nat -> x in
+fun h : nat -> nat = \ x : nat -> x in
+(f g h Z)
