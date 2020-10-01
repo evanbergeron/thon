@@ -44,6 +44,8 @@ sig
       | Unfold of exp
       | TmUnit
 
+    val expMap : (exp -> exp) -> exp -> exp
+
   structure Print :
   sig
     val pp : exp -> string
@@ -95,6 +97,36 @@ struct
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
+
+    fun expMap f e =
+        case e
+         of  Zero => f Zero
+           | TmUnit => f TmUnit
+           | Var (name, n)  => f (Var(name, n))
+           | Succ e' => Succ (f e')
+           | ProdLeft e' => ProdLeft(f e')
+           | ProdRight e' => ProdRight(f e')
+           | PlusLeft(t, e') => PlusLeft(t, f e')
+           | PlusRight(t, e') => PlusRight(t, e')
+           | Case(c, lname, l, rname, r) =>
+             Case(f c, lname, f l, rname, f r)
+           | Fn(argName, t, f') => Fn(argName, t, (f f'))
+           | Let(varname, vartype, varval, varscope) =>
+             Let(varname, vartype, (f varval), (f varscope))
+           | App(f', n) => App((f f'), f n)
+           | Ifz(i, t, prev, e) => Ifz(f i, f t, prev, f e)
+           | Rec(i, baseCase, prevCaseName, recCase) =>
+             Rec(f i, f baseCase, prevCaseName, f recCase)
+           | Fix(name, t, e') => Fix(name, t, f e')
+           | TypFn (name, e') => TypFn (name, f e')
+           | TypApp (appType, e') => TypApp(appType, f e')
+           | Impl(reprType, pkgImpl, t) => Impl(reprType, f pkgImpl, t)
+           | Use(pkg, clientName, typeName, client) =>
+             Use(f pkg, clientName, typeName, f client)
+           | Pair(l, r) => Pair(f l, f r)
+           | Fold(t, e') => Fold(t, (f e'))
+           | Unfold(e') => Unfold(f e')
+
 
   structure Print =
   struct
