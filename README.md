@@ -18,7 +18,7 @@ in
 ```
 
 thon has natural numbers, functions, recursion, binary product and sum
-types, parametric polymorphism, existential packages (a formalization of
+types, polymorphism, existential packages (a formalization of
 interfaces), and recursive types.
 
 ## natural numbers
@@ -74,11 +74,10 @@ let x : nat = Z in x
 ```
 binds the name `x` in the expression following the `in` keyword.
 
-## parametric polymorphism
+## polymorphism
 
-Parametric polymorphism lets us reuse code you wrote for many
-different types, with the guarantee that the code will behave the
-same for all types.
+Polymorphism lets us reuse code you wrote for many different types,
+with the guarantee that the code will behave the same for all types.
 
 ```
 poly t -> \ x : t -> x
@@ -108,14 +107,14 @@ We have two implementations with two separate implementation
 types. The first just holds on to the number.
 ```
 ((*set*) \ x : nat -> x,
-(*get*) \ x : nat -> x)
+ (*get*) \ x : nat -> x)
 ```
 The second stores in the number in a tuple (for no real good reason -
 you didn't write this code, it's not your fault it does it this way).
 
 ```
 ((*set*) \ x : nat -> (x, Z),
-(*get*) \ tup : (nat * nat) -> fst tup)
+ (*get*) \ tup : (nat * nat) -> fst tup)
 ```
 
 (Disclaimer, the syntax here needs to be fixed a bit still, it was
@@ -125,7 +124,7 @@ couple more names through...)
 Now each of these implementations can be packed away with the syntax
 
 ```
-impl (nat -> t, t -> nat) with nat as
+impl some t. ((nat -> t) * (t -> nat)) with nat as
 (
     ((*set*) \ x : nat -> x,
     (*get*) \ x : nat -> x)
@@ -134,7 +133,7 @@ impl (nat -> t, t -> nat) with nat as
 and
 
 ```
-impl (nat -> t, t -> nat) with (nat * nat) as
+impl some t. ((nat -> t) * (t -> nat)) with (nat, nat) as
 (
     ((*set*) \ x : nat -> (x, Z),
     (*get*) \ tup : (nat * nat) -> fst tup)
@@ -152,28 +151,21 @@ use (...either implementation...) as (pkg, t) in
 (... some use of pkg ...)
 ```
 
-Still TODO for me - the `impl` expression need to be clear about what
-the abstracted-over type name is. This was fine back when we just
-specified De Bruijin indices in the typename... but now we need to
-define a type variable name, just like we do for functions.
-
 ## recursive types
 
-`u.(unit | (nat * 0))` is the type of lists natural numbers. The `u`
-is an approximation of the fancy type theory lowercase mu. Eventually
-this will be more reasonable.
+`data nats = (unit | (nat * nats))` is the type of lists natural numbers. 
 
 ```
-fold u . (unit | (nat * 0))
-with left unit : (unit |  (nat * (u . (unit | (nat * 0)))))
+fold data nats = (unit | (nat * nats))
+with left unit : (unit | (nat * (data nats = (unit | (nat * nats)))))
 ```
 
-is the empty list of natural numbers. Haha I will add better syntax for this over time...
+is the empty list of natural numbers.
 
 ```
-\ (nat * (u. (unit |  (nat * 0)))) ->
-   fold u.(unit |  (nat * 0)) with
-   right 0 : (unit | (nat * (u. (unit |  (nat * 0)))))
+\ (nat * (data nats = (unit | nat * nats))) ->
+   fold data nats = (unit | nat * nats) with
+   right 0 : (unit | nat * (data nats = (unit | nat * nats)))
 ```
 
 is a function that takes a pair (nat, natlist) and prepends nat to natlist.
@@ -210,30 +202,30 @@ I've written in thon is available through the git repo.
 let isone : nat -> nat = 
   \ n : nat ->
     ifz n of
-      Z -> Z (*true*)
+      Z -> Z (*false*)
     | S p -> ifz p of Z -> S Z | S p -> Z
-in let iseven : nat -> nat = fix rc : nat -> nat in
+in fun iseven : nat -> nat =
   \ n : nat ->
     ifz n of
       Z -> S Z (*true*)
-    | S p -> ifz (rc p) of Z -> S Z | S p -> Z
-in let divbytwo : nat -> nat = fix rc : nat -> nat in
+    | S p -> ifz (iseven p) of Z -> S Z | S p -> Z
+in fun divbytwo : nat -> nat =
   \ n : nat ->
     ifz n of
       Z -> Z
-    | S p -> ifz p of Z -> Z | S p' -> (S (rc p'))
-in let multbythree : nat -> nat =
+    | S p -> ifz p of Z -> Z | S p' -> (S (divbytwo p'))
+in fun multbythree : nat -> nat =
   \ n : nat ->
-    rec n of
+    ifz n of
       Z -> Z
-   | prevRec -> S S S prevRec
-in let collatz : nat -> nat = fix rc : nat -> nat in
+   | S nminusone -> S S S (multbythree nminusone)
+in fun collatz : nat -> nat =
   \ n : nat ->
     ifz (isone n) of
       Z -> (
         ifz (iseven n) of
-          Z -> rc (S (multbythree n))
-        | S p -> (rc (divbytwo n))
+          Z -> collatz (S (multbythree n))
+        | S p -> (collatz (divbytwo n))
       )
     | S p -> (S Z)
 in (collatz (S S Z))
