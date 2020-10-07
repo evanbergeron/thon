@@ -140,12 +140,25 @@ Both of these expression have type `((nat -> T) * (T -> nat))` for
 some type `T`. Note this is an existential claim, hence the name
 existential packages.
 
-These implementations can be used interchangably by saying
+An implementation can be used as follows:
 
 ```
-use (...either implementation...) as (pkg, t) in
-(... some use of pkg ...)
+let setget : some t. ((nat -> t) * (t -> nat)) =
+    (impl some t. ((nat -> t) * (t -> nat)) with nat as
+    (
+        ((*set*) \ x : nat -> x,
+        (*get*) \ x : nat -> x)
+     ))
+in use setget as (sg, t) in
+let set : (nat -> t) = fst sg in
+let get : (t -> nat) = snd sg in
+let s : t = set (S S Z) in
+let g : nat = get s in
+g
 ```
+
+Note that since the type variable `t` declared in the `use` clause is
+abstract, we can equivalently use the other implementation.
 
 ## recursive types
 

@@ -162,7 +162,7 @@ fun substTypeInExp' srcType dstExp bindingDepth =
             A.Use(substTypeInExp' srcType pkg bindingDepth,
                   clientName,
                   typeName,
-                  substTypeInExp' srcType client (bindingDepth+1)) (*inds type var*)
+                  substTypeInExp' srcType client (bindingDepth+1)) (*binds type var*)
        | A.Fold(t, e') => A.Fold(substType' srcType t bindingDepth,
                              substTypeInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
        | A.Unfold(e') => A.Unfold(substTypeInExp' srcType e' bindingDepth)
@@ -256,7 +256,7 @@ fun setDeBruijnIndex e varnames typnames =
             setDeBruijnIndex pkg varnames typnames,
             clientName,
             typeName,
-            setDeBruijnIndex client (clientName::varnames) typnames) (* TODO need a type name still *)
+            setDeBruijnIndex client (clientName::varnames) (typeName::typnames))
        | A.TypApp (appType, e) =>
             A.TypApp (setDeBruijnIndexInType appType varnames typnames,
                       setDeBruijnIndex e varnames typnames)
@@ -1078,8 +1078,7 @@ val zerobst = parseFile "/home/evan/thon/examples/singletonbst.thon";
 val appbst = eval (A.App(A.App(bstinsert, A.Zero), emptybst));
 val true = (zerobst = appbst);
 
-val setget = parseFile "/home/evan/thon/examples/setget.thon";
-val Some ("t",Prod (Arr (Nat,TypVar ("t",0)),Arr (TypVar ("t",0),Nat))) = typeof setget;
+val Succ (Succ Zero) = runFile "/home/evan/thon/examples/setget.thon";
 
 in
 ()

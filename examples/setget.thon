@@ -1,5 +1,12 @@
-impl some t. ((nat -> t) * (t -> nat)) with nat as
-(
-    ((*set*) \ x : nat -> x,
-    (*get*) \ x : nat -> x)
-)
+let setget : some t. ((nat -> t) * (t -> nat)) =
+    (impl some t. ((nat -> t) * (t -> nat)) with nat as
+    (
+        ((*set*) \ x : nat -> x,
+        (*get*) \ x : nat -> x)
+     ))
+in use setget as (sg, t) in
+let set : (nat -> t) = fst sg in
+let get : (t -> nat) = snd sg in
+let s : t = set (S S Z) in
+let g : nat = get s in
+g
