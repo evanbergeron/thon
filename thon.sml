@@ -360,12 +360,13 @@ fun typeof' ctx typCtx e =
          if not (istype [] reprType) then raise IllTyped else
          (* pkgType : [reprType/A.TypVar 0](t') *)
          let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
+             val A.Some(name, pkgType') = pkgType
          in
-             if not (typeEq (abstractOutType "t" (* BUG *) reprType deducedPkgType)
-                            (abstractOutType "t" (* BUG *) reprType pkgType)) then
+             if not (typeEq (abstractOutType name reprType deducedPkgType)
+                            (abstractOutType name reprType pkgType')) then
                  raise IllTyped
              else
-                 A.Some("t" (* BUG *), pkgType)
+                 pkgType
          end
        | A.Use (pkg, clientName, typeName, client) =>
          let val A.Some(name, r) = typeof' ctx typCtx pkg
@@ -661,37 +662,38 @@ val Arr(Nat, Nat) = typeof' [] [NONE] (Fn("x", Nat, Zero));
 val Arr(TypVar ("t", 0), TypVar ("t", 0)) = abstractOutType "t" Nat (Arr(Nat, Nat));
 val All("t", Arr(TypVar ("t", 0), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (All("t", Arr(TypVar ("t", 0), Nat)));
 
-val e0 = Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0)));
+val e0 = Impl(Nat, Fn("x", Nat, Zero), Some("t", Arr(TypVar ("t", 0), TypVar ("t", 0))));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e0;
 
-val Impl (Nat,Fn("x",Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))) : exp =
-    parse "impl (0 -> 0) with nat as \\ x : nat -> Z";
+val Impl (Nat,Fn ("x",Nat,Zero),Some ("t",Arr (TypVar ("t",0),TypVar ("t",0)))) =
+    parse "impl (some t. t -> t) with nat as \\ x : nat -> Z";
 
-val Impl (Nat,Fn ("x", Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))) : exp =
-    run "impl (0 -> 0) with nat as \\ x : nat -> Z";
+val Impl (Nat,Fn ("x",Nat,Zero),Some ("t",Arr (TypVar ("t",0),TypVar ("t",0)))) =
+    run "impl (some t. t -> t) with nat as \\ x : nat -> Z";
 
 val Impl
     (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-     Fn("l",TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-        Zero),Arr (TypVar ("t",0),TypVar ("t",0))) : Ast.exp =
-    parse "impl (0 -> 0) with (u natlist. (unit |  (nat * natlist))) as \\ l : (u natlist. (unit |  (nat * natlist))) -> Z";
+     Fn
+       ("l",TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
+        Zero),Some ("s",Arr (TypVar ("s",0),TypVar ("s",0)))) : exp =
+    parse "impl (some s. s -> s) with (u natlist. (unit |  (nat * natlist))) as \\ l : (u natlist. (unit |  (nat * natlist))) -> Z";
 
-val Use (Impl (Nat,Fn ("x",Nat,Zero),Arr (TypVar ("t", 0),TypVar ("t", 0))),
-         "pkg", "s", Var ("pkg",0)) : exp =
-    parse "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)";
+val Use (Impl (Nat,Fn ("x",Nat,Zero),Some ("t'",Arr (TypVar ("t'",0),TypVar ("t'",0)))),
+         "pkg","s", Var ("pkg",0)) : exp =
+    parse "use (impl (some t'. t' -> t') with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)";
 
-val Zero = run "use (impl (0 -> 0) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)"
+val Zero = run "use (impl (some t. t -> t) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)"
            handle ClientTypeCannotEscapeClientScope => Zero;
 
 
-val e1 = Impl(Nat, Fn("x", Nat, Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t", 0)));
+val e1 = Impl(Nat, Fn("x", Nat, Var ("x", 0)), Some("t", Arr(TypVar ("t", 0), TypVar ("t", 0))));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e1;
-val e2 = Impl(Arr(Nat, Nat), Fn("x", Arr(Nat, Nat), Var ("x", 0)), Arr(TypVar ("t", 0), TypVar ("t", 0)));
+val e2 = Impl(Arr(Nat, Nat), Fn("x", Arr(Nat, Nat), Var ("x", 0)), Some("t", Arr(TypVar ("t", 0), TypVar ("t", 0))));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e2;
-val e4 = Impl(All("t", Nat), Fn("x", All("t", Nat), Zero), Arr(TypVar ("t", 0), Nat));
+val e4 = Impl(All("t", Nat), Fn("x", All("t", Nat), Zero), Some("t", Arr(TypVar ("t", 0), Nat)));
 val Some("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] e4
 
-val e5 = Impl(Nat, Fn("x", All("t", Nat), Zero), Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)));
+val e5 = Impl(Nat, Fn("x", All("t", Nat), Zero), Some("t", Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0))));
 val Some("t",Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0))) = typeof' [] [] e5
 
 val t5 = typeof' [] [] (Fn("x", All("t", Nat), Zero));
@@ -700,20 +702,20 @@ val Arr(All ("t", TypVar ("t", 1)), TypVar ("t", 0)) = abstractOutType "t" Nat (
 
 val f = Fn("x", Arr(Nat, Nat), Zero);
 val g = Fn ("x", Nat,Succ (Var ("x", 0)));
-val pkg = Impl(Arr(Nat, Nat), f, Arr(TypVar ("t", 0), Nat));
+val pkg = Impl(Arr(Nat, Nat), f, Some("t", Arr(TypVar ("t", 0), Nat)));
 val Some ("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] pkg;
 
-val Some("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), Nat)));
-val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), TypVar ("t", 0))));
-val Nat = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), TypVar ("t", 0))) handle IllTyped => Nat;
+val Some("t",Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), Some("t", Arr(TypVar ("t", 0), Nat))));
+val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), Some("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))));
+val Nat = typeof' [] [] (Impl(Nat, Fn("x", Nat, Zero), Some("t", TypVar ("t", 0)))) handle IllTyped => Nat;
 
-val zeroFnPkg = Impl(Nat, Fn("x", Nat, Zero), Arr(TypVar ("t", 0), Nat));
-val zeroFnPkg2 = Impl(Nat, Fn("x", Nat, Zero), Arr(Nat, TypVar ("t", 0)));
+val zeroFnPkg = Impl(Nat, Fn("x", Nat, Zero), Some("t", Arr(TypVar ("t", 0), Nat)));
+val zeroFnPkg2 = Impl(Nat, Fn("x", Nat, Zero), Some("t", Arr(Nat, TypVar ("t", 0))));
 
 (* Define identity package; can convert Nat to internal repr type and back. *)
 val idid = Pair(Fn("x", Nat, Var ("x", 0)), Fn("x", Nat, Var ("x", 0)));
 val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typeof' [] [] idid;
-val inoutpkg = Impl(Nat, idid, Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat)));
+val inoutpkg = Impl(Nat, idid, Some("t", Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))));
 val Some("t",Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))) = typeof' [] [] inoutpkg;
 val Nat = typeof' [] [] (Use(inoutpkg, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 val true = isval inoutpkg;
@@ -727,7 +729,7 @@ val Zero = eval (Use(inoutpkg, "pkg", "s", App(ProdRight(Var ("x", 0)), App(Prod
 
 val leftandback = Pair(Fn("x", Nat, Pair(Var ("x", 0), Zero)), Fn("x", Prod(Nat, Nat), ProdLeft (Var ("x", 0))));
 val Prod (Arr (Nat,Prod (Nat, Nat)),Arr (Prod (Nat, Nat),Nat)) = typeof' [] [] leftandback;
-val inoutpkg2 = Impl(Prod(Nat, Nat), leftandback, Prod (Arr (Nat,TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)));
+val inoutpkg2 = Impl(Prod(Nat, Nat), leftandback, Some("t", Prod (Arr (Nat,TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat))));
 val Some("t",Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))) = typeof' [] [] inoutpkg2;
 val Nat = typeof' [] [] (Use(inoutpkg2, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 val Zero = eval (Use(inoutpkg2, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));

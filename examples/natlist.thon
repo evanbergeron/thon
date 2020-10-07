@@ -1,4 +1,4 @@
-impl (0 * (((nat * 0) -> 0) * (0 -> nat))) with (u l. (unit |  (nat * l))) as
+impl (some t. (t * (((nat * t) -> t) * (t -> nat)))) with (u l. (unit |  (nat * l))) as
 (
     (*nil*)
     fold u l. (unit | (nat * l))
