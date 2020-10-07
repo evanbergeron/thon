@@ -10,9 +10,11 @@ structure A = Ast
  | ZERO
  | SUCC
  | LPAREN | RPAREN
+ | LBRACE | RBRACE
  | PIPE
  | LAM
  | SARROW
+ | BARROW
  | COLON
  | NAT
  | REC
@@ -43,15 +45,21 @@ structure A = Ast
  | CASE
  | OF
  | LET
+ | DCL
+ | BND
  | EQ
  | IFZ
  | FIX
  | FUN
  | DATA
+ | RET
+ | SEMI
+ | AT
 
 %nonterm
    exp of A.exp
  | typ of A.typ
+ | cmd of A.cmd
  | program of A.exp
 
 %verbose
@@ -66,7 +74,7 @@ structure A = Ast
 
 (* The precedence grows down *)
 %nonassoc TYPEOR (* Deliberately first *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX FUN DATA
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET DCL BND EQ IFZ FIX FUN DATA RET LBRACE RBRACE BARROW SEMI AT
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -100,6 +108,14 @@ exp:
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
   | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
+  | LBRACE cmd RBRACE (A.Cmd cmd)
+
+cmd:
+    RET exp (A.Ret exp)
+  | BND ID BARROW exp SEMI cmd (A.Bnd(ID, exp, cmd))
+  | DCL ID COLON EQ exp IN cmd (A.Dcl(ID, exp, cmd))
+  | AT ID (A.Get(ID))
+  | ID COLON EQ exp (A.Set(ID, exp))
 
 typ:
     NAT (A.Nat)

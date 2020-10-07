@@ -199,8 +199,21 @@ fun setDeBruijnIndexInType t varnames typnames =
             A.TyRec(name, setDeBruijnIndexInType t' varnames (name::typnames))
        end
 
+fun setDeBruijnIndexInCmd c varnames typnames =
+    case c of
+        A.Ret e => A.Ret e
+      | A.Bnd(name, e, c) =>
+        A.Bnd(name,
+              setDeBruijnIndex e varnames typnames,
+              setDeBruijnIndexInCmd c (name::varnames) typnames) (* binds immutable var *)
+      | A.Dcl(name, e, c) =>
+        A.Dcl(name,
+              setDeBruijnIndex e varnames typnames,
+              setDeBruijnIndexInCmd c varnames typnames) (*binds symbol, not a immutable var*)
+      | A.Get name  => A.Get name
+      | A.Set(name, e) => A.Set(name, setDeBruijnIndex e varnames typnames)
 
-fun setDeBruijnIndex e varnames typnames =
+and setDeBruijnIndex e varnames typnames =
     let fun find name names =
         (case List.findi (fn (_, n : string) => n = name) names
          of NONE => NONE
@@ -271,6 +284,7 @@ fun setDeBruijnIndex e varnames typnames =
             A.Impl(setDeBruijnIndexInType reprType varnames typnames,
                    setDeBruijnIndex pkgImpl varnames typnames,
                    setDeBruijnIndexInType pkgType varnames typnames)
+       | A.Cmd c => A.Cmd (setDeBruijnIndexInCmd c varnames typnames)
        | _ => raise Unimplemented (* TODO *)
 end
 
