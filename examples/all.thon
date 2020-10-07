@@ -1,0 +1,1 @@
+(poly t -> poly s -> \ x : (t -> (some v . (s->v))) -> x)

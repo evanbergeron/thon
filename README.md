@@ -117,10 +117,6 @@ you didn't write this code, it's not your fault it does it this way).
  (*get*) \ tup : (nat * nat) -> fst tup)
 ```
 
-(Disclaimer, the syntax here needs to be fixed a bit still, it was
-made before there were variable names and so now I need to thread a
-couple more names through...)
-
 Now each of these implementations can be packed away with the syntax
 
 ```
