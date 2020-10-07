@@ -1078,6 +1078,9 @@ val zerobst = parseFile "/home/evan/thon/examples/singletonbst.thon";
 val appbst = eval (A.App(A.App(bstinsert, A.Zero), emptybst));
 val true = (zerobst = appbst);
 
+val setget = parseFile "/home/evan/thon/examples/setget.thon";
+val Some ("t",Prod (Arr (Nat,TypVar ("t",0)),Arr (TypVar ("t",0),Nat))) = typeof setget;
+
 in
 ()
 end
