@@ -107,7 +107,6 @@ typ:
   | typ SARROW typ (A.Arr(typ1, typ2))
   | typ STAR typ (A.Prod(typ1, typ2))
   | LPAREN typ RPAREN (typ)
-  | IDX (A.TypVar ("t", IDX)) 
   | ID (A.TypVar (ID, ~1)) 
   | ALL ID DOT typ (A.All (ID, typ))
   | SOME ID DOT typ (A.Some (ID, typ))
