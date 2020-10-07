@@ -269,7 +269,7 @@ fun setDeBruijnIndex e varnames typnames =
        | A.Impl (reprType, pkgImpl, pkgType) =>
             A.Impl(setDeBruijnIndexInType reprType varnames typnames,
                    setDeBruijnIndex pkgImpl varnames typnames,
-                   pkgType)
+                   setDeBruijnIndexInType pkgType varnames typnames)
        | _ => raise Unimplemented (* TODO *)
 end
 
