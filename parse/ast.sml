@@ -12,8 +12,7 @@ sig
       | Plus of typ * typ (* sum type *)
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
-
-    datatype Idx = int
+      | TypCmd
 
     datatype exp =
         Zero
@@ -43,6 +42,14 @@ sig
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
+      | Cmd of cmd
+
+    and cmd =
+        Ret of exp
+      | Bnd of string * exp * cmd
+      | Dcl of string * exp * cmd
+      | Get of string
+      | Set of string * exp
 
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
@@ -67,8 +74,7 @@ struct
       | Plus of typ * typ (* sum type *)
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
-
-    datatype Idx = int
+      | TypCmd
 
     datatype exp =
         Zero
@@ -98,6 +104,14 @@ struct
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
+      | Cmd of cmd
+
+    and cmd =
+        Ret of exp
+      | Bnd of string * exp * cmd
+      | Dcl of string * exp * cmd
+      | Get of string
+      | Set of string * exp
 
     (* DEVNOTE this only applies f at the leaves *)
     fun expMap f e =

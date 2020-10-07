@@ -291,34 +291,52 @@ fun eraseNamesInTyp t =
 
 fun typeEq (t : A.typ) (t' : A.typ) = ((eraseNamesInTyp t) = (eraseNamesInTyp t'))
 
-fun typeof' ctx typCtx e =
+fun cmdOk ctx typCtx mutCtx c =
+    case c of
+        A.Ret e => (case typeof' ctx typCtx mutCtx e of A.Nat => true | _ => false)
+      | A.Bnd(name, e, c) => (
+       (* TODO guess this binds, need to bump debrui index?
+          can also toss this binding, i think it's a bit weird *)
+          case typeof' ctx typCtx mutCtx e of
+              A.TypCmd => (cmdOk (A.Nat::ctx) typCtx mutCtx c)
+            | _ => false
+      )
+      | A.Dcl(name, e, c) => (
+          case typeof' ctx typCtx mutCtx e of
+              A.Nat => cmdOk ctx typCtx (name::mutCtx) c
+            | _ => false
+        )
+      | A.Get(name) => true
+      | A.Set(name, e) => (case typeof' ctx typCtx mutCtx e of A.Nat => true | _ => false)
+
+and typeof' ctx typCtx mutCtx e =
     case e
      of  A.Zero => A.Nat
        | A.TmUnit => A.Unit
        | A.Var (name, i) =>
          if i < 0 then raise VarWithNegativeDeBruijinIndex(name, i) else get ctx i
-       | A.Succ e2 => (typeof' ctx typCtx e2)
-       | A.ProdLeft e => let val A.Prod(l, r) = (typeof' ctx typCtx e) in l end
-       | A.ProdRight e => let val A.Prod(l, r) = (typeof' ctx typCtx e) in r end
+       | A.Succ e2 => (typeof' ctx typCtx mutCtx e2)
+       | A.ProdLeft e => let val A.Prod(l, r) = (typeof' ctx typCtx mutCtx e) in l end
+       | A.ProdRight e => let val A.Prod(l, r) = (typeof' ctx typCtx mutCtx e) in r end
        | A.PlusLeft (t, e) =>
          let val A.Plus(l, r) = t in
-             if not (typeEq l (typeof' ctx typCtx e)) then
+             if not (typeEq l (typeof' ctx typCtx mutCtx e)) then
                  raise IllTypedMsg "Sum type annotation does not match deduced type"
              else
                  A.Plus(l, r)
          end
        | A.PlusRight (t, e) =>
          let val A.Plus(l, r) = t in
-             if not (typeEq r (typeof' ctx typCtx e)) then
+             if not (typeEq r (typeof' ctx typCtx mutCtx e)) then
                  raise IllTypedMsg "Sum type annotation does not match deduced type"
              else
                  A.Plus(l, r)
          end
        | A.Case (c, lname, l, rname, r) =>
-         let val A.Plus(lt, rt) = typeof' ctx typCtx c
+         let val A.Plus(lt, rt) = typeof' ctx typCtx mutCtx c
              (* both bind a term var *)
-             val typeofLeftBranch = typeof' (lt::ctx) typCtx l
-             val typeofRightBranch= typeof' (rt::ctx) typCtx r
+             val typeofLeftBranch = typeof' (lt::ctx) typCtx mutCtx l
+             val typeofRightBranch= typeof' (rt::ctx) typCtx mutCtx r
          in
              if not (typeEq (typeofLeftBranch) (typeofRightBranch)) then
                  raise IllTypedMsg "Case statement branches types do not agree"
@@ -327,49 +345,49 @@ fun typeof' ctx typCtx e =
          end
        | A.Fn (argName, argType, funcBody) =>
          if not (istype typCtx argType) then raise IllTypedMsg "Function arg type is not a type."
-         else A.Arr (argType, typeof' (argType::ctx) typCtx funcBody)
+         else A.Arr (argType, typeof' (argType::ctx) typCtx mutCtx funcBody)
        | A.Let (varname, vartype, varval, varscope) =>
          if not (istype typCtx vartype) then
              raise IllTypedMsg "Let var type is not a type"
-         else if not (typeEq (typeof' ctx typCtx varval) vartype) then
+         else if not (typeEq (typeof' ctx typCtx mutCtx varval) vartype) then
              raise IllTypedMsg "Let var type is not equal to deduced var value type."
          else
-            typeof' (vartype::ctx) typCtx varscope
+            typeof' (vartype::ctx) typCtx mutCtx varscope
        | A.App (f, n) =>
-         let val A.Arr (d, c) = typeof' ctx typCtx f
-             val argType = typeof' ctx typCtx n
+         let val A.Arr (d, c) = typeof' ctx typCtx mutCtx f
+             val argType = typeof' ctx typCtx mutCtx n
          in
              if not (typeEq d argType) then raise IllTyped
              else c
          end
        | A.Ifz (i, t, prev, e) =>
-         let val Nat = typeof' ctx typCtx i
-             val thenType = typeof' ctx typCtx t
-             val elseType = typeof' (Nat::ctx) typCtx e
+         let val Nat = typeof' ctx typCtx mutCtx i
+             val thenType = typeof' ctx typCtx mutCtx t
+             val elseType = typeof' (Nat::ctx) typCtx mutCtx e
          in
              if not (typeEq thenType elseType) then raise IllTyped
              else thenType
          end
-       | A.Pair (l, r) => A.Prod(typeof' ctx typCtx l, typeof' ctx typCtx r)
+       | A.Pair (l, r) => A.Prod(typeof' ctx typCtx mutCtx l, typeof' ctx typCtx mutCtx r)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
-         let val A.Nat = typeof' ctx typCtx i
-             val t = typeof' ctx typCtx baseCase
-             val t2 = typeof' (t::ctx) typCtx recCase
+         let val A.Nat = typeof' ctx typCtx mutCtx i
+             val t = typeof' ctx typCtx mutCtx baseCase
+             val t2 = typeof' (t::ctx) typCtx mutCtx recCase
          in
              if not (typeEq t t2) then raise IllTyped else t
          end
-       | A.Fix (name, typ, e) => typeof' (typ::ctx) typCtx e
-       | A.TypFn (name, e) => A.All(name, typeof' ctx (NONE::typCtx) e)
+       | A.Fix (name, typ, e) => typeof' (typ::ctx) typCtx mutCtx e
+       | A.TypFn (name, e) => A.All(name, typeof' ctx (NONE::typCtx) mutCtx e)
        | A.TypApp (appType, e) =>
          if not (istype typCtx appType) then raise IllTyped else
-         let val A.All(name, t) = typeof' ctx typCtx e
+         let val A.All(name, t) = typeof' ctx typCtx mutCtx e
          in
              substType appType t
          end
        | A.Impl (reprType, pkgImpl, pkgType) =>
          if not (istype [] reprType) then raise IllTyped else
          (* pkgType : [reprType/A.TypVar 0](t') *)
-         let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
+         let val deducedPkgType = typeof' ctx (NONE::typCtx) mutCtx pkgImpl
              val A.Some(name, pkgType') = pkgType
          in
              if not (typeEq (abstractOutType name reprType deducedPkgType)
@@ -379,16 +397,16 @@ fun typeof' ctx typCtx e =
                  pkgType
          end
        | A.Use (pkg, clientName, typeName, client) =>
-         let val A.Some(name, r) = typeof' ctx typCtx pkg
+         let val A.Some(name, r) = typeof' ctx typCtx mutCtx pkg
              (* binds BOTH a A.TypVar and a exp A.Var *)
-             val clientType = typeof' (r::ctx) (NONE::typCtx) client
+             val clientType = typeof' (r::ctx) (NONE::typCtx) mutCtx client
              val resType = decrDeBruijinIndices clientType
          in
              if not (istype typCtx resType) then raise IllTyped else
              resType
          end
        | A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *)) =>
-         let val deduced = typeof' ctx (NONE::typCtx) e'
+         let val deduced = typeof' ctx (NONE::typCtx) mutCtx e'
              val absDeduced = A.TyRec(name, abstractOutType name (A.TyRec(name, t)) (deduced))
              val absT = abstractOutType name (A.TyRec(name, t)) (A.TyRec(name, t))
          in
@@ -398,12 +416,13 @@ fun typeof' ctx typCtx e =
        | A.Fold(_ , e'(* binds a typ var *)) =>
          raise IllTypedMsg "Fold type argument must be a recursive type"
        | A.Unfold(e') =>
-         let val A.TyRec(name, t) = typeof' ctx typCtx e' in
+         let val A.TyRec(name, t) = typeof' ctx typCtx mutCtx e' in
              substType (A.TyRec(name, t)) t
          end
+       | A.Cmd c => if not (cmdOk ctx typCtx mutCtx c) then raise IllTyped else A.TypCmd
 
 
-fun typeof e = typeof' [] [] e
+fun typeof e = typeof' [] [] [] e
 
 
 fun isval e =
