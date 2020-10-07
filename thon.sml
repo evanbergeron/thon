@@ -497,6 +497,7 @@ fun step e =
                       A.Zero => t
                     | A.Succ i' => subst i' e
                     | _ => raise IllTypedMsg "ifz conditional must be an integer")
+      (* BUG? should this eval varval before subst? should it eval varscope before subst? *)
       | A.Let (varname, vartype, varval, varscope) => subst varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
