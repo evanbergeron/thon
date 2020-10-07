@@ -9,6 +9,7 @@ structure Thon : sig
                    val step : A.exp -> A.exp
                    val subst : A.exp -> A.exp -> A.exp
                    val run : string -> A.exp
+                   val eraseNamesInTyp : A.typ -> A.typ
                    val runFile : string -> A.exp
                    val findParseErrors : string -> unit
                  end =
@@ -277,8 +278,18 @@ end
 fun substTypeInExp srcType dstExp = substTypeInExp' srcType dstExp 0
 
 
-(* BUG this doesn't respect alpha equivalence (shouldn't care about type var names) *)
-fun typeEq (t : A.typ) (t' : A.typ) = (t = t')
+fun eraseNamesInTyp t =
+    let fun erase t =
+            (case t of
+                 A.TypVar(_, i) => A.TypVar("", i)
+               | A.All(_, t') => A.All("", t')
+               | A.Some(_, t') => A.Some("", t')
+               | A.TyRec(_, t') => A.TyRec("", t')
+               | _ => t
+            )
+    in A.typMap erase t end
+
+fun typeEq (t : A.typ) (t' : A.typ) = ((eraseNamesInTyp t) = (eraseNamesInTyp t'))
 
 fun typeof' ctx typCtx e =
     case e
@@ -348,7 +359,6 @@ fun typeof' ctx typCtx e =
              if not (typeEq t t2) then raise IllTyped else t
          end
        | A.Fix (name, typ, e) => typeof' (typ::ctx) typCtx e
-       (* BUG need to build a type equality func that ignores names *)
        | A.TypFn (name, e) => A.All(name, typeof' ctx (NONE::typCtx) e)
        | A.TypApp (appType, e) =>
          if not (istype typCtx appType) then raise IllTyped else
@@ -1079,6 +1089,8 @@ val appbst = eval (A.App(A.App(bstinsert, A.Zero), emptybst));
 val true = (zerobst = appbst);
 
 val Succ (Succ Zero) = runFile "/home/evan/thon/examples/setget.thon";
+
+val TypFn ("t", Zero) = runFile "/home/evan/thon/examples/typnames.thon";
 
 in
 ()

@@ -45,6 +45,7 @@ sig
       | TmUnit
 
     val expMap : (exp -> exp) -> exp -> exp
+    val typMap : (typ -> typ) -> typ -> typ
 
   structure Print :
   sig
@@ -98,34 +99,48 @@ struct
       | Unfold of exp
       | TmUnit
 
+    (* DEVNOTE this only applies f at the leaves *)
     fun expMap f e =
         case e
          of  Zero => f Zero
            | TmUnit => f TmUnit
            | Var (name, n)  => f (Var(name, n))
-           | Succ e' => Succ (f e')
-           | ProdLeft e' => ProdLeft(f e')
-           | ProdRight e' => ProdRight(f e')
-           | PlusLeft(t, e') => PlusLeft(t, f e')
+           | Succ e' => Succ (expMap f e')
+           | ProdLeft e' => ProdLeft(expMap f e')
+           | ProdRight e' => ProdRight(expMap f e')
+           | PlusLeft(t, e') => PlusLeft(t, expMap f e')
            | PlusRight(t, e') => PlusRight(t, e')
            | Case(c, lname, l, rname, r) =>
-             Case(f c, lname, f l, rname, f r)
-           | Fn(argName, t, f') => Fn(argName, t, (f f'))
+             Case(expMap f c, lname, expMap f l, rname, expMap f r)
+           | Fn(argName, t, f') => Fn(argName, t, (expMap f f'))
            | Let(varname, vartype, varval, varscope) =>
-             Let(varname, vartype, (f varval), (f varscope))
-           | App(f', n) => App((f f'), f n)
-           | Ifz(i, t, prev, e) => Ifz(f i, f t, prev, f e)
+             Let(varname, vartype, (expMap f varval), (expMap f varscope))
+           | App(f', n) => App((expMap f f'), expMap f n)
+           | Ifz(i, t, prev, e) => Ifz(expMap f i, expMap f t, prev, expMap f e)
            | Rec(i, baseCase, prevCaseName, recCase) =>
-             Rec(f i, f baseCase, prevCaseName, f recCase)
-           | Fix(name, t, e') => Fix(name, t, f e')
-           | TypFn (name, e') => TypFn (name, f e')
-           | TypApp (appType, e') => TypApp(appType, f e')
-           | Impl(reprType, pkgImpl, t) => Impl(reprType, f pkgImpl, t)
+             Rec(expMap f i, expMap f baseCase, prevCaseName, expMap f recCase)
+           | Fix(name, t, e') => Fix(name, t, expMap f e')
+           | TypFn (name, e') => TypFn (name, expMap f e')
+           | TypApp (appType, e') => TypApp(appType, expMap f e')
+           | Impl(reprType, pkgImpl, t) => Impl(reprType, expMap f pkgImpl, t)
            | Use(pkg, clientName, typeName, client) =>
-             Use(f pkg, clientName, typeName, f client)
-           | Pair(l, r) => Pair(f l, f r)
-           | Fold(t, e') => Fold(t, (f e'))
-           | Unfold(e') => Unfold(f e')
+             Use(expMap f pkg, clientName, typeName, expMap f client)
+           | Pair(l, r) => Pair(expMap f l, expMap f r)
+           | Fold(t, e') => Fold(t, (expMap f e'))
+           | Unfold(e') => Unfold(expMap f e')
+
+    (* DEVNOTE this applies f at every node *)
+    fun typMap f t =
+        case t of
+            Nat => f t
+          | Unit => f t
+          | TypVar (name, i) => f t
+          | Arr(d, c) => f (Arr(typMap f d, typMap f c))
+          | Prod(l, r) => f (Prod(typMap f l, typMap f r))
+          | Plus(l, r) => f (Plus(typMap f l, typMap f r))
+          | All (name, t') => f (All(name, typMap f t'))
+          | Some (name, t') => f (Some(name, typMap f t'))
+          | TyRec (name, t') => f (TyRec(name, typMap f t'))
 
 
   structure Print =
