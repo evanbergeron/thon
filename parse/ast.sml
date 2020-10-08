@@ -157,6 +157,7 @@ struct
         case t of
             Nat => f t
           | Unit => f t
+          | TypCmd => f t
           | TypVar (name, i) => f t
           | Arr(d, c) => f (Arr(typMap f d, typMap f c))
           | Prod(l, r) => f (Prod(typMap f l, typMap f r))

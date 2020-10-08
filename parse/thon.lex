@@ -59,6 +59,7 @@ ws = [\ \t];
 <INITIAL> "rec"    => (Tokens.REC(!pos,!pos));
 <INITIAL> "cmd"    => (Tokens.CMD(!pos,!pos));
 <INITIAL> "run"    => (Tokens.RUN(!pos,!pos));
+<INITIAL> "do"     => (Tokens.DO(!pos,!pos));
 <INITIAL> "go"     => (Tokens.GO(!pos,!pos));
 <INITIAL> "poly"   => (Tokens.POLY(!pos,!pos));
 <INITIAL> "left"   => (Tokens.LEFT(!pos,!pos));

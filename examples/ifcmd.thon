@@ -1,0 +1,7 @@
+(* if cond then ret Z else ret S Z *)
+(* note the order flips *)
+run
+bnd cond <- cmd(ret Z) in
+do ifz cond of
+       Z -> cmd (ret S Z)
+     | S p -> cmd(ret Z)

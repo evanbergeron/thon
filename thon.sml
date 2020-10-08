@@ -2,6 +2,7 @@
 structure Thon : sig
                    val parse : string -> Ast.exp
                    val parseFile : string -> Ast.exp
+                   val parseTop : string -> Ast.top
                    val parseFileTop : string -> Ast.top
                    val typeof : A.exp -> A.typ
                    val test : unit -> unit
@@ -114,7 +115,23 @@ fun decrDeBruijinIndices t =
 
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
-fun substTypeInExp' srcType dstExp bindingDepth =
+fun substTypeInCmd' srcType dstCmd bindingDepth =
+    case dstCmd of
+        A.Ret e => A.Ret(substTypeInExp' srcType e bindingDepth)
+      | A.Bnd(name, e, c) =>
+        A.Bnd(name,
+              substTypeInExp' srcType e bindingDepth,
+              substTypeInCmd' srcType c (bindingDepth+1)) (* binds immutable var *)
+      | A.Dcl(name, e, c) =>
+        A.Dcl(name,
+              substTypeInExp' srcType e bindingDepth,
+              (*binds symbol, not a immutable var*)
+              substTypeInCmd' srcType c bindingDepth)
+      | A.Get name => A.Get name
+      | A.Set(name, e) => A.Set(name, substTypeInExp' srcType e bindingDepth)
+
+
+and substTypeInExp' srcType dstExp bindingDepth =
     case dstExp
      of  A.Zero => A.Zero
        | A.Var (name, i) => A.Var (name, i)
@@ -173,6 +190,7 @@ fun substTypeInExp' srcType dstExp bindingDepth =
        | A.Fold(t, e') => A.Fold(substType' srcType t bindingDepth,
                              substTypeInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
        | A.Unfold(e') => A.Unfold(substTypeInExp' srcType e' bindingDepth)
+       | A.Cmd c => A.Cmd (substTypeInCmd' srcType c bindingDepth)
 
 
 fun setDeBruijnIndexInType t varnames typnames =
@@ -527,6 +545,8 @@ and subst' src dst bindingDepth =
        | A.Pair (l, r) => A.Pair (subst' src l bindingDepth, subst' src r bindingDepth)
        | A.Fold(t, e') => A.Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
        | A.Unfold(e') => A.Unfold(subst' src e' (bindingDepth))
+       | A.Cmd cmd => A.Cmd (substExpInCmd' src cmd bindingDepth)
+       | _ => raise Unimplemented
 
 fun substExpInCmd src c = substExpInCmd' src c 0
 fun subst src dst = subst' src dst 0
@@ -682,6 +702,13 @@ fun parse s =
     let val A.E ast : A.top = Parse.parse s
     in
         setDeBruijnIndexInExp ast [] []
+    end
+
+fun parseTop s =
+    let val ast : A.top = Parse.parse s
+    in (case ast of
+           A.E e => A.E (setDeBruijnIndexInExp e [] [])
+         | A.Run c => A.Run (setDeBruijnIndexInCmd c [] [] []))
     end
 
 fun parseFile filename =
@@ -1256,6 +1283,18 @@ val Dcl ("foo",Succ Zero,Ret (Succ Zero)) : cmd =
 
 val Ret (Succ Zero) : cmd =
     stepCmd (Dcl ("foo",Succ Zero,Ret (Succ Zero)))
+
+val ifcmd = Run
+    (Bnd
+       ("cond",Cmd (Ret Zero),
+        Bnd
+          ("",Ifz (Var ("cond",0),Cmd (Ret Zero),"p",Cmd (Ret (Succ Zero))),
+           Ret (Var ("",0)))));
+
+val Run (Ret Zero) : top = evalTop ifcmd;
+
+val Run (Ret (Succ Zero)) : top =
+    evalTop (parseFileTop "/home/evan/thon/examples/ifcmd.thon");
 
 in
 ()
