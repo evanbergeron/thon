@@ -1,0 +1,5 @@
+run
+ifz ret S Z then
+    ret Z
+else
+    ret S Z

@@ -1296,6 +1296,9 @@ val Run (Ret Zero) : top = evalTop ifcmd;
 val Run (Ret (Succ Zero)) : top =
     evalTop (parseFileTop "/home/evan/thon/examples/ifcmd.thon");
 
+val Run (Ret (Succ Zero)) : top =
+    evalTop (parseFileTop "/home/evan/thon/examples/ifcmd2.thon");
+
 in
 ()
 end

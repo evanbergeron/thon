@@ -58,17 +58,18 @@ structure A = Ast
  | CMD
  | RUN
  | DO
+ | THEN
+ | ELSE
 
 %nonterm
    exp of A.exp
  | typ of A.typ
  | top of A.top
  | cmd of A.cmd
- | program of A.exp
 
 %verbose
 %pos int
-%start top (* i think likely this should be program, but I really dont like that hack *)
+%start top
 %eop EOF
 
 %name Thon
@@ -78,14 +79,11 @@ structure A = Ast
 
 (* The precedence grows down *)
 %nonassoc TYPEOR (* Deliberately first *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET DCL BND EQ IFZ FIX FUN DATA RET LBRACE RBRACE BARROW SEMI AT CMD RUN DO
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET DCL BND EQ IFZ FIX FUN DATA RET LBRACE RBRACE BARROW SEMI AT CMD RUN DO THEN ELSE
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
 %%
-
-(* program: *)
-(*     GO exp (exp) *)
 
 exp:
     LPAREN exp RPAREN (exp)
@@ -121,6 +119,12 @@ cmd:
   | DO exp (A.Bnd("", exp, A.Ret(A.Var("", 0))))
   | AT ID (A.Get(ID))
   | ID COLON EQ exp (A.Set(ID, exp))
+  | IFZ cmd THEN cmd ELSE cmd (
+        A.Bnd("", A.Cmd(cmd1), (*DO*)A.Bnd("",
+        A.Ifz(A.Var("", 0),
+              A.Cmd(cmd2),
+              "", A.Cmd(cmd3)),
+        A.Ret(A.Var("", 1)))(*/DO*)))
 
 top:
     exp (A.E exp)
