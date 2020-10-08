@@ -199,18 +199,19 @@ fun setDeBruijnIndexInType t varnames typnames =
             A.TyRec(name, setDeBruijnIndexInType t' varnames (name::typnames))
        end
 
-fun setDeBruijnIndexInCmd c varnames typnames =
+fun setDeBruijnIndexInCmd c varnames typnames mutnames =
     case c of
-        A.Ret e => A.Ret e
+        A.Ret e => A.Ret(setDeBruijnIndex e varnames typnames)
       | A.Bnd(name, e, c) =>
         A.Bnd(name,
               setDeBruijnIndex e varnames typnames,
-              setDeBruijnIndexInCmd c (name::varnames) typnames) (* binds immutable var *)
+              setDeBruijnIndexInCmd c (name::varnames) typnames mutnames) (* binds immutable var *)
       | A.Dcl(name, e, c) =>
         A.Dcl(name,
               setDeBruijnIndex e varnames typnames,
-              setDeBruijnIndexInCmd c varnames typnames) (*binds symbol, not a immutable var*)
-      | A.Get name  => A.Get name
+              (*binds symbol, not a immutable var*)
+              setDeBruijnIndexInCmd c varnames typnames (name::mutnames))
+      | A.Get name => A.Get name
       | A.Set(name, e) => A.Set(name, setDeBruijnIndex e varnames typnames)
 
 and setDeBruijnIndex e varnames typnames =
@@ -251,7 +252,7 @@ and setDeBruijnIndex e varnames typnames =
                                    prev,
                                    setDeBruijnIndex e (prev::varnames) typnames)
        | A.Pair (l, r) => A.Pair (setDeBruijnIndex l varnames typnames,
-                                    setDeBruijnIndex r varnames typnames)
+                                  setDeBruijnIndex r varnames typnames)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec (setDeBruijnIndex i varnames typnames,
                    setDeBruijnIndex baseCase varnames typnames,
@@ -284,7 +285,7 @@ and setDeBruijnIndex e varnames typnames =
             A.Impl(setDeBruijnIndexInType reprType varnames typnames,
                    setDeBruijnIndex pkgImpl varnames typnames,
                    setDeBruijnIndexInType pkgType varnames typnames)
-       | A.Cmd c => A.Cmd (setDeBruijnIndexInCmd c varnames typnames)
+       | A.Cmd c => A.Cmd (setDeBruijnIndexInCmd c varnames typnames [])
        | _ => raise Unimplemented (* TODO *)
 end
 
@@ -454,8 +455,27 @@ fun isval e =
       | A.Fold(t, e') => isval e'
       | _ => false
 
+fun final c mem =
+    case c of
+        _ => true
 
-fun subst' src dst bindingDepth =
+fun substExpInCmd' src c bindingDepth =
+    case c of
+        A.Ret e => A.Ret(subst' src e bindingDepth)
+      | A.Bnd(name, e, c') =>
+        A.Bnd(name,
+              subst' src e bindingDepth,
+              substExpInCmd' src c' (bindingDepth+1)) (* binds immutable var *)
+      | A.Dcl(name, e, c') =>
+        A.Dcl(name,
+              subst' src e bindingDepth,
+              substExpInCmd' src c' bindingDepth)
+      | A.Get(name) => c
+      | A.Set(name, e) =>
+        A.Set(name,
+              subst' src e bindingDepth)
+
+and subst' src dst bindingDepth =
     case dst
      of  A.Zero => A.Zero
        | A.TmUnit => A.TmUnit
@@ -500,11 +520,28 @@ fun subst' src dst bindingDepth =
        | A.Fold(t, e') => A.Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
        | A.Unfold(e') => A.Unfold(subst' src e' (bindingDepth))
 
-
+fun substExpInCmd src c = substExpInCmd' src c 0
 fun subst src dst = subst' src dst 0
 
+fun stepCmd c =
+    case c of
+        A.Ret e => if not (isval e) then A.Ret (step e) else c
+      | A.Bnd(name, e, c') =>
+        if not (isval e) then A.Bnd(name, step e, c')
+        (* ensured by typechecker *)
+        else let val A.Cmd(ce) = e in
+        case ce of
+            A.Ret e => raise No (*substExpInCmd e c'*)
+          | A.Bnd(name, e, c) => raise Unimplemented
+          | A.Dcl(name, e, c) => raise Unimplemented
+          | A.Get name => raise Unimplemented
+          | A.Set(name, e) => raise Unimplemented
+        end
+      | A.Dcl(name, e, c') => raise Unimplemented
+      | A.Get name => raise Unimplemented
+      | A.Set(name, e) => raise Unimplemented
 
-fun step e =
+and step e =
     let val _ = typeof e in
     if isval e then e else
     case e of
@@ -579,18 +616,19 @@ fun step e =
                         else (let val true = isval e in e end)
       | A.Unfold e' => if not (isval e') then A.Unfold (step e')
                      else (let val A.Fold(t, e'') = e' in e'' end)
+      | A.Cmd c => A.Cmd (stepCmd c)
       | _ => if (isval e) then e else raise No
     end
 
 
 fun parse s =
-    let val ast : A.exp = Parse.parse s
+    let val A.E ast : A.top = Parse.parse s
     in
         setDeBruijnIndex ast [] []
     end
 
 fun parseFile filename =
-    let val ast : A.exp = Parse.parseFile filename
+    let val A.E ast : A.top = Parse.parseFile filename
     in
         setDeBruijnIndex ast [] []
     end

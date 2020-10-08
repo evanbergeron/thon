@@ -51,6 +51,11 @@ sig
       | Get of string
       | Set of string * exp
 
+    datatype top =
+             Run of cmd
+           | E of exp
+
+
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
 
@@ -112,6 +117,10 @@ struct
       | Dcl of string * exp * cmd
       | Get of string
       | Set of string * exp
+
+    datatype top =
+             Run of cmd
+           | E of exp
 
     (* DEVNOTE this only applies f at the leaves *)
     fun expMap f e =

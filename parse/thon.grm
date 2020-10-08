@@ -55,16 +55,19 @@ structure A = Ast
  | RET
  | SEMI
  | AT
+ | CMD
+ | RUN
 
 %nonterm
    exp of A.exp
  | typ of A.typ
+ | top of A.top
  | cmd of A.cmd
  | program of A.exp
 
 %verbose
 %pos int
-%start exp (* i think likely this should be program, but I really dont like that hack *)
+%start top (* i think likely this should be program, but I really dont like that hack *)
 %eop EOF
 
 %name Thon
@@ -74,7 +77,7 @@ structure A = Ast
 
 (* The precedence grows down *)
 %nonassoc TYPEOR (* Deliberately first *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET DCL BND EQ IFZ FIX FUN DATA RET LBRACE RBRACE BARROW SEMI AT
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET DCL BND EQ IFZ FIX FUN DATA RET LBRACE RBRACE BARROW SEMI AT CMD RUN
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -108,7 +111,7 @@ exp:
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
   | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
-  | LBRACE cmd RBRACE (A.Cmd cmd)
+  | CMD LPAREN cmd RPAREN (A.Cmd cmd)
 
 cmd:
     RET exp (A.Ret exp)
@@ -116,6 +119,10 @@ cmd:
   | DCL ID COLON EQ exp IN cmd (A.Dcl(ID, exp, cmd))
   | AT ID (A.Get(ID))
   | ID COLON EQ exp (A.Set(ID, exp))
+
+top:
+    exp (A.E exp)
+  | RUN cmd (A.Run cmd)
 
 typ:
     NAT (A.Nat)

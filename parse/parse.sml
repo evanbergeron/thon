@@ -1,8 +1,8 @@
 structure A = Ast
 
 signature PARSE = sig
-  val parse : string -> Ast.exp
-  val parseFile : string -> Ast.exp
+  val parse : string -> Ast.top
+  val parseFile : string -> Ast.top
 end
 
 structure Parse :> PARSE =
