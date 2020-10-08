@@ -545,12 +545,31 @@ fun stepCmd' c expForSym =
             else
             (case c'' of
                 A.Ret e => substExpInCmd e c'
-              | A.Bnd(name, e, c) => raise Unimplemented
-              | A.Dcl(name, e, c) => raise Unimplemented
-              | A.Get name => raise Unimplemented
-              | A.Set(name, e) => raise Unimplemented)
+              | _ => raise No)
             end
-      | A.Dcl(name, e, c') => raise Unimplemented
+      | A.Dcl(name, e, c') =>
+        if not (isval e) then
+            A.Dcl(name, step e, c')
+        else if not (isfinal c') then
+            let val () = HashTable.insert expForSym (name, e)
+                val sc' = stepCmd' c' expForSym
+                val se = HashTable.remove expForSym name
+            in
+                A.Dcl(name, se, sc')
+            end
+        else
+            let val () = HashTable.insert expForSym (name, e)
+                val A.Ret e' = c'
+                (* BUG? the book has MA's isval depending on the expForSym,
+                 * but I don't see how/if that's needed. If it's not
+                 * needed, believe we can rm the HashTable operations
+                 * in this case. *)
+                val true = isval e'
+                val _ = HashTable.remove expForSym name
+            in
+                A.Ret e'
+            end
+
       | A.Get name =>
         (case HashTable.find expForSym name of
              SOME e => A.Ret e
