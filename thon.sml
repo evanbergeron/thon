@@ -10,6 +10,7 @@ structure Thon : sig
                    val isval : A.exp -> bool
                    val step : A.exp -> A.exp
                    val stepCmd : A.cmd -> A.cmd
+                   val stepCmd' : A.cmd -> (string, A.exp) HashTable.hash_table-> A.cmd
                    val stepTop : A.top -> A.top
                    val subst : A.exp -> A.exp -> A.exp
                    val run : string -> A.exp
@@ -23,6 +24,7 @@ exception IllTyped
 exception IllTypedMsg of string
 exception No
 exception VarNotInContext
+exception UnknownSymbol
 exception VarWithNegativeDeBruijinIndex of string * int
 exception ClientTypeCannotEscapeClientScope
 exception Unimplemented
@@ -186,7 +188,7 @@ fun setDeBruijnIndexInType t varnames typnames =
          (case find name typnames of
              NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
            | SOME i => A.TypVar (name, i))
-       | A.Arr(d, c) => 
+       | A.Arr(d, c) =>
             A.Arr(setDeBruijnIndexInType d varnames typnames,
                   setDeBruijnIndexInType c varnames typnames)
        | A.Prod(l, r) =>
@@ -460,7 +462,7 @@ fun isval e =
       | A.Cmd _ => true
       | _ => false
 
-fun isfinal c mem =
+fun isfinal c =
     case c of
         A.Ret e => isval e
       | _ => false
@@ -529,23 +531,30 @@ and subst' src dst bindingDepth =
 fun substExpInCmd src c = substExpInCmd' src c 0
 fun subst src dst = subst' src dst 0
 
-(* TODO need mutnames *)
-fun stepCmd c =
+fun stepCmd' c expForSym =
     case c of
         A.Ret e => if not (isval e) then A.Ret (step e) else c
       | A.Bnd(name, e, c') =>
-        if not (isval e) then A.Bnd(name, step e, c')
-        (* ensured by typechecker *)
-        else let val A.Cmd(c'') = e in
-        (case c'' of
-            A.Ret e => substExpInCmd e c'
-          | A.Bnd(name, e, c) => raise Unimplemented
-          | A.Dcl(name, e, c) => raise Unimplemented
-          | A.Get name => raise Unimplemented
-          | A.Set(name, e) => raise Unimplemented)
-        end
+        if not (isval e) then
+            (print "a"; A.Bnd(name, step e, c'))
+        else
+            (* ensured by typechecker *)
+            let val A.Cmd(c'') = e in
+            if not (isfinal c'') then
+                A.Bnd(name, A.Cmd(stepCmd' c'' expForSym), c')
+            else
+            (case c'' of
+                A.Ret e => substExpInCmd e c'
+              | A.Bnd(name, e, c) => raise Unimplemented
+              | A.Dcl(name, e, c) => raise Unimplemented
+              | A.Get name => raise Unimplemented
+              | A.Set(name, e) => raise Unimplemented)
+            end
       | A.Dcl(name, e, c') => raise Unimplemented
-      | A.Get name => raise Unimplemented
+      | A.Get name =>
+        (case HashTable.find expForSym name of
+             SOME e => A.Ret e
+           | NONE => raise UnknownSymbol)
       | A.Set(name, e) => raise Unimplemented
 
 and step e =
@@ -627,6 +636,15 @@ and step e =
       | _ => if (isval e) then e else raise No
     end
 
+and stepCmd c =
+    let
+        val expForSym : (string, A.exp) HashTable.hash_table =
+            HashTable.mkTable (HashString.hashString, op=)
+                              (42 (*initial size*), Fail "not found");
+    in
+        stepCmd' c expForSym
+    end
+
 fun stepTop p =
     case p of A.E e => A.E (step e) | A.Run c => A.Run (stepCmd c)
 
@@ -664,7 +682,7 @@ fun eval e = if isval e then e else eval (step e)
 fun evalTop p =
     case p of
         A.E e => if isval e then p else evalTop (A.E (step e))
-      | A.Run c => if isfinal c [] then p else evalTop (A.Run (stepCmd c))
+      | A.Run c => if isfinal c then p else evalTop (A.Run (stepCmd c))
 
 fun run s = let val e = parse s in if isval e then e else eval (step e) end
 
@@ -1191,6 +1209,16 @@ val TypFn ("t", Zero) = runFile "/home/evan/thon/examples/typnames.thon";
 
 val cmd0 : cmd = Bnd ("x",Cmd (Ret Zero),Ret (Var ("x",0)));
 val Ret Zero = stepCmd cmd0;
+
+val cmd1 : cmd = Bnd ("x",Cmd (Get "sym"),Ret (Var ("x",0)));
+val syms : (string, A.exp) HashTable.hash_table =
+    HashTable.mkTable (HashString.hashString, op=)
+    (42 (*initial size*), Fail "not found");
+val () = HashTable.insert syms ("sym", Succ Zero);
+val Bnd ("x",Cmd (Ret (Succ Zero)),Ret (Var ("x",0))) : cmd = stepCmd' cmd1 syms;
+
+val cmd2 : cmd = Bnd ("x",Cmd (Get "dne"),Ret (Var ("x",0)));
+val Ret Zero = stepCmd' cmd2 syms handle UnknownSymbol => Ret Zero;
 
 in
 ()
