@@ -536,7 +536,7 @@ fun stepCmd' c expForSym =
         A.Ret e => if not (isval e) then A.Ret (step e) else c
       | A.Bnd(name, e, c') =>
         if not (isval e) then
-            (print "a"; A.Bnd(name, step e, c'))
+            A.Bnd(name, step e, c')
         else
             (* ensured by typechecker *)
             let val A.Cmd(c'') = e in
@@ -555,7 +555,13 @@ fun stepCmd' c expForSym =
         (case HashTable.find expForSym name of
              SOME e => A.Ret e
            | NONE => raise UnknownSymbol)
-      | A.Set(name, e) => raise Unimplemented
+      | A.Set(name, e) =>
+        if not (isval e) then
+            A.Set(name, step e)
+        else
+            (HashTable.insert expForSym (name, e);
+             A.Ret e)
+
 
 and step e =
     let val _ = typeof e in
@@ -1214,11 +1220,18 @@ val cmd1 : cmd = Bnd ("x",Cmd (Get "sym"),Ret (Var ("x",0)));
 val syms : (string, A.exp) HashTable.hash_table =
     HashTable.mkTable (HashString.hashString, op=)
     (42 (*initial size*), Fail "not found");
+
 val () = HashTable.insert syms ("sym", Succ Zero);
 val Bnd ("x",Cmd (Ret (Succ Zero)),Ret (Var ("x",0))) : cmd = stepCmd' cmd1 syms;
 
 val cmd2 : cmd = Bnd ("x",Cmd (Get "dne"),Ret (Var ("x",0)));
 val Ret Zero = stepCmd' cmd2 syms handle UnknownSymbol => Ret Zero;
+
+(* Set turns into Ret and writes its corresponding symbol *)
+val cmd3 : cmd =
+    Bnd ("x",Cmd (Set("sym", (Succ (Succ Zero)))),Ret (Var ("x",0)));
+val Bnd ("x",Cmd (Ret (Succ (Succ Zero))),Ret (Var ("x",0))) : cmd = stepCmd' cmd3 syms;
+val SOME(Succ (Succ Zero)) = HashTable.find syms "sym";
 
 in
 ()
