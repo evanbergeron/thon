@@ -569,7 +569,6 @@ fun stepCmd' c expForSym =
             in
                 A.Ret e'
             end
-
       | A.Get name =>
         (case HashTable.find expForSym name of
              SOME e => A.Ret e
@@ -1251,6 +1250,12 @@ val cmd3 : cmd =
     Bnd ("x",Cmd (Set("sym", (Succ (Succ Zero)))),Ret (Var ("x",0)));
 val Bnd ("x",Cmd (Ret (Succ (Succ Zero))),Ret (Var ("x",0))) : cmd = stepCmd' cmd3 syms;
 val SOME(Succ (Succ Zero)) = HashTable.find syms "sym";
+
+val Dcl ("foo",Succ Zero,Ret (Succ Zero)) : cmd =
+    stepCmd (Dcl ("foo", Zero, Set("foo", Succ Zero)))
+
+val Ret (Succ Zero) : cmd =
+    stepCmd (Dcl ("foo",Succ Zero,Ret (Succ Zero)))
 
 in
 ()
