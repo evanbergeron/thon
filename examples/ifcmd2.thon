@@ -1,5 +1,8 @@
 run
-ifz ret S Z then
-    ret Z
+ifz ret Z then
+    dcl foo := Z in
+    bnd unused <- cmd(foo := S Z);
+    @foo    
 else
-    ret S Z
+    dcl bar := Z in
+    bar := S S S Z 

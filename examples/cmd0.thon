@@ -1,0 +1,3 @@
+run
+    bnd x <- cmd(ret Z);
+    ret x

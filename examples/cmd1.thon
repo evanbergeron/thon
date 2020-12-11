@@ -1,5 +1,4 @@
-(* if cond then ret Z else ret S Z *)
-(* note the order flips *)
+(* if cond then ret S Z else ret Z *)
 run
 bnd cond <- cmd(ret Z);
 do ifz cond of
