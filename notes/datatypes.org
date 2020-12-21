@@ -1,0 +1,8 @@
+SML 90 got local datatype declarations a bit wrong -
+let datatype t = C in C end
+was legal, but is not in SML 97.
+
+SML 97 disallows C to escape the scope. This is similar to the
+type-checking for existential packages - that plus the generativity of
+`use` (`use` declares a type var) may be why we want to elaborate to
+existential packges.
