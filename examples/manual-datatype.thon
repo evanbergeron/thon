@@ -2,27 +2,19 @@
  * Datatypes are a combination of three different language features:
  * sum types, recursive types, and existential types.
  *
- * Here's a slightly reworded snippet from the introduction of the
- * paper "Typed Compiliation of Recursive Datatypes":
- *
- *    Harper and Stone [translate] a datatype declaration as a module
- *    containing an abstract type and functions to construct and
- *    deconstruct values of that type ... datatypes *are* abstract
- *    types.
- *
- * Or from "A type-theoretic interpretation of standard ML":
+ * From "A type-theoretic interpretation of standard ML":
  *
  *     A datatypes declaration elaborates to a structure consisting of
  *     a type together with operations to create and analyze values of
  *     the type. ... The underlying implementation type is defined to
  *     be a recursive sum type, with one summand corresponding to each
  *     constructor in the declaration. The constructores are
- *     rperesented by total functions that inject values into the
+ *     represented by total functions that inject values into the
  *     appropriate summand of the recursive type. ... The structure is
- *     sealed with a signature derived from the datatype delcaration
+ *     sealed with a signature derived from the datatype declaration 
  *     in which the implementation type is held abstract, and the
- *     operations describe above are declared as operations on that
- *     abstrac type. Holding the implementation type abstract captures
+ *     operations described above are declared as operations on that
+ *     abstract type. Holding the implementation type abstract captures
  *     the "generativity" of datatype declarations in Standard ML; the
  *     declared type is "new" in the sense that it is represented by a
  *     path that is, by alpha-conversion, distinct from all previous
@@ -31,27 +23,26 @@
  *     signature used to seal the structure resulting from elaboration
  *     of the correspond datatype declaration.
  *
- * At the time of writing, I don't understand the last sentence of the
- * above paragraph, but we'll do the rest of it.
- *
  * So here's some thon code that manually implements
  *
  * data List = Nil | Cons of int * List
  *
- * Still want to double-check this.
- *
  *)
-impl (some t. ((unit -> t) * (((nat * t) -> t))))
-with (u l. (unit |  (nat * l))) as
-(
-    (* Nil *)
-    \ inUnit : unit ->
+let ListImpl : (some t. (t * (((nat * t) -> t)))) =
+    impl (some t. (t * (((nat * t) -> t))))
+    with (u l. (unit |  (nat * l))) as
+    (
+        (* Nil - since this takes no args, may as well return val directly *)
         fold u l. (unit | (nat * l))
-        with left inUnit : (unit |  (nat * (u l . (unit | (nat * l)))))
-    ,
-    (* Cons *)
-    \ natAndNatList : (nat * (u l. (unit |  (nat * l)))) ->
-        fold u l.(unit |  (nat * l))
-        with right natAndNatList : (unit
-                                  | (nat * (u l. (unit |  (nat * l)))))
-)
+        with left unit : (unit |  (nat * (u l . (unit | (nat * l)))))
+        ,
+        (* Cons *)
+        \ natAndNatList : (nat * (u l. (unit |  (nat * l)))) ->
+            fold u l.(unit |  (nat * l))
+            with right natAndNatList : (unit
+                                     | (nat * (u l. (unit |  (nat * l)))))
+    )
+in use ListImpl as (li, List) in
+let Nil : List = fst li in
+let Cons : (nat * List) -> List = snd li in
+Z
