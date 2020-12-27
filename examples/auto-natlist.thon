@@ -1,0 +1,6 @@
+data List = Nil unit | Cons nat * List
+
+in fun isempty : List -> nat =
+    \ natlist : (List) -> Z
+
+in (isempty Nil)

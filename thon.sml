@@ -12,6 +12,7 @@ structure Thon : sig
                    val eraseNamesInTyp : A.typ -> A.typ
                    val runFile : string -> A.exp
                    val findParseErrors : string -> unit
+                   val elaborateDatatypes : A.exp -> A.exp
                  end =
 struct
 
@@ -107,6 +108,17 @@ fun decrDeBruijinIndices t =
       | A.TyRec (name, t') => A.TyRec(name, decrDeBruijinIndices t')
 
 
+(* UNDONE error on negative index - right now just using to incr i think *)
+fun shiftDeBruijinIndicesInVar j (A.Var(name, i)) = A.Var(name, i + j)
+  | shiftDeBruijinIndicesInVar j e = e
+
+fun shiftDeBruijinIndicesInTypVar j (A.TypVar(name, i)) = A.TypVar(name, i + j)
+  | shiftDeBruijinIndicesInTypVar j t = t
+
+fun shiftDeBruijinIndicesInExp j e = A.expMap (shiftDeBruijinIndicesInVar j) e
+
+fun shiftDeBruijinIndicesInTyp j t = A.typMap (shiftDeBruijinIndicesInTypVar j) t
+
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
 fun substTypeInExp' srcType dstExp bindingDepth =
     case dstExp
@@ -182,7 +194,7 @@ fun setDeBruijnIndexInType t varnames typnames =
          (case find name typnames of
              NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
            | SOME i => A.TypVar (name, i))
-       | A.Arr(d, c) => 
+       | A.Arr(d, c) =>
             A.Arr(setDeBruijnIndexInType d varnames typnames,
                   setDeBruijnIndexInType c varnames typnames)
        | A.Prod(l, r) =>
@@ -271,8 +283,62 @@ fun setDeBruijnIndex e varnames typnames =
             A.Impl(setDeBruijnIndexInType reprType varnames typnames,
                    setDeBruijnIndex pkgImpl varnames typnames,
                    setDeBruijnIndexInType pkgType varnames typnames)
+       | A.Data(dname, lname, ltyp, rname, rtyp, exp) =>
+         A.Data(dname,
+                lname,
+                (* binds a typ var*)
+                setDeBruijnIndexInType ltyp varnames (dname::typnames),
+                rname,
+                (* binds a typ var*)
+                setDeBruijnIndexInType rtyp varnames (dname::typnames),
+                setDeBruijnIndex exp (lname::rname::varnames) (dname::typnames)
+               )
        | _ => raise Unimplemented (* TODO *)
 end
+
+fun elaborateDatatype e =
+    case e of
+        A.Data(dataname, lname, ltyp, rname, rtyp, exp) =>
+        let
+            val datanameimpl = dataname ^ "Impl"
+            val withType = A.TyRec(dataname, A.Plus(ltyp, rtyp))
+            (* dataname is not bound here - the recursive reference is bound to the abstract
+             * type bound in the Some *)
+            val tInLtyp = substType (A.TypVar("t", 0)) ltyp
+            val tInRtyp = substType (A.TypVar("t", 0)) rtyp
+            val pkgType = A.Some("t", (*arbitrary name ok here *)
+                                 A.Prod(A.Arr(tInLtyp, A.TypVar("t", 0)),
+                                        A.Arr(tInRtyp, A.TypVar("t", 0))))
+            val lfn = A.Fn("foo", substType withType ltyp,
+                           A.Fold(withType, A.PlusLeft(
+                                      A.Plus(substType withType ltyp,
+                                             substType withType rtyp),
+                                      A.Var("foo", 0)
+                                  )))
+            val rfn = A.Fn("natAndNatList", substType withType rtyp,
+                           A.Fold(withType, A.PlusRight(
+                                      A.Plus(substType withType ltyp,
+                                             substType withType rtyp),
+                                      A.Var("natAndNatList", 0)
+                                  )))
+            val dtval = A.Impl(withType,
+                               A.Pair(lfn, rfn),
+                               pkgType)
+            val useExp =
+                A.Use(A.Var(datanameimpl, 0), "li", dataname,
+                A.Let(lname, (A.Arr(ltyp, A.TypVar(dataname, 0))), A.ProdLeft(A.Var("li", 0)),
+                (A.Let(rname, (A.Arr(rtyp, A.TypVar(dataname, 0))), A.ProdRight(A.Var("li", 1)),
+                (* TODO need to shift some DeBruijin indices around since we've manually
+                 * bound variables here (in both types and exprs) *)
+                exp))))
+
+        in
+            A.Let(datanameimpl, pkgType, dtval, useExp)
+        end
+      | _ => e
+
+
+fun elaborateDatatypes e = A.expMap elaborateDatatype e
 
 
 fun substTypeInExp srcType dstExp = substTypeInExp' srcType dstExp 0
@@ -570,10 +636,19 @@ fun findParseErrors filename =
 
 fun eval e = if isval e then e else eval (step e)
 
-fun run s = let val e = parse s in if isval e then e else eval (step e) end
+fun run s =
+    let val e' = parse s
+        val e = elaborateDatatypes e'
+    in
+        if isval e then e else eval (step e)
+    end
 
-fun runFile s = let val e = parseFile s in if isval e then e else eval (step e) end
-
+fun runFile s =
+    let val e' = parseFile s
+        val e = elaborateDatatypes e'
+    in
+        if isval e then e else eval (step e)
+    end
 
 
 (******* Tests *******)
@@ -946,7 +1021,7 @@ val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero));
 val TypFn ("s", Fn("x",TypVar ("s", 0),Var ("x", 0))) : Ast.exp =
     parse "poly s -> \\ x : s -> x";
 (* TODO also wrong *)
-val TypFn("t", TypFn ("t'",Fn ("x",Arr (TypVar ("t",1),TypVar ("t'",0)),Var ("x",0)))) = 
+val TypFn("t", TypFn ("t'",Fn ("x",Arr (TypVar ("t",1),TypVar ("t'",0)),Var ("x",0)))) =
     parse "poly t -> poly t' -> \\ x : (t -> t') -> x";
 val TypApp (Nat,TypFn ("s", Fn("x",TypVar ("s", 0),Var ("x",0)))) =
     parse "((poly s -> \\ x : s -> x) (nat))";
@@ -1092,6 +1167,17 @@ val true = (zerobst = appbst);
 val Succ (Succ Zero) = runFile "/home/evan/thon/examples/setget.thon";
 
 val TypFn ("t", Zero) = runFile "/home/evan/thon/examples/typnames.thon";
+
+val
+  Data
+    ("List","Nil",Unit,"Cons",
+     Prod (Nat,Some ("t",Arr (TypVar ("t",0),TypVar ("List",1)))),Zero)
+  : Ast.exp =
+    parse "data List = Nil unit | Cons nat * (some t. t -> List) in Z";
+
+val manualDatatype = parseFile "/home/evan/thon/examples/manual-datatype.thon";
+val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * List in Z");
+val true = (manualDatatype = autoDatatype);
 
 in
 ()

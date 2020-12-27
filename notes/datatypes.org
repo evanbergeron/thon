@@ -6,3 +6,7 @@ SML 97 disallows C to escape the scope. This is similar to the
 type-checking for existential packages - that plus the generativity of
 `use` (`use` declares a type var) may be why we want to elaborate to
 existential packges.
+
+* Helpful links
+Talks about separating generativity, union, and recursive
+https://courses.cs.washington.edu/courses/cse341/04wi/lectures/07-ml-user-types.html

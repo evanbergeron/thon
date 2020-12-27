@@ -1,11 +1,11 @@
-fun isempty : (data l = (unit | nat * l)) -> nat =
-  \ natlist : (data l = (unit | nat * l)) ->
+fun isempty : (u l. (unit | nat * l)) -> nat =
+  \ natlist : (u l. (unit | nat * l)) ->
         (case (unfold natlist) of
            empty -> S Z
          | not -> Z)
-in let nil : (data l = (unit | nat * l)) =
-    fold data l = (unit | nat * l) with
+in let nil : (u l. (unit | nat * l)) =
+    fold u l. (unit | nat * l) with
     left unit : (unit
-               | nat * (data l = (unit | nat * l)))
+               | nat * (u l. (unit | nat * l)))
 in
 (isempty nil)

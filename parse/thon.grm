@@ -100,6 +100,7 @@ exp:
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
   | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
+  | DATA ID EQ ID typ PIPE ID typ IN exp (A.Data(ID1, ID2, typ1, ID3, typ2, exp))
 
 typ:
     NAT (A.Nat)
@@ -111,6 +112,5 @@ typ:
   | ALL ID DOT typ (A.All (ID, typ))
   | SOME ID DOT typ (A.Some (ID, typ))
   | TYPEREC ID DOT typ (A.TyRec (ID, typ))
-  | DATA ID EQ typ (A.TyRec (ID, typ))
   (* TODO should this take precedence below star and arrow? *)
   | typ PIPE typ %prec TYPEOR (A.Plus (typ1, typ2))

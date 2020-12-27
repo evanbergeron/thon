@@ -24,12 +24,15 @@ sig
       | App of exp * exp
       | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * string * exp (*recCase - binds*)
       | Fix of string (*x*) * typ (*: t*) * exp (*x's scope*)
-      | Data of string (*x*) * typ (*= t*) * exp (*x's scope*)
       | TypFn of string * exp (* binds type variable *)
       | Ifz of exp * exp * string * exp
       | TypApp of typ * exp
       | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
       | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
+      | Data of string *
+                string * typ *
+                string * typ *
+                exp (*TODO non-binary datatypes*)
       | Pair of exp * exp
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of exp
@@ -79,12 +82,15 @@ struct
       | App of exp * exp
       | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * string * exp (*recCase - binds*)
       | Fix of string (*x*) * typ (*: t*) * exp (*x's scope*)
-      | Data of string (*x*) * typ (*= t*) * exp (*x's scope*)
       | TypFn of string * exp (* binds type variable *)
       | Ifz of exp * exp * string * exp
       | TypApp of typ * exp
       | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
       | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
+      | Data of string *
+                string * typ *
+                string * typ *
+                exp (*TODO non-binary datatypes*)
       | Pair of exp * exp
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of exp
@@ -105,29 +111,31 @@ struct
          of  Zero => f Zero
            | TmUnit => f TmUnit
            | Var (name, n)  => f (Var(name, n))
-           | Succ e' => Succ (expMap f e')
-           | ProdLeft e' => ProdLeft(expMap f e')
-           | ProdRight e' => ProdRight(expMap f e')
-           | PlusLeft(t, e') => PlusLeft(t, expMap f e')
-           | PlusRight(t, e') => PlusRight(t, e')
+           | Succ e' => f (Succ (expMap f e'))
+           | ProdLeft e' => f (ProdLeft(expMap f e'))
+           | ProdRight e' => f (ProdRight(expMap f e'))
+           | PlusLeft(t, e') => f (PlusLeft(t, expMap f e'))
+           | PlusRight(t, e') => f (PlusRight(t, expMap f e'))
            | Case(c, lname, l, rname, r) =>
-             Case(expMap f c, lname, expMap f l, rname, expMap f r)
-           | Fn(argName, t, f') => Fn(argName, t, (expMap f f'))
+             f (Case(expMap f c, lname, expMap f l, rname, expMap f r))
+           | Fn(argName, t, f') => f (Fn(argName, t, (expMap f f')))
            | Let(varname, vartype, varval, varscope) =>
-             Let(varname, vartype, (expMap f varval), (expMap f varscope))
-           | App(f', n) => App((expMap f f'), expMap f n)
-           | Ifz(i, t, prev, e) => Ifz(expMap f i, expMap f t, prev, expMap f e)
+             f (Let(varname, vartype, (expMap f varval), (expMap f varscope)))
+           | App(f', n) => f (App((expMap f f'), expMap f n))
+           | Ifz(i, t, prev, e) => f (Ifz(expMap f i, expMap f t, prev, expMap f e))
            | Rec(i, baseCase, prevCaseName, recCase) =>
-             Rec(expMap f i, expMap f baseCase, prevCaseName, expMap f recCase)
-           | Fix(name, t, e') => Fix(name, t, expMap f e')
-           | TypFn (name, e') => TypFn (name, expMap f e')
-           | TypApp (appType, e') => TypApp(appType, expMap f e')
-           | Impl(reprType, pkgImpl, t) => Impl(reprType, expMap f pkgImpl, t)
+             f (Rec(expMap f i, expMap f baseCase, prevCaseName, expMap f recCase))
+           | Fix(name, t, e') => f (Fix(name, t, expMap f e'))
+           | TypFn (name, e') => f (TypFn (name, expMap f e'))
+           | TypApp (appType, e') => f (TypApp(appType, expMap f e'))
+           | Impl(reprType, pkgImpl, t) => f (Impl(reprType, expMap f pkgImpl, t))
            | Use(pkg, clientName, typeName, client) =>
-             Use(expMap f pkg, clientName, typeName, expMap f client)
-           | Pair(l, r) => Pair(expMap f l, expMap f r)
-           | Fold(t, e') => Fold(t, (expMap f e'))
-           | Unfold(e') => Unfold(expMap f e')
+             f (Use(expMap f pkg, clientName, typeName, expMap f client))
+           | Pair(l, r) => f (Pair(expMap f l, expMap f r))
+           | Fold(t, e') => f (Fold(t, (expMap f e')))
+           | Unfold(e') => f (Unfold(expMap f e'))
+           | Data(dataname, lname, ltyp, rname, rtyp, exp) =>
+             f (Data(dataname, lname, ltyp, rname, rtyp, f exp))
 
     (* DEVNOTE this applies f at every node *)
     fun typMap f t =

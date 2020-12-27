@@ -28,21 +28,22 @@
  * data List = Nil | Cons of int * List
  *
  *)
-let ListImpl : (some t. (t * (((nat * t) -> t)))) =
-    impl (some t. (t * (((nat * t) -> t))))
-    with (u l. (unit |  (nat * l))) as
+let ListImpl : (some t. ((unit -> t) * (((nat * t) -> t)))) =
+    impl (some t. ((unit -> t) * (((nat * t) -> t))))
+    with (u List. (unit |  (nat * List))) as
     (
-        (* Nil - since this takes no args, may as well return val directly *)
-        fold u l. (unit | (nat * l))
-        with left unit : (unit |  (nat * (u l . (unit | (nat * l)))))
+        (* Nil *)
+        \ foo : unit ->
+            fold u List. (unit | (nat * List))
+            with left foo : (unit |  (nat * (u List . (unit | (nat * List)))))
         ,
         (* Cons *)
-        \ natAndNatList : (nat * (u l. (unit |  (nat * l)))) ->
-            fold u l.(unit |  (nat * l))
+        \ natAndNatList : (nat * (u List. (unit |  (nat * List)))) ->
+            fold u List.(unit |  (nat * List))
             with right natAndNatList : (unit
-                                     | (nat * (u l. (unit |  (nat * l)))))
+                                     | (nat * (u List. (unit |  (nat * List)))))
     )
 in use ListImpl as (li, List) in
-let Nil : List = fst li in
+let Nil : unit -> List = fst li in
 let Cons : (nat * List) -> List = snd li in
 Z
