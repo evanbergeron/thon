@@ -1,25 +1,21 @@
 # thon
 
 thon is a small programming language. Here's an example program that
-verifies the empty list is empty.
+verifies the singleton list is not empty.
 
 ```
-fun isempty : (data l = (unit | nat * l)) -> nat =
-  \ natlist : (data l = (unit | nat * l)) ->
-        (case (unfold natlist) of
+data list = Nil unit | Cons nat * list in
+fun isempty : list -> nat =
+  \ natlist : list ->
+        (case (exposelist natlist) of
            empty -> S Z
          | not -> Z)
-in let nil : (data l = (unit | nat * l)) =
-    fold data l = (unit | nat * l) with
-    left unit : (unit
-               | nat * (data l = (unit | nat * l)))
-in
-(isempty nil)
+in (isempty (Cons (Z, (Nil unit))))
 ```
 
 thon has natural numbers, functions, recursion, binary product and sum
 types, polymorphism, existential packages (a formalization of
-interfaces), and recursive types.
+interfaces), recursive types, and binary algebraic datatypes.
 
 ## natural numbers
 
@@ -162,19 +158,19 @@ abstract, we can equivalently use the other implementation.
 
 ## recursive types
 
-`data nats = (unit | (nat * nats))` is the type of lists natural numbers. 
+`u nats. (unit | (nat * nats))` is the type of lists natural numbers.
 
 ```
-fold data nats = (unit | (nat * nats))
-with left unit : (unit | (nat * (data nats = (unit | (nat * nats)))))
+fold u nats.  (unit | (nat * nats))
+with left unit : (unit | (nat * (u nats. (unit | (nat * nats)))))
 ```
 
 is the empty list of natural numbers.
 
 ```
-\ (nat * (data nats = (unit | nat * nats))) ->
-   fold data nats = (unit | nat * nats) with
-   right 0 : (unit | nat * (data nats = (unit | nat * nats)))
+\ (nat * (u nats. (unit | nat * nats))) ->
+   fold u nats. (unit | nat * nats) with
+   right 0 : (unit | nat * (u nats. (unit | nat * nats)))
 ```
 
 is a function that takes a pair (nat, natlist) and prepends nat to natlist.
@@ -208,7 +204,7 @@ A fun program I wrote after adding recursion. Pretty much all the code
 I've written in thon is available through the git repo.
 
 ```
-let isone : nat -> nat = 
+let isone : nat -> nat =
   \ n : nat ->
     ifz n of
       Z -> Z (*false*)
