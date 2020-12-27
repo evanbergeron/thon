@@ -1232,7 +1232,8 @@ val
 val manualDatatype = parseFile "/home/evan/thon/examples/manual-datatype.thon";
 val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * List in Z");
 
-val (Succ Zero) = runFile "/home/evan/thon/examples/auto-natlist.thon";
+val Zero = runFile "/home/evan/thon/examples/auto-natlist.thon";
+val Succ (Succ Zero) = runFile "/home/evan/thon/examples/bst-depth.thon";
 
 in
 ()
