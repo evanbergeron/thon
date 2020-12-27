@@ -4,13 +4,13 @@ thon is a small programming language. Here's an example program that
 verifies the singleton list is not empty.
 
 ```
-data list = Nil unit | Cons nat * list in
+data list = nil unit | cons nat * list in
 fun isempty : list -> nat =
   \ natlist : list ->
-        (case (exposelist natlist) of
-           empty -> S Z
-         | not -> Z)
-in (isempty (Cons (Z, (Nil unit))))
+  case exposelist natlist of
+      empty -> S Z
+    | not -> Z
+in (isempty (cons (Z, (nil unit))))
 ```
 
 thon has natural numbers, functions, recursion, binary product and sum
