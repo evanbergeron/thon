@@ -1,5 +1,7 @@
-let x : nat = S Z in
-data List = Nil unit | Cons nat * List
-in let isempty : List -> nat =
-    \ natlist : (List) -> x
+data List = Nil unit | Cons nat * List in
+fun isempty : List -> nat =
+  \ natlist : List ->
+        (case (exposeList natlist) of
+           empty -> S Z
+         | not -> Z)
 in (isempty (Nil unit))

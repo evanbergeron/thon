@@ -328,7 +328,7 @@ fun setDeBruijnIndex e varnames typnames =
                 (* binds a typ var*)
                 setDeBruijnIndexInType rtyp varnames (dname::typnames),
                 (* binds lname and rname and dname *)
-                setDeBruijnIndex exp (rname::lname::varnames) (dname::typnames)
+                setDeBruijnIndex exp (("expose" ^ dname)::rname::lname::varnames) (dname::typnames)
                )
        | _ => raise Unimplemented (* TODO *)
 end
@@ -343,9 +343,14 @@ fun elaborateDatatype e =
              * type bound in the Some *)
             val tInLtyp = substType (A.TypVar("t", 0)) ltyp
             val tInRtyp = substType (A.TypVar("t", 0)) rtyp
+            val exposeFnType = A.Arr(A.TypVar("t", 0),
+                                     A.Plus(tInLtyp, tInRtyp))
+            val exposeFn = A.Fn(dataname ^ "exp", withType, A.Unfold(A.Var(dataname ^ "exp", 0)))
             val pkgType = A.Some("t", (*arbitrary name ok here *)
-                                 A.Prod(A.Arr(tInLtyp, A.TypVar("t", 0)),
-                                        A.Arr(tInRtyp, A.TypVar("t", 0))))
+                                 A.Prod(A.Prod(A.Arr(tInLtyp, A.TypVar("t", 0)),
+                                               A.Arr(tInRtyp, A.TypVar("t", 0))),
+                                 exposeFnType)
+                                )
             val lfn = A.Fn("foo", substType withType ltyp,
                            A.Fold(withType, A.PlusLeft(
                                       A.Plus(substType withType ltyp,
@@ -359,12 +364,15 @@ fun elaborateDatatype e =
                                       A.Var("natAndNatList", 0)
                                   )))
             val dtval = A.Impl(withType,
-                               A.Pair(lfn, rfn),
+                               A.Pair(A.Pair(lfn, rfn), exposeFn),
                                pkgType)
             val useExp =
                 A.Use(A.Var(datanameimpl, 0), "li", dataname,
-                A.Let(lname, (A.Arr(ltyp, A.TypVar(dataname, 0))), A.ProdLeft(A.Var("li", 0)),
-                (A.Let(rname, (A.Arr(rtyp, A.TypVar(dataname, 0))), A.ProdRight(A.Var("li", 1)),
+                A.Let(lname, (A.Arr(ltyp, A.TypVar(dataname, 0))), A.ProdLeft(A.ProdLeft(A.Var("li", 0))),
+               (A.Let(rname, (A.Arr(rtyp, A.TypVar(dataname, 0))), A.ProdRight(A.ProdLeft(A.Var("li", 1))),
+                A.Let("expose" ^ dataname,
+                      (A.Arr(A.TypVar(dataname, 0), A.Plus(ltyp, rtyp))),
+                      A.ProdRight(A.Var("li", 2)),
                 (* We've already bound term vars lname and rname, and type var dname.
                  *
                  * We have package impl to bind still, the use impl pkg exp to bind,
@@ -377,8 +385,7 @@ fun elaborateDatatype e =
                  * Need to bind impl and use vars. (Which are bound immediately before
                  * the two sides of the datatype declaration).
                  *)
-                (shiftDeBruijinIndicesInExp 2 exp 2)))))
-
+                (shiftDeBruijinIndicesInExp 3 exp 3))))))
         in
             A.Let(datanameimpl, pkgType, dtval, useExp)
         end
@@ -1224,9 +1231,8 @@ val
 
 val manualDatatype = parseFile "/home/evan/thon/examples/manual-datatype.thon";
 val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * List in Z");
-val true = (manualDatatype = autoDatatype);
 
-val Succ Zero = runFile "/home/evan/thon/examples/auto-natlist.thon"; 
+val (Succ Zero) = runFile "/home/evan/thon/examples/auto-natlist.thon";
 
 in
 ()
