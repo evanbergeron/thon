@@ -13,6 +13,7 @@ structure Thon : sig
                    val runFile : string -> A.exp
                    val findParseErrors : string -> unit
                    val elaborateDatatypes : A.exp -> A.exp
+                   val shiftDeBruijinIndicesInExp : int -> A.exp -> int -> A.exp
                  end =
 struct
 
@@ -108,16 +109,51 @@ fun decrDeBruijinIndices t =
       | A.TyRec (name, t') => A.TyRec(name, decrDeBruijinIndices t')
 
 
-(* UNDONE error on negative index - right now just using to incr i think *)
-fun shiftDeBruijinIndicesInVar j (A.Var(name, i)) = A.Var(name, i + j)
-  | shiftDeBruijinIndicesInVar j e = e
+fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
+    case dst
+     of  A.Zero => A.Zero
+       | A.TmUnit => A.TmUnit
+       | A.Var (name, n)  => if n >= bindingDepth then A.Var(name, n+shift) else
+                             A.Var(name, n)
+       | A.Succ e2 => A.Succ (shiftDeBruijinIndicesInExp shift e2 bindingDepth)
+       | A.ProdLeft e => A.ProdLeft (shiftDeBruijinIndicesInExp shift e bindingDepth)
+       | A.ProdRight e => A.ProdRight (shiftDeBruijinIndicesInExp shift e bindingDepth)
+       | A.PlusLeft (t, e) => A.PlusLeft (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
+       | A.PlusRight (t, e) => A.PlusRight (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
+       | A.Case(c, lname, l, rname, r) =>
+         A.Case(shiftDeBruijinIndicesInExp shift c bindingDepth,
+                lname, shiftDeBruijinIndicesInExp shift l (bindingDepth+1),
+                rname, shiftDeBruijinIndicesInExp shift r (bindingDepth+1))
+       | A.Fn (argName, t, f) => A.Fn(argName, t, (shiftDeBruijinIndicesInExp shift f (bindingDepth+1)))
+       | A.Let (varname, vartype, varval, varscope) =>
+         A.Let(varname,
+               vartype,
+               (shiftDeBruijinIndicesInExp shift varval (bindingDepth)),
+               (shiftDeBruijinIndicesInExp shift varscope (bindingDepth+1)))
+       | A.App (f, n) => A.App((shiftDeBruijinIndicesInExp shift f bindingDepth), (shiftDeBruijinIndicesInExp shift n bindingDepth))
+       | A.Ifz (i, t, prev, e) => A.Ifz(shiftDeBruijinIndicesInExp shift i bindingDepth,
+                                        shiftDeBruijinIndicesInExp shift t bindingDepth,
+                                        prev,
+                                        shiftDeBruijinIndicesInExp shift e (bindingDepth+1)) (* binds *)
+       | A.Rec (i, baseCase, prevCaseName, recCase) =>
+         A.Rec(shiftDeBruijinIndicesInExp shift i bindingDepth,
+               shiftDeBruijinIndicesInExp shift baseCase bindingDepth,
+               prevCaseName, shiftDeBruijinIndicesInExp shift recCase (bindingDepth+1))
+       | A.Fix (name, t, e) =>
+         A.Fix(name, t, shiftDeBruijinIndicesInExp shift e (bindingDepth+1)) (* binds *)
+       | A.TypFn (name, e) => A.TypFn (name, shiftDeBruijinIndicesInExp shift e bindingDepth) (* abstracts over types, not exps *)
+       | A.TypApp (appType, e) => A.TypApp(appType, shiftDeBruijinIndicesInExp shift e bindingDepth)
+       | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, shiftDeBruijinIndicesInExp shift pkgImpl bindingDepth, t)
+       | A.Use (pkg, clientName, typeName, client) =>
+         A.Use(shiftDeBruijinIndicesInExp shift pkg bindingDepth,
+               clientName,
+               typeName,
+               shiftDeBruijinIndicesInExp shift client (bindingDepth+1))
+       | A.Pair (l, r) => A.Pair (shiftDeBruijinIndicesInExp shift l bindingDepth, shiftDeBruijinIndicesInExp shift r bindingDepth)
+       | A.Fold(t, e') => A.Fold(t, (shiftDeBruijinIndicesInExp shift e' (bindingDepth))) (* binds a typ var *)
+       | A.Unfold(e') => A.Unfold(shiftDeBruijinIndicesInExp shift e' (bindingDepth))
 
-fun shiftDeBruijinIndicesInTypVar j (A.TypVar(name, i)) = A.TypVar(name, i + j)
-  | shiftDeBruijinIndicesInTypVar j t = t
 
-fun shiftDeBruijinIndicesInExp j e = A.expMap (shiftDeBruijinIndicesInVar j) e
-
-fun shiftDeBruijinIndicesInTyp j t = A.typMap (shiftDeBruijinIndicesInTypVar j) t
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
 fun substTypeInExp' srcType dstExp bindingDepth =
@@ -291,7 +327,8 @@ fun setDeBruijnIndex e varnames typnames =
                 rname,
                 (* binds a typ var*)
                 setDeBruijnIndexInType rtyp varnames (dname::typnames),
-                setDeBruijnIndex exp (lname::rname::varnames) (dname::typnames)
+                (* binds lname and rname and dname *)
+                setDeBruijnIndex exp (rname::lname::varnames) (dname::typnames)
                )
        | _ => raise Unimplemented (* TODO *)
 end
@@ -328,9 +365,19 @@ fun elaborateDatatype e =
                 A.Use(A.Var(datanameimpl, 0), "li", dataname,
                 A.Let(lname, (A.Arr(ltyp, A.TypVar(dataname, 0))), A.ProdLeft(A.Var("li", 0)),
                 (A.Let(rname, (A.Arr(rtyp, A.TypVar(dataname, 0))), A.ProdRight(A.Var("li", 1)),
-                (* TODO need to shift some DeBruijin indices around since we've manually
-                 * bound variables here (in both types and exprs) *)
-                exp))))
+                (* We've already bound term vars lname and rname, and type var dname.
+                 *
+                 * We have package impl to bind still, the use impl pkg exp to bind,
+                 * the use impl pkg typ var is already bound as dname, and lname and
+                 * rname are already bound.
+                 *
+                 * Just bump by two. Just a term rewrite, no new type variables are
+                 * created in this rewrite.
+                 *
+                 * Need to bind impl and use vars. (Which are bound immediately before
+                 * the two sides of the datatype declaration).
+                 *)
+                (shiftDeBruijinIndicesInExp 2 exp 2)))))
 
         in
             A.Let(datanameimpl, pkgType, dtval, useExp)
@@ -1178,6 +1225,8 @@ val
 val manualDatatype = parseFile "/home/evan/thon/examples/manual-datatype.thon";
 val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * List in Z");
 val true = (manualDatatype = autoDatatype);
+
+val Succ Zero = runFile "/home/evan/thon/examples/auto-natlist.thon"; 
 
 in
 ()

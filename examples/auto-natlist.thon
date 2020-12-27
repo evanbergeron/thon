@@ -1,6 +1,5 @@
+let x : nat = S Z in
 data List = Nil unit | Cons nat * List
-
-in fun isempty : List -> nat =
-    \ natlist : (List) -> Z
-
-in (isempty Nil)
+in let isempty : List -> nat =
+    \ natlist : (List) -> x
+in (isempty (Nil unit))
