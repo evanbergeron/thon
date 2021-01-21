@@ -44,8 +44,8 @@ fun onKeyword kw s =
         prefixOk andalso suffixOk
     end
 
-fun eatKeyword kw s = (
-    TextIO.inputN (s, (String.size kw));
+fun eatWord w s = (
+    TextIO.inputN (s, (String.size w));
     eatWhitespace s
 )
 
@@ -53,25 +53,44 @@ fun lex' s out =
     case lookaheadN s 1 of
         "f" =>
             if onKeyword "fun" s then (
-                eatKeyword "fun" s;
+                eatWord "fun" s;
                 lex' s (FUN::out)
             ) else (
                 let val name = getName s in
-                eatKeyword name s;
+                eatWord name s;
                 lex' s ((NAME name)::out)
                 end
             )
       | "n" =>
             if onKeyword "nat" s then (
-                eatKeyword "nat" s;
+                eatWord "nat" s;
                 lex' s (NAT::out)
             ) else (
                 let val name = getName s in
-                eatKeyword name s;
+                eatWord name s;
                 lex' s ((NAME name)::out)
                 end
             )
-       | other => (print (other ^"\n"); out)
+      | "(" => (
+          eatWord "(" s;
+          lex' s (LPAREN::out)
+      )
+      | ")" => (
+          eatWord ")" s;
+          lex' s (RPAREN::out)
+      )
+      | ":" => (
+          eatWord ":" s;
+          lex' s (COLON::out)
+      )
+      | other => (print (other ^"\n"); out)
+
+      (* | _ => ( *)
+      (*     let val name = getName s in *)
+      (*     eatWord name s; *)
+      (*     lex' s ((NAME name)::out) *)
+      (*     end *)
+      (* ) *)
 
 fun lex s =
     let val backwards = lex' s [] in List.rev backwards end
