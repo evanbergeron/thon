@@ -21,6 +21,14 @@ fun lookaheadOnlyN s n =
         val chars = explode n
     in List.nth (chars, (List.length chars) - 1) end
 
+fun getName' s n =
+    if Char.isSpace (lookaheadOnlyN s n) then
+        lookaheadN s (n-1)
+    else
+        getName' s (n+1)
+
+fun getName s = getName' s 1
+
 fun eatWhitespace stream =
     case TextIO.lookahead stream of
         NONE => ()
@@ -48,16 +56,20 @@ fun lex' s out =
                 eatKeyword "fun" s;
                 lex' s (FUN::out)
             ) else (
-                (* TODO eat name *)
-                out
+                let val name = getName s in
+                eatKeyword name s;
+                lex' s ((NAME name)::out)
+                end
             )
       | "n" =>
             if onKeyword "nat" s then (
                 eatKeyword "nat" s;
                 lex' s (NAT::out)
             ) else (
-                (* TODO eat name *)
-                out
+                let val name = getName s in
+                eatKeyword name s;
+                lex' s ((NAME name)::out)
+                end
             )
        | other => (print (other ^"\n"); out)
 
