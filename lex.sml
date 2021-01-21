@@ -1,26 +1,42 @@
 structure Lex : sig
-              datatype Token = FUN | COLON | LPAREN | RPAREN | NAME of string
+datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string
               val lexFile : string -> Token list
           end  =
 struct 
 
-datatype Token = FUN | COLON | LPAREN | RPAREN | NAME of string
+datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string
 
-fun nextKeyword stream =
-    nextKeywordRec stream ""
-and nextKeywordRec stream out =
-    case TextIO.input1 stream of
-        NONE => out
-      | SOME c => if (Char.isSpace c) orelse (Char.isPunct c) then out else nextKeywordRec stream (out ^ (Char.toString c))
+fun lookaheadN s n =
+    (* Can raise Size *)
+    let val st = TextIO.getInstream s
+        val (n, tail) = TextIO.StreamIO.inputN (st, n);
+    in n
+    end
+
+fun inputWhitespace stream =
+    case TextIO.lookahead stream of
+        NONE => ()
+      | SOME c => if (Char.isSpace c) then
+                  (TextIO.input1 stream; inputWhitespace stream)
+                  else ()
 
 fun lex' s out = 
-    (* case TextIO.lookahead s of *)
-    (* case TextIO.input1 s of *)
-    case nextKeyword s of
+    case lookaheadN s 3 of
         "" => out
-      | "fun" => lex' s (FUN::out)
-      | key => lex' s ((NAME key)::out)
-and lex s = let val backwards = lex' s [] in List.rev backwards end
+      | "fun" => (
+          TextIO.inputN (s, 3);
+          inputWhitespace s;
+          lex' s (FUN::out)
+      )
+      | "nat" => (
+          TextIO.inputN (s, 3);
+          inputWhitespace s;
+          lex' s (NAT::out)
+      )
+      | other => (print (other ^"\n"); out)
+
+fun lex s =
+    let val backwards = lex' s [] in List.rev backwards end
 
 fun lexFile filename = lex (TextIO.openIn filename)
     
