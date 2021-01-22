@@ -1,7 +1,7 @@
 structure Lex : sig
 datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string
-              val lexFile : string -> Token list
-          end  =
+val lexFile : string -> Token list
+end  =
 struct
 
 datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string
@@ -22,7 +22,7 @@ fun lookaheadOnlyN s n =
     in List.nth (chars, (List.length chars) - 1) end
 
 fun getName' s n =
-    if Char.isSpace (lookaheadOnlyN s n) then
+    if not (Char.isAlphaNum (lookaheadOnlyN s n)) then
         lookaheadN s (n-1)
     else
         getName' s (n+1)
@@ -51,7 +51,8 @@ fun eatWord w s = (
 
 fun lex' s out =
     case lookaheadN s 1 of
-        "f" =>
+        "" => out
+      | "f" =>
             if onKeyword "fun" s then (
                 eatWord "fun" s;
                 lex' s (FUN::out)
@@ -83,14 +84,10 @@ fun lex' s out =
           eatWord ":" s;
           lex' s (COLON::out)
       )
-      | other => (print (other ^"\n"); out)
-
-      (* | _ => ( *)
-      (*     let val name = getName s in *)
-      (*     eatWord name s; *)
-      (*     lex' s ((NAME name)::out) *)
-      (*     end *)
-      (* ) *)
+      | other => let val name = getName s in
+                 eatWord name s;
+                 lex' s ((NAME name)::out)
+                 end
 
 fun lex s =
     let val backwards = lex' s [] in List.rev backwards end
