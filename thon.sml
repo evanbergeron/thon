@@ -1265,6 +1265,7 @@ val
    NEWLINE,DEDENT,RETURN,NAME "b",NEWLINE] : Lex.Token list =
     Lex.lexFile "/home/evan/thon/examples/lex02.thon";
 
+val true = (Lex.lexFileNoPrintErrMsg "/home/evan/thon/examples/lex03.thon"; false) handle UnexpectedToken => true;
 
 in
 ()

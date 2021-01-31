@@ -1,0 +1,5 @@
+fun foo(a nat) nat:
+    let x nat -> nat = fn(x nat) nat => s x
+    fun bar(n nat) nat:
+        return n
+    return a

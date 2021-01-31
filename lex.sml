@@ -1,13 +1,14 @@
 structure Lex : sig
 datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
 val lexFile : string -> Token list
+val lexFileNoPrintErrMsg : string -> Token list
 end  =
 struct
 
 datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
 
 exception UnexpectedIndentLevel
-exception UnexpectedToken
+exception UnexpectedToken of string
 
 fun lookaheadN s n =
     (* Can raise Size *)
@@ -107,7 +108,7 @@ and lexLines' s out indentLevel =
             eatWord "=" s;
             lexLines' s (EQUAL::out) indentLevel
         ) else (
-            raise UnexpectedToken
+            raise UnexpectedToken("saw `=`, expected `=>` or `=`")
         )
       | "i" => eatKeywordOrName ("if", IF) s indentLevel out
       | "t" => eatKeywordOrName ("then", THEN) s indentLevel out
@@ -154,24 +155,32 @@ and lexLines' s out indentLevel =
               (eatWord ":" s;
                lexLines' s (COLON::out) indentLevel)
       )
-      | other => let val name = getName s in
-                     eatWord name s;
-                     lexLines' s ((NAME name)::out) indentLevel
-                 end
-                     )
+      | other =>
+        if not (Char.isAlpha (String.sub (other, 0))) then
+            raise UnexpectedToken("indentifiers must start with alphabetic characters")
+        else
+            let val name = getName s in
+            eatWord name s;
+            lexLines' s ((NAME name)::out) indentLevel
+            end
+      )
 
 fun lexLines s indentLevel =
     let val backwards = lexLines' s [] indentLevel in List.rev backwards end
 
-fun lex s =
+fun lex s printErrMsg =
     let
         val indentLevel = ref 0;
         val forewards = lexLines s indentLevel
     in
         forewards
     end
+    handle UnexpectedToken msg => (if printErrMsg then print ("Syntax error: " ^ msg ^ "\n") else ();
+                                   raise (UnexpectedToken msg) )
 
-fun lexFile filename = lex (TextIO.openIn filename)
+fun lexFile filename = lex (TextIO.openIn filename) true
+
+fun lexFileNoPrintErrMsg filename = lex (TextIO.openIn filename) false
 
 
 end
