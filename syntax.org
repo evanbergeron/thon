@@ -29,9 +29,9 @@ are required."
 This is likely why subclassing is ideal...
 
 ** Bob has two criticisms of typeclasses
-*** They insist that a type can implement a type class in exactly one way. 
+*** They insist that a type can implement a type class in exactly one way.
     This is true of rust traits as well.
-*** They confound two separate issues: specifying how a type implements a type class and specifying when such a specification should be used during type inference.  
+*** They confound two separate issues: specifying how a type implements a type class and specifying when such a specification should be used during type inference.
 (See the borked example above).
 
 sign Foo = ()
@@ -65,7 +65,7 @@ Or maybe we just allow both or none?
 binds a fresh type variable t.
 *** use pkg as l : someNatList t in
 *** l : some t (t, (nat, t) -> t) = pkg
-the same as 
+the same as
 open l
 *** l : someNatList t = pkg
 *** l : someNatList t
@@ -103,7 +103,7 @@ polymorphism, but leaving the function part. Providing a type.
 similar to deriving clause of haskell typeclasses, but is at expression layer not type layer.
 similar to impl () for () { } in rust, but it's a many-to-many relationship between impls and sigs
 but i think in rust, for a fixed "struct type" and fixed trait, there is a single impl.
-not the case here. fix a tuple type and a sign. impl() 
+not the case here. fix a tuple type and a sign. impl()
 
 *** pkgImpl deriving (someNatList t) [similar to rust, haskell?]
 similar to haskell, but it's at the expression layer, not the type definition layer. so bit more flexible?
@@ -134,7 +134,7 @@ class someNatList t where (t, (nat, t) -> t)
 or
 class someNatList t = (t, (nat, t) -> t)
 
-instance 
+instance
 
 then we just define an object of this type.
 name : t = ...
@@ -186,7 +186,7 @@ instance Borked (Int, Int) where
 
 instance (Borked a, Borked b) => Borked (a, b) where
     bork (a, b) = ">>" ++ bork a ++ " " ++ bork b ++ "<<"
-    
+
 We have two instances of the typeclass Borked for pairs: one for a pair of Ints and another for a pair of anything else that's Borked. No comments
 
 Suppose that we want to bork a pair of Int values. To do so, the compiler must choose an instance to use. Because these instances are right next to each other, it may seem that it could simply choose the more specific instance. 2 comments
@@ -217,7 +217,7 @@ and
 ```0 * ((nat * 0) -> 0)```
 becomes
 ```some t (t * ((nat * t) -> t))```
-or 
+or
 ```trait Stack = (t * ((nat * t) -> t))```
 and then
 ```impl (0 * ((nat * 0) -> 0)) with (u. (unit |  (nat * 0))) as```
@@ -239,3 +239,123 @@ impl Stack natlist as (...)
 taken from fortress
 factorial(n) requires (n>=0) ensures (result >= 0) =
 * s = [ x | x > 0] would be nice
+
+* New spec
+** Expressions
+
+- Zero is Z
+- Variables are alphanumeric, start with alpha. _ allowed, ' allowed
+- Succ e is S e
+- Fn of argName * argType * funcBody is fn argName argType = argBody. This is an inline expression.
+- Let of foo * t * varval * varscope is
+  probably ok to not allow as an inline expression. So we could have
+
+  let foo t = varval
+  varscope
+
+  the varscope goes up until the dedent
+
+- App f e is an inline expression. f(e)
+
+- Rec of exp (*i : Nat*) * exp (*baseCase: t*) * string * exp (*recCase - binds*)
+  is not reachable from the concrete syntax.
+- Fix of string (*x*) * typ (*: t*) * exp (*x's scope*) is not reachable from the concrete syntax.
+- TypFn of string * exp (* binds type variable *)
+- Ifz of exp * exp * string * exp is not reachable from the concrete syntax (will be replaced by a normal if)
+
+  Inline expression:
+
+  if cond then thenExp else elseExp
+
+  Whitespace sensitive expression:
+
+  if cond:
+      thenExp
+  else:
+      elseExp
+
+- TypApp of typ * exp
+- Impl of reprType * pkgImpl* pkgType
+
+  Whitespace sensitive expression. Must bind to a name.
+
+  module MyMod(reprType) as pkgType:
+      pkgImpl
+
+  e.g.
+
+  data nats = nil | cons nat * nats
+  module Queue(nats) NilCons:
+
+  SML does
+
+  signature AST =
+  sig
+  end
+  structure Ast :> AST =
+  struct
+  end
+
+  signature NilCons:
+      nil = ()
+
+
+
+
+
+  TODO not too sure on this one. Should ask others about this.
+
+- Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
+- Data of foo *
+        Ctor1 * t1 *
+        Ctor2 * t2 *
+        exp (*TODO non-binary datatypes*)
+
+  Whitespace sensitive expression
+
+  data foo = Ctor1 t1 | Ctor2 t2
+  exp
+
+  Alternatively,
+
+  data foo =
+      Ctor1 t1
+    | Ctor2 t2
+  exp
+
+- Pair of e1 * e2.  Inline expression (e1, e2)
+- ProdLeft of exp. Not too sure about this one. I like e[0], e[1], etc, but that introduces out-of-bounds errors.
+  Maybe e[left], e[right]? Maybe skip that syntax and just do left / right for now. Idk.
+- ProdRight of exp. Not directly reachable - only through the datatype syntax.
+- PlusLeft of typ * exp. Not directly reachable - only through the datatype syntax.
+  Probably not directly reachable. Only via the datatype, so it'll depend on the Ctor.
+- PlusRight of typ * exp. Same
+- Case of exp (* thing being cased on*) *
+        string * exp (* Left binds term var *) *
+        string * exp (* Right binds term var *)
+
+  This can expect a datatype expression and automatically call the expose function.
+
+  This is a whitespace sensitive expresison
+
+  case e:
+      Ctor1 e:
+          exp
+      Ctor2 e:
+          exp
+
+- Fold of typ (*binds*) * exp. Not directly reachable.
+- Unfold of exp. Not directly reachable.
+- TmUnit is the inline expression ().
+
+** Types
+
+Nat
+TypVar of string * int
+Arr of typ * typ
+All of string * typ (* binds *)
+Some of string * typ (* binds *)
+Prod of typ * typ
+Plus of typ * typ (* sum type *)
+TyRec of string * typ (* binds *)
+Unit (* nullary sum *)
