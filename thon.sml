@@ -1240,6 +1240,13 @@ open Lex;
 val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,INDENT,FUN,NAME "bar",LPAREN,
      NAME "n",NAT,RPAREN,INDENT,RETURN,NAME "n",DEDENT,RETURN,NAME "a"] = Lex.lexFile "/home/evan/thon/examples/lex00.thon";
 
+val
+  [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,INDENT,LET,NAME "x",NAT,SARROW,
+   NAT,EQUAL,FN,LPAREN,NAME "x",NAT,RPAREN,NAT,DARROW,SUCC,NAME "x",FUN,
+   NAME "bar",LPAREN,NAME "n",NAT,RPAREN,INDENT,RETURN,NAME "n",DEDENT,RETURN,
+   NAME "a"] : Lex.Token list =
+    Lex.lexFile "/home/evan/thon/examples/lex01.thon";
+
 in
 ()
 end

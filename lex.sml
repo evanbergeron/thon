@@ -1,13 +1,13 @@
 structure Lex : sig
-datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW
 val lexFile : string -> Token list
 end  =
 struct
 
-datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN
-
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW
 
 exception UnexpectedIndentLevel
+exception UnexpectedToken
 
 fun lookaheadN s n =
     (* Can raise Size *)
@@ -82,7 +82,33 @@ and lexLines' s out indentLevel =
             else
                 raise UnexpectedIndentLevel
         end
-      | "f" => eatKeywordOrName ("fun", FUN) s indentLevel out
+      | "=" =>
+        if onKeyword "=>" s then (
+            eatWord "=>" s;
+            lexLines' s (DARROW::out) indentLevel
+        ) else if onKeyword "=" s then (
+            eatWord "=" s;
+            lexLines' s (EQUAL::out) indentLevel
+        ) else (
+            raise UnexpectedToken
+        )
+      | "-" => eatKeywordOrName ("->", SARROW) s indentLevel out
+      | "z" => eatKeywordOrName ("z", ZERO) s indentLevel out
+      | "s" => eatKeywordOrName ("s", SUCC) s indentLevel out
+      | "l" => eatKeywordOrName ("let", LET) s indentLevel out
+      | "f" => (* eatKeywordOrName ("fun", FUN) s indentLevel out *)
+        if onKeyword "fun" s then (
+            eatWord "fun" s;
+            lexLines' s (FUN::out) indentLevel
+        ) else if onKeyword "fn" s then (
+            eatWord "fn" s;
+            lexLines' s (FN::out) indentLevel
+        ) else (
+            let val name = getName s in
+                eatWord name s;
+                lexLines' s ((NAME name)::out) indentLevel
+            end
+        )
       | "n" => eatKeywordOrName ("nat", NAT) s indentLevel out
       | "r" => eatKeywordOrName ("return", RETURN) s indentLevel out
       | "(" => (
