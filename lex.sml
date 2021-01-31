@@ -1,10 +1,10 @@
 structure Lex : sig
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
 val lexFile : string -> Token list
 end  =
 struct
 
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
 
 exception UnexpectedIndentLevel
 exception UnexpectedToken
@@ -44,7 +44,7 @@ fun eatWhitespace stream =
     case TextIO.lookahead stream of
         NONE => ()
       (* If I need to spit out NEWLINE tokens, feed `out` down here *)
-      | SOME #"\n" => (TextIO.input1 stream; ())
+      | SOME #"\n" => ((*TextIO.input1 stream*)(); ())
       | SOME c => if (Char.isSpace c)then
                   (TextIO.input1 stream; eatWhitespace stream)
                   else ()
@@ -75,6 +75,7 @@ fun eatKeywordOrName (w, tok) s indentLevel out =
     )
 
 and lexLines' s out indentLevel =
+    (();
     case lookaheadN s 1 of
         "" => out
       | " " =>
@@ -94,6 +95,10 @@ and lexLines' s out indentLevel =
             else
                 raise UnexpectedIndentLevel
         end
+      | "\n" => (
+          TextIO.input1 s; (* can't eatWord here - keep leading spaces *)
+          lexLines' s (NEWLINE::out) indentLevel
+        )
       | "=" =>
         if onKeyword "=>" s then (
             eatWord "=>" s;
@@ -144,7 +149,7 @@ and lexLines' s out indentLevel =
               (eatWord ":\n" s;
                (* could also incr after checking next line *)
                indentLevel := !indentLevel + 1;
-               lexLines' s (INDENT::out) indentLevel)
+               lexLines' s (INDENT::NEWLINE::out) indentLevel)
           else
               (eatWord ":" s;
                lexLines' s (COLON::out) indentLevel)
@@ -153,6 +158,7 @@ and lexLines' s out indentLevel =
                      eatWord name s;
                      lexLines' s ((NAME name)::out) indentLevel
                  end
+                     )
 
 fun lexLines s indentLevel =
     let val backwards = lexLines' s [] indentLevel in List.rev backwards end
