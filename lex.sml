@@ -1,10 +1,10 @@
 structure Lex : sig
-datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT
+datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN
 val lexFile : string -> Token list
 end  =
 struct
 
-datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT
+datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN
 
 
 exception UnexpectedIndentLevel
@@ -53,7 +53,18 @@ fun eatWord w s = (
     eatWhitespace s
 )
 
-fun lexLines' s out indentLevel =
+fun eatKeywordOrName (w, tok) s indentLevel out =
+    if onKeyword w s then (
+        eatWord w s;
+        lexLines' s (tok::out) indentLevel
+    ) else (
+        let val name = getName s in
+            eatWord name s;
+            lexLines' s ((NAME name)::out) indentLevel
+        end
+    )
+
+and lexLines' s out indentLevel =
     case lookaheadN s 1 of
         "" => out
       | " " =>
@@ -66,31 +77,14 @@ fun lexLines' s out indentLevel =
                 (eatWord spaces s;
                  lexLines' s out indentLevel)
             else if lookaheadN s (4 * ((!indentLevel)-1)) = dedentSpaces then
-                (eatWord spaces s;
+                (eatWord dedentSpaces s;
                  lexLines' s (DEDENT::out) indentLevel)
             else
                 raise UnexpectedIndentLevel
         end
-      | "f" =>
-        if onKeyword "fun" s then (
-            eatWord "fun" s;
-            lexLines' s (FUN::out) indentLevel
-        ) else (
-            let val name = getName s in
-                eatWord name s;
-                lexLines' s ((NAME name)::out) indentLevel
-            end
-        )
-      | "n" =>
-        if onKeyword "nat" s then (
-            eatWord "nat" s;
-            lexLines' s (NAT::out) indentLevel
-        ) else (
-            let val name = getName s in
-                eatWord name s;
-                lexLines' s ((NAME name)::out) indentLevel
-            end
-        )
+      | "f" => eatKeywordOrName ("fun", FUN) s indentLevel out
+      | "n" => eatKeywordOrName ("nat", NAT) s indentLevel out
+      | "r" => eatKeywordOrName ("return", RETURN) s indentLevel out
       | "(" => (
           eatWord "(" s;
           lexLines' s (LPAREN::out) indentLevel

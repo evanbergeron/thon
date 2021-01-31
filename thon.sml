@@ -1235,6 +1235,11 @@ val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * 
 val Zero = runFile "/home/evan/thon/examples/auto-natlist.thon";
 val Succ (Succ Zero) = runFile "/home/evan/thon/examples/bst-depth.thon";
 
+(* Handwritten lexer tests *)
+open Lex;
+val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,INDENT,FUN,NAME "bar",LPAREN,
+     NAME "n",NAT,RPAREN,INDENT,RETURN,NAME "n",DEDENT,RETURN,NAME "a"] = Lex.lexFile "/home/evan/thon/examples/lex00.thon";
+
 in
 ()
 end

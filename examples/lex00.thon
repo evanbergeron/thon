@@ -1,0 +1,4 @@
+fun foo(a nat):
+    fun bar(n nat):
+        return n
+    return a
