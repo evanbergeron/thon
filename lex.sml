@@ -43,7 +43,7 @@ fun eatWhitespace stream =
 fun onKeyword kw s =
     let val prefixOk = kw = (lookaheadN s (String.size kw))
         val afterChar = lookaheadOnlyN s ((String.size kw)+1)
-        val suffixOk = Char.isSpace afterChar
+        val suffixOk = not (Char.isAlphaNum afterChar)
     in
         prefixOk andalso suffixOk
     end
