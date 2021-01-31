@@ -1,10 +1,10 @@
 structure Lex : sig
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA
 val lexFile : string -> Token list
 end  =
 struct
 
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA
 
 exception UnexpectedIndentLevel
 exception UnexpectedToken
@@ -22,7 +22,7 @@ fun lookaheadOnlyN s n =
     let val st = TextIO.getInstream s
         val (n, tail) = TextIO.StreamIO.inputN (st, n);
         val chars = explode n
-    in List.nth (chars, (List.length chars) - 1) end
+    in (List.nth (chars, (List.length chars) - 1)) end
 
 fun getName' s n =
     if not (Char.isAlphaNum (lookaheadOnlyN s n)) then
@@ -32,9 +32,18 @@ fun getName' s n =
 
 fun getName s = getName' s 1
 
+fun getNumSpaces' s n =
+    if not (#" " = (lookaheadOnlyN s n)) then
+        n
+    else
+        getNumSpaces' s (n+1)
+
+fun getNumSpaces s = getNumSpaces' s 0
+
 fun eatWhitespace stream =
     case TextIO.lookahead stream of
         NONE => ()
+      (* If I need to spit out NEWLINE tokens, feed `out` down here *)
       | SOME #"\n" => (TextIO.input1 stream; ())
       | SOME c => if (Char.isSpace c)then
                   (TextIO.input1 stream; eatWhitespace stream)
@@ -53,6 +62,7 @@ fun eatWord w s = (
     eatWhitespace s
 )
 
+(* TODO lets 0 be a keyword, which is jank *)
 fun eatKeywordOrName (w, tok) s indentLevel out =
     if onKeyword w s then (
         eatWord w s;
@@ -73,11 +83,13 @@ and lexLines' s out indentLevel =
             val dedentSpaces =
                 String.concat (List.tabulate (4*((!indentLevel)-1), fn _ => " "))
         in
+            (* TODO can dedent unboundedly - use getNumSpaces *)
             if lookaheadN s (4 * (!indentLevel)) = spaces then
                 (eatWord spaces s;
                  lexLines' s out indentLevel)
             else if lookaheadN s (4 * ((!indentLevel)-1)) = dedentSpaces then
                 (eatWord dedentSpaces s;
+                 indentLevel := !indentLevel - 1;
                  lexLines' s (DEDENT::out) indentLevel)
             else
                 raise UnexpectedIndentLevel
@@ -92,11 +104,19 @@ and lexLines' s out indentLevel =
         ) else (
             raise UnexpectedToken
         )
+      | "i" => eatKeywordOrName ("if", IF) s indentLevel out
+      | "t" => eatKeywordOrName ("then", THEN) s indentLevel out
+      | "e" => eatKeywordOrName ("else", ELSE) s indentLevel out
+      | "d" => eatKeywordOrName ("data", DATA) s indentLevel out
+      | "c" => eatKeywordOrName ("case", CASE) s indentLevel out
+      (* TODO can just directly eat single chars *)
+      | "," => eatKeywordOrName (",", COMMA) s indentLevel out
+      | "|" => eatKeywordOrName ("|", BAR) s indentLevel out
       | "-" => eatKeywordOrName ("->", SARROW) s indentLevel out
       | "z" => eatKeywordOrName ("z", ZERO) s indentLevel out
       | "s" => eatKeywordOrName ("s", SUCC) s indentLevel out
       | "l" => eatKeywordOrName ("let", LET) s indentLevel out
-      | "f" => (* eatKeywordOrName ("fun", FUN) s indentLevel out *)
+      | "f" =>
         if onKeyword "fun" s then (
             eatWord "fun" s;
             lexLines' s (FUN::out) indentLevel

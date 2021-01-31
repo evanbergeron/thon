@@ -1,0 +1,18 @@
+fun foo(a nat) nat:
+    let b nat = z
+    let f nat -> nat = fn(x nat) nat => s x
+    if t:
+        let c nat = f(b)
+    else:
+        let c nat = f(a)
+    let p (nat, nat) = (s z, z)
+    data tree = nil | node nat tree tree
+    let n tree = nil
+    let n2 tree = node(z, nil, nil)
+    case n2:
+        nil:
+            return b
+        node(val, l, r):
+            return f(n)
+        return TODOstillNeedToHandleMultiDedent
+    return b
