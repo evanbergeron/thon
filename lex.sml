@@ -1,10 +1,13 @@
 structure Lex : sig
-datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string
+datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT
 val lexFile : string -> Token list
 end  =
 struct
 
-datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string
+datatype Token = FUN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT
+
+
+exception UnexpectedIndentLevel
 
 fun lookaheadN s n =
     (* Can raise Size *)
@@ -32,7 +35,8 @@ fun getName s = getName' s 1
 fun eatWhitespace stream =
     case TextIO.lookahead stream of
         NONE => ()
-      | SOME c => if (Char.isSpace c) then
+      | SOME #"\n" => (TextIO.input1 stream; ())
+      | SOME c => if (Char.isSpace c)then
                   (TextIO.input1 stream; eatWhitespace stream)
                   else ()
 
@@ -49,48 +53,77 @@ fun eatWord w s = (
     eatWhitespace s
 )
 
-fun lex' s out =
+fun lexLines' s out indentLevel =
     case lookaheadN s 1 of
         "" => out
+      | " " =>
+        let val spaces =
+                String.concat (List.tabulate (4*(!indentLevel), fn _ => " "))
+            val dedentSpaces =
+                String.concat (List.tabulate (4*((!indentLevel)-1), fn _ => " "))
+        in
+            if lookaheadN s (4 * (!indentLevel)) = spaces then
+                (eatWord spaces s;
+                 lexLines' s out indentLevel)
+            else if lookaheadN s (4 * ((!indentLevel)-1)) = dedentSpaces then
+                (eatWord spaces s;
+                 lexLines' s (DEDENT::out) indentLevel)
+            else
+                raise UnexpectedIndentLevel
+        end
       | "f" =>
-            if onKeyword "fun" s then (
-                eatWord "fun" s;
-                lex' s (FUN::out)
-            ) else (
-                let val name = getName s in
+        if onKeyword "fun" s then (
+            eatWord "fun" s;
+            lexLines' s (FUN::out) indentLevel
+        ) else (
+            let val name = getName s in
                 eatWord name s;
-                lex' s ((NAME name)::out)
-                end
-            )
+                lexLines' s ((NAME name)::out) indentLevel
+            end
+        )
       | "n" =>
-            if onKeyword "nat" s then (
-                eatWord "nat" s;
-                lex' s (NAT::out)
-            ) else (
-                let val name = getName s in
+        if onKeyword "nat" s then (
+            eatWord "nat" s;
+            lexLines' s (NAT::out) indentLevel
+        ) else (
+            let val name = getName s in
                 eatWord name s;
-                lex' s ((NAME name)::out)
-                end
-            )
+                lexLines' s ((NAME name)::out) indentLevel
+            end
+        )
       | "(" => (
           eatWord "(" s;
-          lex' s (LPAREN::out)
+          lexLines' s (LPAREN::out) indentLevel
       )
       | ")" => (
           eatWord ")" s;
-          lex' s (RPAREN::out)
+          lexLines' s (RPAREN::out) indentLevel
       )
       | ":" => (
-          eatWord ":" s;
-          lex' s (COLON::out)
+          if lookaheadN s 2 = ":\n" then
+              (eatWord ":\n" s;
+               (* could also incr after checking next line *)
+               indentLevel := !indentLevel + 1;
+               lexLines' s (INDENT::out) indentLevel)
+          else
+              (eatWord ":" s;
+               lexLines' s (COLON::out) indentLevel)
       )
       | other => let val name = getName s in
-                 eatWord name s;
-                 lex' s ((NAME name)::out)
+                     eatWord name s;
+                     lexLines' s ((NAME name)::out) indentLevel
                  end
 
+fun lexLines s indentLevel =
+    let val backwards = lexLines' s [] indentLevel in List.rev backwards end
+
 fun lex s =
-    let val backwards = lex' s [] in List.rev backwards end
+    let
+        val indentLevel = ref 0;
+        val forewards = lexLines s indentLevel
+    in
+        forewards
+    end
 
 fun lexFile filename = lex (TextIO.openIn filename)
 
