@@ -1,0 +1,72 @@
+* Russo 99
+https://people.mpi-sws.org/~dreyer/courses/modules/russo99.pdf
+
+"Mini-SML and thus Standard ML is baed on a purely second-order type theory. IN this interpretation, signatures are types parameterised on type variables, functor are polymorphic functions who types have universally quantified type variables, and structure expressions have types with existentially quantified type variables.
+
+A universal quantifier is explicitly introduced when a functor is defined and silently eliminated when it is applied. An existential quantifier is explicltly introduced by a datatype definition or an opaque signature constraint and silently eliminated and re-introduced at other points in the semantics.
+
+* Russo Thesis
+See the section on the Moscow ML implementation - it has some example syntax.
+https://www.microsoft.com/en-us/research/wp-content/uploads/1998/03/Types-for-Modules.pdf
+They don't allow `open` inside core expressions (makes sense, they are inconvenient).
+
+Instead they provide package type elimination inside let expression declaration.
+
+open e as X : S in e'
+
+becomes
+
+let module X as S = e in e' end
+
+In the first syntax, I would have to change
+
+use e as (X, S in e
+
+to
+
+let module X as S = e in e'
+
+signature Nat = sig type nat
+                    val Z:nat
+                    val S:nat -> nat
+                    val plus: nat -> nat -> nat
+                end
+
+structure SafeNat = (* unlimited range but slow *)
+    struct
+        datatype nat = Z | S of nat
+        fun plus Z m = m
+          | plus (S n) m = S (plus n m)
+    end
+    
+
+structure FastNat = (* limited range but fast *)
+    struct type nat = int
+        val Z = 0
+        fun S n = n + 1
+        fun plus n m = n + m
+    end
+
+type natpack = [ NAT ] (* package type *)
+
+val safeNat = [ structure SafeNat as NAT ] (* packing *)
+val fastNat = [ structure FastNat as NAT ]
+
+structure Nat as NAT = (* unpacking *)
+    if (913 mod 7 = 5) then safeNat else fastNat
+
+val natlist = [safeNat,fastNat] : [ NAT ] list
+    
+We could have a whitespace sensitive one and a non-whitespace
+sensitive one? Or just a whitespace sensitive one, maybe. As long as
+all constructs are reachable as whitespace sensitive, any combo should
+be reachable.
+
+structure SafeNat:
+    datatype nat = Z | S of nat
+    fun plus(z nat, m nat) nat:
+        case z:
+            Z:
+                m
+            S n:
+                S (plus(n, m))
