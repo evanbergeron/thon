@@ -626,6 +626,8 @@ val Fn ("x",Nat,Var ("x",0)) : Ast.exp = Thon.newParse "fn (x nat) => x";
 
 val Fn ("x",Nat,Fn ("y",Nat,Var ("y",0))) : Ast.exp = Thon.newParse "fn (x nat) => fn (y nat) => y";
 
+val Succ (Succ Zero) : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/divbytwonew.thon";
+
 in
 ()
 end

@@ -1,0 +1,12 @@
+fun divbytwo(n nat) nat:
+    ifz n:
+        z:
+            z
+        s(p):
+            ifz p:
+                z:
+                    z
+                s(q):
+                    s(divbytwo(q))
+
+divbytwo (s(s(s(s(z)))))

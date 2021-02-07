@@ -1,5 +1,5 @@
 structure Lex : sig
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR | IFZ
 val lex : string -> Token list
 val lexFile : string -> Token list
 val lexFileNoPrintErrMsg : string -> Token list
@@ -7,7 +7,7 @@ val tokenToString : Token -> string
 end  =
 struct
 
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR | IFZ
 
 exception No
 exception UnexpectedIndentLevel
@@ -37,6 +37,7 @@ fun tokenToString FUN = "FUN"
   | tokenToString EQ = "EQ"
   | tokenToString DARROW = "DARROW"
   | tokenToString IF = "IF"
+  | tokenToString IFZ = "IFZ"
   | tokenToString THEN = "THEN"
   | tokenToString ELSE = "ELSE"
   | tokenToString DATA = "DATA"
@@ -178,7 +179,19 @@ and lexLines' s out indentLevel =
             lexLines' s (STAR::out) indentLevel
           )
       | "u" => eatKeywordOrName ("unit", UNIT) s indentLevel out
-      | "i" => eatKeywordOrName ("if", IF) s indentLevel out
+      | "i" =>
+        if onKeyword "ifz" s then (
+            eatWord "ifz" s;
+            lexLines' s (IFZ::out) indentLevel
+        ) else if onKeyword "if" s then (
+            eatWord "if" s;
+            lexLines' s (IF::out) indentLevel
+        ) else (
+            let val name = getName s in
+                eatWord name s;
+                lexLines' s ((NAME name)::out) indentLevel
+            end
+        )
       | "t" => eatKeywordOrName ("then", THEN) s indentLevel out
       | "e" => eatKeywordOrName ("else", ELSE) s indentLevel out
       | "d" => eatKeywordOrName ("data", DATA) s indentLevel out

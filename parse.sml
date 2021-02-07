@@ -208,6 +208,33 @@ and parseExpr tokens i =
                A.Case(caseExpr, fstCaseVarName, fstCaseExpr, sndCaseVarName, sndCaseExpr)
             end
         )
+        | Lex.IFZ => (
+           let
+               val () = expect tokens Lex.IFZ i
+               val ifzExpr = parseExpr tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val () = expect tokens Lex.ZERO i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val zeroExpr = parseExpr tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+               val () = expect tokens Lex.SUCC i
+               val () = expect tokens Lex.LPAREN i
+               val prevName = consumeName tokens i
+               val () = expect tokens Lex.RPAREN i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val succExpr = parseExpr tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+           in
+               A.Ifz(ifzExpr, zeroExpr, prevName, succExpr)
+            end
+        )
         | Lex.NAME name =>
           (case lookahead tokens i of
                SOME Lex.LPAREN => (

@@ -51,12 +51,18 @@ Functions are applied to their arguments by juxtaposition.
 Here's a divide-by-two function:
 
 ```
-fun divbytwo : nat -> nat =
-  \ n : nat ->
-    ifz n of
-      Z -> Z
-    | S p -> ifz p of Z -> Z | S p' -> (S (divbytwo p'))
-in divbytwo (S S S S Z)
+fun divbytwo(n nat) nat:
+    ifz n:
+        z:
+            z
+        s(p):
+            ifz p:
+                z:
+                    z
+                s(q):
+                    s(divbytwo(q))
+
+divbytwo (s(s(s(s(z)))))
 ```
 If the number is zero, we're done. Otherwise, it has some predecessor
 number `p`. If `p` is zero, then return zero (taking the
