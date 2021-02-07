@@ -120,31 +120,37 @@ fun eatKeywordOrName (w, tok) s indentLevel out =
         end
     )
 
+and getIndentDedentTokens s out indentLevel =
+    let
+        (* TODO assert last elt of out is NEWLINE here *)
+        val () = debugPrint ("Indent level: " ^ (Int.toString (!indentLevel)))
+        val numSpaces = eatAndGetNumSpaces s
+        (* UNDONE 2 space indent *)
+        val thisLineIndentLevel = numSpaces div 4;
+        val () = debugPrint ("thisLineIndentLevel " ^ (Int.toString (thisLineIndentLevel)))
+        val tok = if thisLineIndentLevel > (!indentLevel) then INDENT else DEDENT
+        val numToks = abs (thisLineIndentLevel - (!indentLevel))
+        val toks = List.tabulate (numToks, fn _ => tok);
+    in
+        toks
+    end
+
 and lexLines' s out indentLevel =
     (debugPrint "=======================";
      List.map (fn tok => debugPrint (tokenToString tok)) out;
     case lookaheadN s 1 of
         "" => out
-      | " " =>
-        let
-            (* TODO assert last elt of out is NEWLINE here *)
-            val () = debugPrint ("Indent level: " ^ (Int.toString (!indentLevel)))
-            val numSpaces = eatAndGetNumSpaces s
-            (* UNDONE 2 space indent *)
-            val thisLineIndentLevel = numSpaces div 4;
-            val () = debugPrint ("thisLineIndentLevel " ^ (Int.toString (thisLineIndentLevel)))
-            val tok = if thisLineIndentLevel > (!indentLevel) then INDENT else DEDENT
-            val numToks = abs (thisLineIndentLevel - (!indentLevel))
-            val toks = List.tabulate (numToks, fn _ => tok);
+      | " " => 
+        let val toks = getIndentDedentTokens s out indentLevel
         in
-            (
-            if thisLineIndentLevel = (!indentLevel) then
+            if List.length toks = 0 then
                 (* No indent or dedent here *)
                 lexLines' s out indentLevel
             else
-                 (indentLevel := thisLineIndentLevel;
-                 lexLines' s (toks @ out) indentLevel)
-            )
+                (indentLevel := !indentLevel +
+                                ((List.length toks) *
+                                 (if DEDENT = List.nth (toks, 0) then ~1 else 1))
+                ; lexLines' s (toks @ out) indentLevel)
         end
       | "\n" => (
           TextIO.input1 s; (* can't eatWord here - keep leading spaces *)
