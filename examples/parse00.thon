@@ -1,2 +1,2 @@
-fun zero(a nat):
+fun zero(a nat) nat:
     z

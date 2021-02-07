@@ -1281,7 +1281,15 @@ val
 
 val true = (Lex.lexFileNoPrintErrMsg "/home/evan/thon/examples/lex03.thon"; false) handle UnexpectedToken => true;
 
-val Fn ("a",Nat,Zero) : Ast.exp = newRunFile "/home/evan/thon/examples/parse00.thon";
+val Let ("zero",Arr (Nat,Nat),Fix ("zero",Arr (Nat,Nat),Fn ("a",Nat,Zero)),TmUnit)
+    : Ast.exp =
+    newParseFile "/home/evan/thon/examples/parse00.thon";
+
+val Let
+    ("ident",Arr (Nat,Nat),
+     Fix ("ident",Arr (Nat,Nat),Fn ("a",Nat,Var ("a",0))),
+     App (Var ("ident",0),Zero)) : Ast.exp =
+    newParseFile "/home/evan/thon/examples/parse01.thon";
 
 in
 ()

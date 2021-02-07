@@ -6,6 +6,14 @@ exception Unimplemented
 
 fun parse s = A.Zero
 
+fun incr i = (i := !i + 1)
+
+fun println s = print (s  ^ "\n")
+
+fun debugPrint s =
+    if true then println s
+    else ()
+
 fun errMsg (expectedToken, actualToken) =
     ("Expected " ^ (Lex.tokenToString expectedToken) ^
      ", got " ^ (Lex.tokenToString actualToken) ^ "\n")
@@ -15,6 +23,11 @@ fun expect tokens (token : Lex.Token) i =
         (print (errMsg(token,  List.nth (tokens, !i)));
          raise UnexpectedToken(errMsg(token,  List.nth (tokens, !i))))
     else (i := !i + 1)
+
+fun lookahead tokens i =
+    if ((!i)+1) > ((List.length tokens) - 1)
+    then NONE
+    else SOME (List.nth (tokens, ((!i)+1)))
 
 fun consumeName tokens i =
     let val res  =
@@ -27,58 +40,62 @@ fun consumeName tokens i =
     in i := (!i) + 1;
        res end
 
+fun consumeNewlines tokens i =
+    if (!i) >= (List.length tokens) then () else
+    case List.nth (tokens, !i) of
+        Lex.NEWLINE => (incr(i); consumeNewlines tokens i)
+      | _ => ()
+
 fun parseType tokens i =
     case List.nth (tokens, !i) of
         Lex.NAT => (i := (!i) + 1; A.Nat)
       | _ => raise Unimplemented
 
-fun lookahead tokens i =
-    if ((!i)+1) > ((List.length tokens) - 1)
-    then NONE
-    else SOME (List.nth (tokens, ((!i)+1)))
-
 fun parseExpr tokens i =
-    (
-      (case List.nth (tokens, !i) of
-           Lex.FUN =>
-           let
-               val () = expect tokens Lex.FUN i
-               val funcName = consumeName tokens i
-               val () = expect tokens Lex.LPAREN i
-               (* TODO multiple params *)
-               val argName = consumeName tokens i
-               val argType = parseType tokens i
-               val () = expect tokens Lex.RPAREN i
-               val retType = parseType tokens i
-               val funcType = A.Arr(argType, retType)
-               val () = expect tokens Lex.NEWLINE i
-               val () = expect tokens Lex.INDENT i
-               val body = parseExpr tokens i
-               val () = expect tokens Lex.NEWLINE i
-           in
-               A.Let(funcName, funcType, A.Fix(funcName, funcType, A.Fn(argName, argType, body)), A.Zero)
-           end
-         | Lex.ZERO => A.Zero
-         | Lex.NAME name =>
-           (case lookahead tokens i of
-                SOME Lex.LPAREN => (
-                 (* Function application *)
-                 let val funcName = consumeName tokens i
-                     val () = expect tokens Lex.LPAREN i
-                     (* TODO multiple params *)
-                     val arg = parseExpr tokens i
-                     val () = expect tokens Lex.RPAREN i
-                 in
-                     A.App(A.Var(funcName, ~1), arg)
-                 end
-             )
-              | _ => let val () = expect tokens (Lex.NAME name) i
-                     in
-                         A.Var (name, ~1)
-                     end
-           )
+    (if (!i) >= (List.length tokens) then A.TmUnit else
+     (case List.nth (tokens, !i) of
+          Lex.FUN =>
+          let
+              val () = expect tokens Lex.FUN i
+              val funcName = consumeName tokens i
+              val () = expect tokens Lex.LPAREN i
+              (* TODO multiple params *)
+              val argName = consumeName tokens i
+              val argType = parseType tokens i
+              val () = expect tokens Lex.RPAREN i
+              val retType = parseType tokens i
+              val funcType = A.Arr(argType, retType)
+              val () = consumeNewlines tokens i
+              val () = expect tokens Lex.INDENT i
+                                       val () = debugPrint "func ident"
+              val body = parseExpr tokens i
+              val () = consumeNewlines tokens i
+              val rest = parseExpr tokens i
+          in
+              A.Let(funcName, funcType,
+                    A.Fix(funcName, funcType, A.Fn(argName, argType, body)), rest)
+          end
+        | Lex.ZERO => (incr(i); A.Zero)
+        | Lex.NAME name =>
+          (case lookahead tokens i of
+               SOME Lex.LPAREN => (
+                (* Function application *)
+                let val funcName = consumeName tokens i
+                    val () = expect tokens Lex.LPAREN i
+                    (* TODO multiple params *)
+                    val arg = parseExpr tokens i
+                    val () = expect tokens Lex.RPAREN i
+                in
+                    A.App(A.Var(funcName, ~1), arg)
+                end
+            )
+             | _ => let val () = expect tokens (Lex.NAME name) i
+                    in
+                        A.Var (name, ~1)
+                    end
+          )
 
-         | _ => raise Unimplemented)
+        | tok => (println (Lex.tokenToString tok); raise Unimplemented))
     )
 
 fun parseFile filename =

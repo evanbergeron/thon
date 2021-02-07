@@ -1,0 +1,4 @@
+fun ident(a nat) nat:
+    a
+
+ident(z)
