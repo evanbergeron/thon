@@ -44,6 +44,22 @@ fun consumeNewlines tokens i =
         Lex.NEWLINE => (incr(i); consumeNewlines tokens i)
       | _ => ()
 
+(* TODO don't necassarily need to INDENT - output bool if it did and
+ * feed that to consumeEndBlock *)
+fun consumeStartBlock tokens i =
+    let 
+        val () = expect tokens Lex.COLON i
+        val () = consumeNewlines tokens i
+        val () = expect tokens Lex.INDENT i
+    in () end
+
+fun consumeEndBlock tokens i =
+    let 
+        val () = consumeNewlines tokens i
+        val () = expect tokens Lex.DEDENT i
+        val () = consumeNewlines tokens i
+    in () end
+
 fun parseType tokens i =
     let val this =
             (case List.nth (tokens, !i) of
@@ -95,17 +111,10 @@ and parseExpr tokens i =
                val () = expect tokens Lex.RPAREN i
                val retType = parseType tokens i
                val funcType = A.Arr(argType, retType)
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
-               val () = debugPrint (funcName ^ " indent")
+
+               val () = consumeStartBlock tokens i
                val body = parseExpr tokens i
-               val () = debugPrint (funcName ^ " end of body")
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.DEDENT i
-               val () = debugPrint (funcName ^ " dedent")
-               val () = consumeNewlines tokens i
-               val () = debugPrint (funcName ^ " afterwards")
+               val () = consumeEndBlock tokens i
            in
                if (!i) < (List.length tokens) andalso
                   List.nth (tokens, (!i))  = Lex.DEDENT then
@@ -133,17 +142,15 @@ and parseExpr tokens i =
            let
                val () = expect tokens Lex.DATA i
                val datatypeName = consumeName tokens i
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
+
+               val () = consumeStartBlock tokens i
                val fstTypeCtorName = consumeName tokens i
                val fstTypeCtorType = parseType tokens i
                val () = consumeNewlines tokens i
                val sndTypeCtorName = consumeName tokens i
                val sndTypeCtorType = parseType tokens i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.DEDENT i
-               val () = consumeNewlines tokens i
+               val () = consumeEndBlock tokens i
+
            in
                (* TODO handle dedent again case *)
                 let
@@ -190,24 +197,20 @@ and parseExpr tokens i =
            let
                val () = expect tokens Lex.CASE i
                val caseExpr = parseExpr tokens i
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
+
+               val () = consumeStartBlock tokens i
                val fstCaseVarName = consumeName tokens i
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
+
+               val () = consumeStartBlock tokens i
                val fstCaseExpr = parseExpr tokens i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.DEDENT i
+               val () = consumeEndBlock tokens i
+
                val sndCaseVarName = consumeName tokens i
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
+
+               val () = consumeStartBlock tokens i
                val sndCaseExpr = parseExpr tokens i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.DEDENT i
-               val () = consumeNewlines tokens i
+               val () = consumeEndBlock tokens i
+
                val () = expect tokens Lex.DEDENT i
            in
                A.Case(caseExpr, fstCaseVarName, fstCaseExpr, sndCaseVarName, sndCaseExpr)
@@ -217,27 +220,23 @@ and parseExpr tokens i =
            let
                val () = expect tokens Lex.IFZ i
                val ifzExpr = parseExpr tokens i
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
+
+               val () = consumeStartBlock tokens i
                val () = expect tokens Lex.ZERO i
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
+
+               val () = consumeStartBlock tokens i
                val zeroExpr = parseExpr tokens i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.DEDENT i
+               val () = consumeEndBlock tokens i
+
                val () = expect tokens Lex.SUCC i
                val () = expect tokens Lex.LPAREN i
                val prevName = consumeName tokens i
                val () = expect tokens Lex.RPAREN i
-               val () = expect tokens Lex.COLON i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.INDENT i
+
+               val () = consumeStartBlock tokens i
                val succExpr = parseExpr tokens i
-               val () = consumeNewlines tokens i
-               val () = expect tokens Lex.DEDENT i
-               val () = consumeNewlines tokens i
+               val () = consumeEndBlock tokens i
+
                val () = expect tokens Lex.DEDENT i
            in
                A.Ifz(ifzExpr, zeroExpr, prevName, succExpr)
