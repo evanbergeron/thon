@@ -243,7 +243,8 @@ factorial(n) requires (n>=0) ensures (result >= 0) =
 * New spec
 ** Expressions
 
-- Zero is Z
+- Zero i
+  s Z
 - Variables are alphanumeric, start with alpha. _ allowed, ' allowed
 - Succ e is S e
 - Fn of argName * argType * funcBody is fn argName argType = argBody. This is an inline expression.
@@ -347,6 +348,24 @@ factorial(n) requires (n>=0) ensures (result >= 0) =
 - Fold of typ (*binds*) * exp. Not directly reachable.
 - Unfold of exp. Not directly reachable.
 - TmUnit is the inline expression ().
+  
+fun foo(a int) int:
+    let b int = 0
+    let f int -> int = \ x int -> x + 1
+    let t bool = true
+    if t:
+        let c int = f(b)
+    else:
+        let c int = f(a)
+    let p (bool, int) = (false, 0)
+    data tree = nil | node int tree tree
+    let n tree = nil
+    let n2 tree = node(0, nil, nil)
+    case n2 of:
+        nil: return b
+        node(val, l, r):
+            return f(b)
+    return b
 
 ** Types
 
@@ -359,3 +378,5 @@ Prod of typ * typ
 Plus of typ * typ (* sum type *)
 TyRec of string * typ (* binds *)
 Unit (* nullary sum *)
+
+
