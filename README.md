@@ -4,22 +4,31 @@ thon is a small programming language. Here's an example program that
 verifies the singleton list is not empty.
 
 ```
-data list = nil unit | cons nat * list in
-fun isempty : list -> nat =
-  \ natlist : list ->
-  case exposelist natlist of
-      empty -> S Z
-    | not -> Z
-in (isempty (cons (Z, (nil unit))))
+data list:
+    nil unit
+    cons nat * list
+
+fun isempty(l list) nat:
+    case exposelist(l):
+        empty:
+            s(z)
+        not:
+            z
+
+isempty(cons(z, nil(unit)))
 ```
 
 thon has natural numbers, functions, recursion, binary product and sum
 types, polymorphism, existential packages (a formalization of
 interfaces), recursive types, and binary algebraic datatypes.
 
+Thon is currently under syntactic refactoring, so this README
+regrettably mixes examples of the two syntaxes (and likely will
+continue to do so for some time).
+
 ## natural numbers
 
-`Z` is the natural number 0. `S Z` is 1 (the succesor of one). `S S Z` is 2, and so on.
+`z` is the natural number 0. `s(z)` is 1 (the succesor of one). `s(s(z))` is 2, and so on.
 
 ## functions
 
@@ -29,8 +38,8 @@ supports anonymous functions and named, recursive functions.
 Here are some example anonymous functions.
 
 ```
-\ x : nat -> x
-\ x : nat -> (\ y : nat -> y)
+fn (x nat) nat => x
+fn (x nat) => fn (y nat) => y
 ```
 
 Functions are applied to their arguments by juxtaposition.
@@ -66,9 +75,10 @@ fix loop : nat in loop
 ## variables
 
 ```
-let x : nat = Z in x
+let x nat = z
+e
 ```
-binds the name `x` in the expression following the `in` keyword.
+binds the name `x` in the expression `e`.
 
 ## polymorphism
 
