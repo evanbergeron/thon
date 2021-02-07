@@ -227,12 +227,8 @@ and lexLines' s out indentLevel =
           lexLines' s (RPAREN::out) indentLevel
       )
       | ":" => (
-          if lookaheadN s 2 = ":\n" then
-              (eatWord ":" s;
-               lexLines' s out indentLevel)
-          else
-              (eatWord ":" s;
-               lexLines' s (COLON::out) indentLevel)
+          eatWord ":" s;
+          lexLines' s (COLON::out) indentLevel
       )
       | other =>
         if not (Char.isAlpha (String.sub (other, 0))) then
