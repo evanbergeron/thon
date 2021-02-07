@@ -1,5 +1,5 @@
 fun foo(a nat) nat:
-    let x nat -> nat = fn(x nat) nat => s x
+    let x nat -> nat = fn(x nat) => s(x)
     fun bar(n nat) nat:
-        return n
-    return a
+        n
+    a

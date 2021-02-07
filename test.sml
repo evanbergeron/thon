@@ -2,9 +2,9 @@ structure T = Thon
 structure Test : sig
               val test : unit -> unit
           end =
-struct 
+struct
 
-fun test() = let 
+fun test() = let
 open Thon;
 open A;
 (* Data Natlist = None | Some(Nat, Natlist) *)
@@ -541,21 +541,21 @@ val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NEWLINE,INDENT,FUN,NAME "bar",LPA
     = Lex.lexFile "/home/evan/thon/examples/lex00.thon";
 
 val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,NEWLINE,INDENT,LET,NAME "x",
-   NAT,SARROW,NAT,EQUAL,FN,LPAREN,NAME "x",NAT,RPAREN,NAT,DARROW,SUCC,
-   NAME "x",NEWLINE,FUN,NAME "bar",LPAREN,NAME "n",NAT,RPAREN,NAT,NEWLINE,
-   INDENT,RETURN,NAME "n",NEWLINE,DEDENT,RETURN,NAME "a",NEWLINE,DEDENT]
+   NAT,SARROW,NAT,EQ,FN,LPAREN,NAME "x",NAT,RPAREN,DARROW,SUCC,LPAREN,
+   NAME "x",RPAREN,NEWLINE,FUN,NAME "bar",LPAREN,NAME "n",NAT,RPAREN,NAT,
+   NEWLINE,INDENT,NAME "n",NEWLINE,DEDENT,NAME "a",NEWLINE,DEDENT]
   : Lex.Token list =
     Lex.lexFile "/home/evan/thon/examples/lex01.thon";
 
 val
   [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,NEWLINE,INDENT,LET,NAME "b",NAT,
-   EQUAL,ZERO,NEWLINE,LET,NAME "f",NAT,SARROW,NAT,EQUAL,FN,LPAREN,NAME "x",NAT,RPAREN,
-   NAT,DARROW,SUCC,NAME "x",NEWLINE,IF,NAME "t",NEWLINE,INDENT,LET,NAME "c",NAT,EQUAL,
-   NAME "f",LPAREN,NAME "b",RPAREN,NEWLINE,DEDENT,ELSE,NEWLINE,INDENT,LET,NAME "c",NAT,EQUAL,
+   EQ,ZERO,NEWLINE,LET,NAME "f",NAT,SARROW,NAT,EQ,FN,LPAREN,NAME "x",NAT,RPAREN,
+   NAT,DARROW,SUCC,NAME "x",NEWLINE,IF,NAME "t",NEWLINE,INDENT,LET,NAME "c",NAT,EQ,
+   NAME "f",LPAREN,NAME "b",RPAREN,NEWLINE,DEDENT,ELSE,NEWLINE,INDENT,LET,NAME "c",NAT,EQ,
    NAME "f",LPAREN,NAME "a",RPAREN,NEWLINE,DEDENT,LET,NAME "p",LPAREN,NAT,COMMA,NAT,
-   RPAREN,EQUAL,LPAREN,SUCC,ZERO,COMMA,ZERO,RPAREN,NEWLINE,DATA,NAME "tree",EQUAL,
+   RPAREN,EQ,LPAREN,SUCC,ZERO,COMMA,ZERO,RPAREN,NEWLINE,DATA,NAME "tree",EQ,
    NAME "nil",BAR,NAME "node",NAT,NAME "tree",NAME "tree",NEWLINE,LET,NAME "n",
-   NAME "tree",EQUAL,NAME "nil",NEWLINE,LET,NAME "n2",NAME "tree",EQUAL,NAME "node",
+   NAME "tree",EQ,NAME "nil",NEWLINE,LET,NAME "n2",NAME "tree",EQ,NAME "node",
    LPAREN,ZERO,COMMA,NAME "nil",COMMA,NAME "nil",RPAREN,NEWLINE,CASE,NAME "n2",NEWLINE,INDENT,
    NAME "nil",NEWLINE,INDENT,RETURN,NAME "b",NEWLINE,DEDENT,NAME "node",LPAREN,NAME "val",
    COMMA,NAME "l",COMMA,NAME "r",RPAREN,NEWLINE,INDENT,RETURN,NAME "f",LPAREN,
@@ -605,6 +605,22 @@ val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,NEWLINE,INDENT,
 val Data ("list","nil",Unit,"cons",Prod (Nat,TypVar ("list",0)),
           App (Var ("cons",1),Pair (Zero,App (Var ("nil",2),TmUnit)))) : Ast.exp
     = newParseFile "/home/evan/thon/examples/isemptynew.thon";
+
+val Zero = newRunFile "/home/evan/thon/examples/isemptyagain.thon";
+
+val Let
+    ("foo",Arr (Nat,Nat),
+     Fix
+       ("foo",Arr (Nat,Nat),
+        Fn
+          ("a",Nat,
+           Let
+             ("x",Arr (Nat,Nat),Fn ("x",Nat,Succ (Var ("x",0))),
+              Let
+                ("bar",Arr (Nat,Nat),
+                 Fix ("bar",Arr (Nat,Nat),Fn ("n",Nat,Var ("n",0))),
+                 Var ("a",2))))),TmUnit) : Ast.exp =
+    newParseFile "/home/evan/thon/examples/lex01.thon";
 
 in
 ()

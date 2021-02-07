@@ -158,13 +158,64 @@ and parseExpr tokens i =
         )
         | Lex.UNIT => (incr(i); A.TmUnit)
         | Lex.ZERO => (incr(i); A.Zero)
+        | Lex.FN => (
+            let
+                val () = expect tokens Lex.FN i
+                val () = expect tokens Lex.LPAREN i
+                (* TODO multiple params - should implement n-nary products first *)
+                val argName = consumeName tokens i
+                val argType = parseType tokens i
+                val () = expect tokens Lex.RPAREN i
+                val () = expect tokens Lex.DARROW i
+                val body = parseExpr tokens i
+                val () = consumeNewlines tokens i
+            in
+                A.Fn(argName, argType, body)
+            end)
+        | Lex.LET => (
+            let
+                val () = expect tokens Lex.LET i
+                val varName = consumeName tokens i
+                val varType = parseType tokens i
+                val () = expect tokens Lex.EQ i
+                val varExpr = parseExpr tokens i
+                val () = consumeNewlines tokens i
+                (* TODO last of block *)
+                val rest = parseExpr tokens i
+            in
+                A.Let(varName, varType, varExpr, rest)
+            end
+        )
+        | Lex.CASE => (
+           let
+               val () = expect tokens Lex.CASE i
+               val caseExpr = parseExpr tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val fstCaseVarName = consumeName tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val fstCaseExpr = parseExpr tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+               val sndCaseVarName = consumeName tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val sndCaseExpr = parseExpr tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+           in
+               A.Case(caseExpr, fstCaseVarName, fstCaseExpr, sndCaseVarName, sndCaseExpr)
+            end
+        )
         | Lex.NAME name =>
           (case lookahead tokens i of
                SOME Lex.LPAREN => (
                 (* Function application *)
                 let val funcName = consumeName tokens i
                     val () = expect tokens Lex.LPAREN i
-                    (* TODO multiple params *)
                     val arg = parseFuncCallParams tokens i
                     val () = expect tokens Lex.RPAREN i
                 in
@@ -176,7 +227,21 @@ and parseExpr tokens i =
                         A.Var (name, ~1)
                     end
           )
-
+        | Lex.SUCC =>
+          (case lookahead tokens i of
+               SOME Lex.LPAREN => (
+                (* Succ application *)
+                let val () = expect tokens Lex.SUCC i
+                    val () = expect tokens Lex.LPAREN i
+                    val arg = parseExpr tokens i
+                    val () = expect tokens Lex.RPAREN i
+                in
+                    A.Succ(arg)
+                end
+            )
+            | SOME tok => raise UnexpectedToken("Expected ( after s, got " ^ (Lex.tokenToString tok))
+            | NONE => raise UnexpectedToken("Unexpected EOF after s")
+          )
         | tok => (raise UnexpectedToken("Got unexpected " ^ (Lex.tokenToString tok))))
     )
 

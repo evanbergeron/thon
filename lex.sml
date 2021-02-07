@@ -1,12 +1,12 @@
 structure Lex : sig
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
 val lexFile : string -> Token list
 val lexFileNoPrintErrMsg : string -> Token list
 val tokenToString : Token -> string
 end  =
 struct
 
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
 
 exception No
 exception UnexpectedIndentLevel
@@ -33,7 +33,7 @@ fun tokenToString FUN = "FUN"
   | tokenToString SUCC = "SUCC"
   | tokenToString LET = "LET"
   | tokenToString SARROW = "SARROW"
-  | tokenToString EQUAL = "EQUAL"
+  | tokenToString EQ = "EQ"
   | tokenToString DARROW = "DARROW"
   | tokenToString IF = "IF"
   | tokenToString THEN = "THEN"
@@ -168,7 +168,7 @@ and lexLines' s out indentLevel =
             lexLines' s (DARROW::out) indentLevel
         ) else if onKeyword "=" s then (
             eatWord "=" s;
-            lexLines' s (EQUAL::out) indentLevel
+            lexLines' s (EQ::out) indentLevel
         ) else (
             raise UnexpectedToken("saw `=`, expected `=>` or `=`")
         )

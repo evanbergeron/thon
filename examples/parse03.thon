@@ -1,0 +1,5 @@
+fun id(a nat) nat:
+    fun idHelper(b nat) nat:
+        a
+    idHelper(z)
+id(z)
