@@ -14,6 +14,5 @@ Group is
   parse/parse.sml
   lex.sml
   parse.sml
-  elaborate.sml
   thon.sml
   test.sml
