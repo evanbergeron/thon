@@ -1,5 +1,6 @@
 structure Lex : sig
 datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
+val lex : string -> Token list
 val lexFile : string -> Token list
 val lexFileNoPrintErrMsg : string -> Token list
 val tokenToString : Token -> string
@@ -233,7 +234,7 @@ and lexLines' s out indentLevel =
 fun lexLines s indentLevel =
     let val backwards = lexLines' s [] indentLevel in List.rev backwards end
 
-fun lex s printErrMsg =
+fun lex' s printErrMsg =
     let
         val indentLevel = ref 0;
         val forewards = lexLines s indentLevel
@@ -243,9 +244,11 @@ fun lex s printErrMsg =
     handle UnexpectedToken msg => (if printErrMsg then print ("Lexing error: " ^ msg ^ "\n") else ();
                                    raise (UnexpectedToken msg) )
 
-fun lexFile filename = lex (TextIO.openIn filename) true
+fun lex s = lex' (TextIO.openString s) true
 
-fun lexFileNoPrintErrMsg filename = lex (TextIO.openIn filename) false
+fun lexFile filename = lex' (TextIO.openIn filename) true
+
+fun lexFileNoPrintErrMsg filename = lex' (TextIO.openIn filename) false
 
 
 end

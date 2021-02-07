@@ -1,6 +1,7 @@
 (* thon - a small functional language *)
 structure Thon : sig
               val parse : string -> Ast.exp
+              val newParse : string -> Ast.exp
               val parseFile : string -> Ast.exp
               val typeof' : A.typ list -> 'b option list -> A.exp -> A.typ
               val typeof : A.exp -> A.typ
@@ -681,6 +682,12 @@ fun step e =
 
 fun parse s =
     let val ast : A.exp = Parse.parse s
+    in
+        setDeBruijnIndex ast [] []
+    end
+
+fun newParse s =
+    let val ast : A.exp = NewParse.parse s
     in
         setDeBruijnIndex ast [] []
     end

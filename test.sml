@@ -622,6 +622,10 @@ val Let
                  Var ("a",2))))),TmUnit) : Ast.exp =
     newParseFile "/home/evan/thon/examples/lex01.thon";
 
+val Fn ("x",Nat,Var ("x",0)) : Ast.exp = Thon.newParse "fn (x nat) => x";
+
+val Fn ("x",Nat,Fn ("y",Nat,Var ("y",0))) : Ast.exp = Thon.newParse "fn (x nat) => fn (y nat) => y";
+
 in
 ()
 end

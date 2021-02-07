@@ -4,8 +4,6 @@ struct
 exception UnexpectedToken of string
 exception Unimplemented of string
 
-fun parse s = A.Zero
-
 fun incr i = (i := !i + 1)
 
 fun println s = print (s  ^ "\n")
@@ -244,6 +242,17 @@ and parseExpr tokens i =
           )
         | tok => (raise UnexpectedToken("Got unexpected " ^ (Lex.tokenToString tok))))
     )
+
+
+fun parse s =
+    let val tokens = Lex.lex s
+        val i = ref 0;
+    in
+        parseExpr tokens i
+    end
+    handle UnexpectedToken msg => (print ("Parsing error: " ^ msg ^ "\n");
+                                   raise (UnexpectedToken msg) )
+
 
 fun parseFile filename =
     let val tokens = Lex.lexFile filename
