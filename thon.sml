@@ -1304,6 +1304,12 @@ val Let
      TmUnit) : Ast.exp =
     newParseFile "/home/evan/thon/examples/parse02.thon";
 
+
+val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,NEWLINE,INDENT,
+   FUN,NAME "bar",LPAREN,NAME "b",NAT,RPAREN,NAT,NEWLINE,INDENT,NAME "a"]
+  : Lex.Token list = 
+    Lex.lexFile "/home/evan/thon/examples/lex04.thon";
+
 in
 ()
 end

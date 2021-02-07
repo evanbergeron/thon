@@ -52,18 +52,24 @@ fun lookaheadN s n =
 
 (* Get last char of lookahead *)
 fun lookaheadOnlyN s n =
-    (* Can raise Size *)
     let val st = TextIO.getInstream s
-        val (n, tail) = TextIO.StreamIO.inputN (st, n);
-        val chars = explode n
-    in (List.nth (chars, (List.length chars) - 1)) end
+        val (k, tail) = TextIO.StreamIO.inputN (st, n);
+        val () = debugPrint k
+        val () = debugPrint (Int.toString n)
+        val chars = explode k
+        val res = (List.nth (chars, (List.length chars) - 1))
+    in if n > (List.length chars) then NONE else SOME
+        (debugPrint (Int.toString n); debugPrint (Char.toString res); res) end
 
 fun getName' s n =
     (debugPrint ("getName " ^ (Int.toString n));
-    if not (Char.isAlphaNum (lookaheadOnlyN s n)) then
-        lookaheadN s (n-1)
-    else
-        getName' s (n+1))
+     case lookaheadOnlyN s n of
+         NONE => lookaheadN s (n-1)
+       | SOME c =>
+         (if not (Char.isAlphaNum (c)) then
+              lookaheadN s (n-1)
+          else
+              getName' s (n+1)))
 
 fun getName s = getName' s 1
 
@@ -89,10 +95,10 @@ fun eatWhitespace stream =
                   else ()
 
 fun onKeyword kw s =
-    (debugPrint ("onKeyword" ^ kw);
+    (debugPrint ("onKeyword " ^ kw);
     let val prefixOk = kw = (lookaheadN s (String.size kw))
         val afterChar = lookaheadOnlyN s ((String.size kw)+1)
-        val suffixOk = not (Char.isAlphaNum afterChar)
+        val suffixOk = not (Char.isAlphaNum (Option.valOf afterChar))
     in
         prefixOk andalso suffixOk
     end)
