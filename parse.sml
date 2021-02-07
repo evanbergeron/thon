@@ -2,7 +2,7 @@ structure NewParse : PARSE =
 struct
 
 exception UnexpectedToken of string
-exception Unimplemented
+exception Unimplemented of string
 
 fun parse s = A.Zero
 
@@ -50,59 +50,113 @@ fun parseType tokens i =
     let val this =
             (case List.nth (tokens, !i) of
                  Lex.NAT => (i := (!i) + 1; A.Nat)
-               | _ => raise Unimplemented)
+               | Lex.NAME name => (i := (!i) + 1; A.TypVar(name, ~1))
+               | Lex.UNIT => (i := (!i) + 1; A.Unit)
+               | _ => raise Unimplemented("See token that is not nat or name in type"))
     in
-        (case List.nth (tokens, !i) of
-             Lex.SARROW => (incr(i); A.Arr(this, (parseType tokens i))) | _ => this)
+        case List.nth (tokens, !i) of
+            Lex.SARROW => (incr(i); A.Arr(this, (parseType tokens i)))
+          | Lex.STAR => (incr(i); A.Prod(this, (parseType tokens i)))
+          | _ => this
     end
 
-fun parseExpr tokens i =
+
+(* Parses between parens - expect LPAREN in caller before calling and RPAREN after *)
+fun parseFuncCallParams tokens i =
+    let
+        val arg = parseExpr tokens i
+    in
+        (* TODO eventually got clean up all these unguarded array accesses *)
+        (* Also UNDONE handle more than two func call params *)
+        case List.nth (tokens, !i) of
+            Lex.COMMA =>
+            let
+                val () = expect tokens Lex.COMMA i
+                val arg2 = parseExpr tokens i
+            in
+                A.Pair(arg, arg2)
+            end
+           | Lex.RPAREN => arg
+           | tok => raise UnexpectedToken("expected func param or LPAREN, got " ^
+                                          (Lex.tokenToString tok))
+    end
+
+
+and parseExpr tokens i =
     (if (!i) >= (List.length tokens) then A.TmUnit else
      (case List.nth (tokens, !i) of
-          Lex.FUN =>
-          let
-              val () = expect tokens Lex.FUN i
-              val funcName = consumeName tokens i
-              val () = debugPrint (funcName ^ " begin")
-              val () = expect tokens Lex.LPAREN i
-              (* TODO multiple params - should implement n-nary products first *)
-              val argName = consumeName tokens i
-              val argType = parseType tokens i
-              val () = expect tokens Lex.RPAREN i
-              val retType = parseType tokens i
-              val funcType = A.Arr(argType, retType)
-              val () = consumeNewlines tokens i
-              val () = expect tokens Lex.INDENT i
-              val () = debugPrint (funcName ^ " indent")
-              val body = parseExpr tokens i
-              val () = debugPrint (funcName ^ " end of body")
-              val () = consumeNewlines tokens i
-              val () = expect tokens Lex.DEDENT i
-              val () = debugPrint (funcName ^ " dedent")
-              val () = consumeNewlines tokens i
-              val () = debugPrint (funcName ^ " afterwards")
-          in
-              if (!i) < (List.length tokens) andalso
-                 List.nth (tokens, (!i))  = Lex.DEDENT then
-                  (debugPrint (funcName ^ "see dedent next");
-                   (* TODO double check these semantics. If there's a
+          Lex.FUN => (
+           let
+               val () = expect tokens Lex.FUN i
+               val funcName = consumeName tokens i
+               val () = debugPrint (funcName ^ " begin")
+               val () = expect tokens Lex.LPAREN i
+               (* TODO multiple params - should implement n-nary products first *)
+               val argName = consumeName tokens i
+               val argType = parseType tokens i
+               val () = expect tokens Lex.RPAREN i
+               val retType = parseType tokens i
+               val funcType = A.Arr(argType, retType)
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val () = debugPrint (funcName ^ " indent")
+               val body = parseExpr tokens i
+               val () = debugPrint (funcName ^ " end of body")
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+               val () = debugPrint (funcName ^ " dedent")
+               val () = consumeNewlines tokens i
+               val () = debugPrint (funcName ^ " afterwards")
+           in
+               if (!i) < (List.length tokens) andalso
+                  List.nth (tokens, (!i))  = Lex.DEDENT then
+                   (debugPrint (funcName ^ "see dedent next");
+                    (* TODO double check these semantics. If there's a
                       dedent after this funciton definition, then this is
                       the last chunk of the parent block and so the value
                       of the parent block should be this function? If so,
                       will need to replicate this logic across every
                       other construct. *)
-                   A.Let(funcName, funcType,
-                         A.Fix(funcName, funcType,
-                               A.Fn(argName, argType, body)), A.Var(funcName, ~1)))
-              else
-                  let
-                      val rest = parseExpr tokens i
-                  in
-                      A.Let(funcName, funcType,
-                            A.Fix(funcName, funcType,
-                                  A.Fn(argName, argType, body)), rest)
-                  end
-          end
+                    A.Let(funcName, funcType,
+                          A.Fix(funcName, funcType,
+                                A.Fn(argName, argType, body)), A.Var(funcName, ~1)))
+               else
+                   let
+                       val rest = parseExpr tokens i
+                   in
+                       A.Let(funcName, funcType,
+                             A.Fix(funcName, funcType,
+                                   A.Fn(argName, argType, body)), rest)
+                   end
+           end
+        )
+        | Lex.DATA => (
+           let
+               val () = expect tokens Lex.DATA i
+               val datatypeName = consumeName tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.INDENT i
+               val fstTypeCtorName = consumeName tokens i
+               val fstTypeCtorType = parseType tokens i
+               val () = consumeNewlines tokens i
+               val sndTypeCtorName = consumeName tokens i
+               val sndTypeCtorType = parseType tokens i
+               val () = consumeNewlines tokens i
+               val () = expect tokens Lex.DEDENT i
+               val () = consumeNewlines tokens i
+           in
+               (* TODO handle dedent again case *)
+                let
+                    val rest = parseExpr tokens i
+                in
+                    A.Data(datatypeName,
+                           fstTypeCtorName, fstTypeCtorType,
+                           sndTypeCtorName, sndTypeCtorType,
+                           rest)
+                end
+           end
+        )
+        | Lex.UNIT => (incr(i); A.TmUnit)
         | Lex.ZERO => (incr(i); A.Zero)
         | Lex.NAME name =>
           (case lookahead tokens i of
@@ -111,7 +165,7 @@ fun parseExpr tokens i =
                 let val funcName = consumeName tokens i
                     val () = expect tokens Lex.LPAREN i
                     (* TODO multiple params *)
-                    val arg = parseExpr tokens i
+                    val arg = parseFuncCallParams tokens i
                     val () = expect tokens Lex.RPAREN i
                 in
                     A.App(A.Var(funcName, ~1), arg)
@@ -123,8 +177,7 @@ fun parseExpr tokens i =
                     end
           )
 
-        | tok => (println ("Got unexpected " ^
-                           (Lex.tokenToString tok)); raise Unimplemented))
+        | tok => (raise UnexpectedToken("Got unexpected " ^ (Lex.tokenToString tok))))
     )
 
 fun parseFile filename =
@@ -133,4 +186,8 @@ fun parseFile filename =
     in
         parseExpr tokens i
     end
+    handle UnexpectedToken msg => (print ("Parsing error: " ^ msg ^ "\n");
+                                   raise (UnexpectedToken msg) )
+
+
 end

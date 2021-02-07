@@ -601,6 +601,11 @@ val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,NEWLINE,INDENT,
   : Lex.Token list =
     Lex.lexFile "/home/evan/thon/examples/lex04.thon";
 
+
+val Data ("list","nil",Unit,"cons",Prod (Nat,TypVar ("list",0)),
+          App (Var ("cons",1),Pair (Zero,App (Var ("nil",2),TmUnit)))) : Ast.exp
+    = newParseFile "/home/evan/thon/examples/isemptynew.thon";
+
 in
 ()
 end

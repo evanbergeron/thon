@@ -1,12 +1,12 @@
 structure Lex : sig
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
 val lexFile : string -> Token list
 val lexFileNoPrintErrMsg : string -> Token list
 val tokenToString : Token -> string
 end  =
 struct
 
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR
 
 exception No
 exception UnexpectedIndentLevel
@@ -43,6 +43,8 @@ fun tokenToString FUN = "FUN"
   | tokenToString CASE = "CASE"
   | tokenToString COMMA = "COMMA"
   | tokenToString NEWLINE = "NEWLINE"
+  | tokenToString UNIT = "UNIT"
+  | tokenToString STAR = "STAR"
 
 fun lookaheadN s n =
     (* Can raise Size *)
@@ -170,6 +172,11 @@ and lexLines' s out indentLevel =
         ) else (
             raise UnexpectedToken("saw `=`, expected `=>` or `=`")
         )
+      | "*" => (
+            eatWord "*" s;
+            lexLines' s (STAR::out) indentLevel
+          )
+      | "u" => eatKeywordOrName ("unit", UNIT) s indentLevel out
       | "i" => eatKeywordOrName ("if", IF) s indentLevel out
       | "t" => eatKeywordOrName ("then", THEN) s indentLevel out
       | "e" => eatKeywordOrName ("else", ELSE) s indentLevel out
@@ -215,7 +222,7 @@ and lexLines' s out indentLevel =
       )
       | other =>
         if not (Char.isAlpha (String.sub (other, 0))) then
-            raise UnexpectedToken("indentifiers must start with alphabetic characters")
+            raise UnexpectedToken("See identifier starting with " ^ other ^ ". Indentifiers must start with alphabetic characters.")
         else
             let val name = getName s in
             eatWord name s;
@@ -233,7 +240,7 @@ fun lex s printErrMsg =
     in
         forewards
     end
-    handle UnexpectedToken msg => (if printErrMsg then print ("Syntax error: " ^ msg ^ "\n") else ();
+    handle UnexpectedToken msg => (if printErrMsg then print ("Lexing error: " ^ msg ^ "\n") else ();
                                    raise (UnexpectedToken msg) )
 
 fun lexFile filename = lex (TextIO.openIn filename) true

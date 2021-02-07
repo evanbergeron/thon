@@ -1,0 +1,5 @@
+data list:
+    nil unit
+    cons nat * list
+
+cons(z, nil(unit))
