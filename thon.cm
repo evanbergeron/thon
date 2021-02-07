@@ -8,10 +8,11 @@ Group is
   ml-yacc-lib.cm
 #endif
 
-  lex.sml
   parse/ast.sml
   parse/thon.grm
   parse/thon.lex
   parse/parse.sml
+  lex.sml
+  parse.sml
   elaborate.sml
   thon.sml

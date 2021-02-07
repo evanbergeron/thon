@@ -11,6 +11,7 @@ structure Thon : sig
                    val run : string -> A.exp
                    val eraseNamesInTyp : A.typ -> A.typ
                    val runFile : string -> A.exp
+                   val newRunFile : string -> A.exp
                    val findParseErrors : string -> unit
                    val elaborateDatatypes : A.exp -> A.exp
                    val shiftDeBruijinIndicesInExp : int -> A.exp -> int -> A.exp
@@ -682,6 +683,12 @@ fun parseFile filename =
         setDeBruijnIndex ast [] []
     end
 
+fun newParseFile filename =
+    let val ast : A.exp = NewParse.parseFile filename
+    in
+        setDeBruijnIndex ast [] []
+    end
+
 fun findParseErrors filename =
     let val _ = parseFile filename
     in
@@ -704,6 +711,12 @@ fun runFile s =
         if isval e then e else eval (step e)
     end
 
+fun newRunFile s =
+    let val e' = newParseFile s
+        val e = elaborateDatatypes e'
+    in
+        if isval e then e else eval (step e)
+    end
 
 (******* Tests *******)
 
@@ -1266,6 +1279,8 @@ val
     Lex.lexFile "/home/evan/thon/examples/lex02.thon";
 
 val true = (Lex.lexFileNoPrintErrMsg "/home/evan/thon/examples/lex03.thon"; false) handle UnexpectedToken => true;
+
+val Fn ("a",Nat,Zero) : Ast.exp = newRunFile "/home/evan/thon/examples/parse00.thon";
 
 in
 ()
