@@ -63,6 +63,7 @@ fun parseExpr tokens i =
           let
               val () = expect tokens Lex.FUN i
               val funcName = consumeName tokens i
+              val () = debugPrint (funcName ^ " begin")
               val () = expect tokens Lex.LPAREN i
               (* TODO multiple params - should implement n-nary products first *)
               val argName = consumeName tokens i
@@ -72,13 +73,35 @@ fun parseExpr tokens i =
               val funcType = A.Arr(argType, retType)
               val () = consumeNewlines tokens i
               val () = expect tokens Lex.INDENT i
-                                       val () = debugPrint "func ident"
+              val () = debugPrint (funcName ^ " indent")
               val body = parseExpr tokens i
+              val () = debugPrint (funcName ^ " end of body")
               val () = consumeNewlines tokens i
-              val rest = parseExpr tokens i
+              val () = expect tokens Lex.DEDENT i
+              val () = debugPrint (funcName ^ " dedent")
+              val () = consumeNewlines tokens i
+              val () = debugPrint (funcName ^ " afterwards")
           in
-              A.Let(funcName, funcType,
-                    A.Fix(funcName, funcType, A.Fn(argName, argType, body)), rest)
+              if (!i) < (List.length tokens) andalso
+                 List.nth (tokens, (!i))  = Lex.DEDENT then
+                  (debugPrint (funcName ^ "see dedent next");
+                   (* TODO double check these semantics. If there's a
+                      dedent after this funciton definition, then this is
+                      the last chunk of the parent block and so the value
+                      of the parent block should be this function? If so,
+                      will need to replicate this logic across every
+                      other construct. *)
+                   A.Let(funcName, funcType,
+                         A.Fix(funcName, funcType,
+                               A.Fn(argName, argType, body)), A.Var(funcName, ~1)))
+              else
+                  let
+                      val rest = parseExpr tokens i
+                  in
+                      A.Let(funcName, funcType,
+                            A.Fix(funcName, funcType,
+                                  A.Fn(argName, argType, body)), rest)
+                  end
           end
         | Lex.ZERO => (incr(i); A.Zero)
         | Lex.NAME name =>
@@ -100,7 +123,8 @@ fun parseExpr tokens i =
                     end
           )
 
-        | tok => (println (Lex.tokenToString tok); raise Unimplemented))
+        | tok => (println ("Got unexpected " ^
+                           (Lex.tokenToString tok)); raise Unimplemented))
     )
 
 fun parseFile filename =

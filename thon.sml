@@ -1253,13 +1253,13 @@ val Succ (Succ Zero) = runFile "/home/evan/thon/examples/bst-depth.thon";
 open Lex;
 val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NEWLINE,INDENT,FUN,NAME "bar",LPAREN,
      NAME "n",NAT,RPAREN,NEWLINE,INDENT,RETURN,NAME "n",NEWLINE,DEDENT,RETURN,NAME "a",
-     NEWLINE]
+     NEWLINE,DEDENT] : Lex.Token list
     = Lex.lexFile "/home/evan/thon/examples/lex00.thon";
 
 val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,NEWLINE,INDENT,LET,NAME "x",
    NAT,SARROW,NAT,EQUAL,FN,LPAREN,NAME "x",NAT,RPAREN,NAT,DARROW,SUCC,
    NAME "x",NEWLINE,FUN,NAME "bar",LPAREN,NAME "n",NAT,RPAREN,NAT,NEWLINE,
-   INDENT,RETURN,NAME "n",NEWLINE,DEDENT,RETURN,NAME "a",NEWLINE]
+   INDENT,RETURN,NAME "n",NEWLINE,DEDENT,RETURN,NAME "a",NEWLINE,DEDENT]
   : Lex.Token list =
     Lex.lexFile "/home/evan/thon/examples/lex01.thon";
 
@@ -1276,7 +1276,7 @@ val
    NAME "nil",NEWLINE,INDENT,RETURN,NAME "b",NEWLINE,DEDENT,NAME "node",LPAREN,NAME "val",
    COMMA,NAME "l",COMMA,NAME "r",RPAREN,NEWLINE,INDENT,RETURN,NAME "f",LPAREN,
    NAME "n",RPAREN,NEWLINE,DEDENT,RETURN,NAME "TODOstillNeedToHandleMultiDedent",
-   NEWLINE,DEDENT,RETURN,NAME "b",NEWLINE] : Lex.Token list =
+   NEWLINE,DEDENT,RETURN,NAME "b",NEWLINE,DEDENT] : Lex.Token list =
     Lex.lexFile "/home/evan/thon/examples/lex02.thon";
 
 val true = (Lex.lexFileNoPrintErrMsg "/home/evan/thon/examples/lex03.thon"; false) handle UnexpectedToken => true;
@@ -1292,6 +1292,12 @@ val Let
     newParseFile "/home/evan/thon/examples/parse01.thon";
 
 
+
+val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,NEWLINE,INDENT,
+   FUN,NAME "bar",LPAREN,NAME "b",NAT,RPAREN,NAT,NEWLINE,INDENT,NAME "a",
+   NEWLINE,DEDENT,DEDENT] : Lex.Token list =
+    Lex.lexFile "/home/evan/thon/examples/parse02.thon";
+
 val Let
     ("foo",Arr (Nat,Arr (Nat,Nat)),
      Fix
@@ -1300,14 +1306,15 @@ val Let
           ("a",Nat,
            Let
              ("bar",Arr (Nat,Nat),
-              Fix ("bar",Arr (Nat,Nat),Fn ("b",Nat,Var ("a",2))),TmUnit))),
+              Fix ("bar",Arr (Nat,Nat),Fn ("b",Nat,Var ("a",2))),
+              Var ("bar",0)))),
      TmUnit) : Ast.exp =
     newParseFile "/home/evan/thon/examples/parse02.thon";
 
 
 val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,NEWLINE,INDENT,
    FUN,NAME "bar",LPAREN,NAME "b",NAT,RPAREN,NAT,NEWLINE,INDENT,NAME "a"]
-  : Lex.Token list = 
+  : Lex.Token list =
     Lex.lexFile "/home/evan/thon/examples/lex04.thon";
 
 in

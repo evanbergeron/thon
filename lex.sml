@@ -8,6 +8,7 @@ struct
 
 datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
 
+exception No
 exception UnexpectedIndentLevel
 exception UnexpectedToken of string
 exception UnimplementTokenToString
@@ -140,22 +141,25 @@ and lexLines' s out indentLevel =
      List.map (fn tok => debugPrint (tokenToString tok)) out;
     case lookaheadN s 1 of
         "" => out
-      | " " => 
+      | " " => raise No
+      | "\n" => (
+     (case lookaheadOnlyN s 2 of
+         SOME #"\n" => (TextIO.input1 s;
+                        lexLines' s (NEWLINE::out) indentLevel)
+        | _ =>
+          (TextIO.input1 s; (* can't eatWord here - keep leading spaces *)
         let val toks = getIndentDedentTokens s out indentLevel
         in
             if List.length toks = 0 then
                 (* No indent or dedent here *)
-                lexLines' s out indentLevel
+                lexLines' s (NEWLINE::out) indentLevel
             else
                 (indentLevel := !indentLevel +
                                 ((List.length toks) *
                                  (if DEDENT = List.nth (toks, 0) then ~1 else 1))
-                ; lexLines' s (toks @ out) indentLevel)
-        end
-      | "\n" => (
-          TextIO.input1 s; (* can't eatWord here - keep leading spaces *)
-          lexLines' s (NEWLINE::out) indentLevel
-        )
+                ; lexLines' s (toks @ (NEWLINE::out)) indentLevel)
+        end)
+        ))
       | "=" =>
         if onKeyword "=>" s then (
             eatWord "=>" s;
@@ -204,7 +208,6 @@ and lexLines' s out indentLevel =
       | ":" => (
           if lookaheadN s 2 = ":\n" then
               (eatWord ":" s;
-               (* could also incr after checking next line *)
                lexLines' s out indentLevel)
           else
               (eatWord ":" s;
