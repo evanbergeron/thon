@@ -12,6 +12,12 @@ exception UnexpectedIndentLevel
 exception UnexpectedToken of string
 exception UnimplementTokenToString
 
+fun println s = print (s  ^ "\n")
+
+fun debugPrint s =
+    if false then println s
+    else ()
+
 fun tokenToString FUN = "FUN"
   | tokenToString FN = "FN"
   | tokenToString NAT = "NAT"
@@ -53,20 +59,25 @@ fun lookaheadOnlyN s n =
     in (List.nth (chars, (List.length chars) - 1)) end
 
 fun getName' s n =
+    (debugPrint ("getName " ^ (Int.toString n));
     if not (Char.isAlphaNum (lookaheadOnlyN s n)) then
         lookaheadN s (n-1)
     else
-        getName' s (n+1)
+        getName' s (n+1))
 
 fun getName s = getName' s 1
 
-fun getNumSpaces' s n =
-    if not (#" " = (lookaheadOnlyN s n)) then
-        n
-    else
-        getNumSpaces' s (n+1)
+fun eatAndGetNumSpaces' s n =
+    (debugPrint ("eatAndGetNumSpaces' " ^ (Int.toString n));
+     case TextIO.lookahead s of
+         SOME #" " => (
+          TextIO.input1 s;
+          eatAndGetNumSpaces' s (n+1)
+         )
+       | _ => n
+    )
 
-fun getNumSpaces s = getNumSpaces' s 0
+fun eatAndGetNumSpaces s = eatAndGetNumSpaces' s 0
 
 fun eatWhitespace stream =
     case TextIO.lookahead stream of
@@ -78,12 +89,13 @@ fun eatWhitespace stream =
                   else ()
 
 fun onKeyword kw s =
+    (debugPrint ("onKeyword" ^ kw);
     let val prefixOk = kw = (lookaheadN s (String.size kw))
         val afterChar = lookaheadOnlyN s ((String.size kw)+1)
         val suffixOk = not (Char.isAlphaNum afterChar)
     in
         prefixOk andalso suffixOk
-    end
+    end)
 
 fun eatWord w s = (
     TextIO.inputN (s, (String.size w));
@@ -103,25 +115,30 @@ fun eatKeywordOrName (w, tok) s indentLevel out =
     )
 
 and lexLines' s out indentLevel =
-    (();
+    (debugPrint "=======================";
+     List.map (fn tok => debugPrint (tokenToString tok)) out;
     case lookaheadN s 1 of
         "" => out
       | " " =>
-        let val spaces =
-                String.concat (List.tabulate (4*(!indentLevel), fn _ => " "))
-            val dedentSpaces =
-                String.concat (List.tabulate (4*((!indentLevel)-1), fn _ => " "))
+        let
+            (* TODO assert last elt of out is NEWLINE here *)
+            val () = debugPrint ("Indent level: " ^ (Int.toString (!indentLevel)))
+            val numSpaces = eatAndGetNumSpaces s
+            (* UNDONE 2 space indent *)
+            val thisLineIndentLevel = numSpaces div 4;
+            val () = debugPrint ("thisLineIndentLevel " ^ (Int.toString (thisLineIndentLevel)))
+            val tok = if thisLineIndentLevel > (!indentLevel) then INDENT else DEDENT
+            val numToks = abs (thisLineIndentLevel - (!indentLevel))
+            val toks = List.tabulate (numToks, fn _ => tok);
         in
-            (* TODO can dedent unboundedly - use getNumSpaces *)
-            if lookaheadN s (4 * (!indentLevel)) = spaces then
-                (eatWord spaces s;
-                 lexLines' s out indentLevel)
-            else if lookaheadN s (4 * ((!indentLevel)-1)) = dedentSpaces then
-                (eatWord dedentSpaces s;
-                 indentLevel := !indentLevel - 1;
-                 lexLines' s (DEDENT::out) indentLevel)
+            (
+            if thisLineIndentLevel = (!indentLevel) then
+                (* No indent or dedent here *)
+                lexLines' s out indentLevel
             else
-                raise UnexpectedIndentLevel
+                 (indentLevel := thisLineIndentLevel;
+                 lexLines' s (toks @ out) indentLevel)
+            )
         end
       | "\n" => (
           TextIO.input1 s; (* can't eatWord here - keep leading spaces *)
@@ -174,10 +191,9 @@ and lexLines' s out indentLevel =
       )
       | ":" => (
           if lookaheadN s 2 = ":\n" then
-              (eatWord ":\n" s;
+              (eatWord ":" s;
                (* could also incr after checking next line *)
-               indentLevel := !indentLevel + 1;
-               lexLines' s (INDENT::NEWLINE::out) indentLevel)
+               lexLines' s out indentLevel)
           else
               (eatWord ":" s;
                lexLines' s (COLON::out) indentLevel)

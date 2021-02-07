@@ -1291,6 +1291,19 @@ val Let
      App (Var ("ident",0),Zero)) : Ast.exp =
     newParseFile "/home/evan/thon/examples/parse01.thon";
 
+
+val Let
+    ("foo",Arr (Nat,Arr (Nat,Nat)),
+     Fix
+       ("foo",Arr (Nat,Arr (Nat,Nat)),
+        Fn
+          ("a",Nat,
+           Let
+             ("bar",Arr (Nat,Nat),
+              Fix ("bar",Arr (Nat,Nat),Fn ("b",Nat,Var ("a",2))),TmUnit))),
+     TmUnit) : Ast.exp =
+    newParseFile "/home/evan/thon/examples/parse02.thon";
+
 in
 ()
 end

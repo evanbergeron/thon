@@ -11,7 +11,7 @@ fun incr i = (i := !i + 1)
 fun println s = print (s  ^ "\n")
 
 fun debugPrint s =
-    if true then println s
+    if false then println s
     else ()
 
 fun errMsg (expectedToken, actualToken) =
@@ -47,9 +47,14 @@ fun consumeNewlines tokens i =
       | _ => ()
 
 fun parseType tokens i =
-    case List.nth (tokens, !i) of
-        Lex.NAT => (i := (!i) + 1; A.Nat)
-      | _ => raise Unimplemented
+    let val this =
+            (case List.nth (tokens, !i) of
+                 Lex.NAT => (i := (!i) + 1; A.Nat)
+               | _ => raise Unimplemented)
+    in
+        (case List.nth (tokens, !i) of
+             Lex.SARROW => (incr(i); A.Arr(this, (parseType tokens i))) | _ => this)
+    end
 
 fun parseExpr tokens i =
     (if (!i) >= (List.length tokens) then A.TmUnit else
@@ -59,7 +64,7 @@ fun parseExpr tokens i =
               val () = expect tokens Lex.FUN i
               val funcName = consumeName tokens i
               val () = expect tokens Lex.LPAREN i
-              (* TODO multiple params *)
+              (* TODO multiple params - should implement n-nary products first *)
               val argName = consumeName tokens i
               val argType = parseType tokens i
               val () = expect tokens Lex.RPAREN i
