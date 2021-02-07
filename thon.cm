@@ -16,3 +16,4 @@ Group is
   parse.sml
   elaborate.sml
   thon.sml
+  test.sml
