@@ -12,6 +12,7 @@ structure Thon : sig
                    val eraseNamesInTyp : A.typ -> A.typ
                    val runFile : string -> A.exp
                    val newRunFile : string -> A.exp
+                   val newParseFile : string -> A.exp
                    val findParseErrors : string -> unit
                    val elaborateDatatypes : A.exp -> A.exp
                    val shiftDeBruijinIndicesInExp : int -> A.exp -> int -> A.exp

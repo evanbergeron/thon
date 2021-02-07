@@ -2,6 +2,7 @@ structure Lex : sig
 datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQUAL | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE
 val lexFile : string -> Token list
 val lexFileNoPrintErrMsg : string -> Token list
+val tokenToString : Token -> string
 end  =
 struct
 
@@ -9,6 +10,32 @@ datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | IND
 
 exception UnexpectedIndentLevel
 exception UnexpectedToken of string
+exception UnimplementTokenToString
+
+fun tokenToString FUN = "FUN"
+  | tokenToString FN = "FN"
+  | tokenToString NAT = "NAT"
+  | tokenToString COLON = "COLON"
+  | tokenToString LPAREN = "LPAREN"
+  | tokenToString RPAREN = "RPAREN"
+  | tokenToString (NAME name) = "NAME " ^ name
+  | tokenToString INDENT = "INDENT"
+  | tokenToString DEDENT = "DEDENT"
+  | tokenToString RETURN = "RETURN"
+  | tokenToString ZERO = "ZERO"
+  | tokenToString SUCC = "SUCC"
+  | tokenToString LET = "LET"
+  | tokenToString SARROW = "SARROW"
+  | tokenToString EQUAL = "EQUAL"
+  | tokenToString DARROW = "DARROW"
+  | tokenToString IF = "IF"
+  | tokenToString THEN = "THEN"
+  | tokenToString ELSE = "ELSE"
+  | tokenToString DATA = "DATA"
+  | tokenToString BAR = "BAR"
+  | tokenToString CASE = "CASE"
+  | tokenToString COMMA = "COMMA"
+  | tokenToString NEWLINE = "NEWLINE"
 
 fun lookaheadN s n =
     (* Can raise Size *)
