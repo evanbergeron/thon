@@ -20,9 +20,9 @@ thon has natural numbers, functions, recursion, binary product and sum
 types, polymorphism, existential packages (a formalization of
 interfaces), recursive types, and binary algebraic datatypes.
 
-Thon is currently under syntactic refactoring, so this README
-regrettably mixes examples of the two syntaxes (and likely will
-continue to do so for some time).
+Thon is currently under syntactic refactoring, so this README mixes
+examples of the two syntaxes (I point out the cases the legacy syntax
+is used).
 
 ## natural numbers
 
@@ -88,8 +88,8 @@ binds the name `x` in the expression `e`.
 Polymorphism lets us reuse code you wrote for many different types,
 with the guarantee that the code will behave the same for all types.
 
-
 ```
+(* Legacy syntax *)
 poly t -> \ x : t -> x
 ```
 is the polymorphic identity function. Feed it a type to get the
@@ -158,6 +158,7 @@ existential packages.
 An implementation can be used as follows:
 
 ```
+(* Legacy syntax *)
 let setget : some t. ((nat -> t) * (t -> nat)) =
     (impl some t. ((nat -> t) * (t -> nat)) with nat as
     (
