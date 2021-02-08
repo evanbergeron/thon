@@ -10,10 +10,8 @@ data list:
 
 fun isempty(l list) nat:
     case exposelist(l):
-        empty:
-            s(z)
-        not:
-            z
+        empty: s(z)
+        not: z
 
 isempty(cons(z, nil(unit)))
 ```
@@ -28,7 +26,8 @@ continue to do so for some time).
 
 ## natural numbers
 
-`z` is the natural number 0. `s(z)` is 1 (the succesor of one). `s(s(z))` is 2, and so on.
+`z` is the natural number 0. `s(z)` is 1 (the succesor of
+one). `s(s(z))` is 2, and so on.
 
 ## functions
 
@@ -38,14 +37,14 @@ supports anonymous functions and named, recursive functions.
 Here are some example anonymous functions.
 
 ```
-fn (x nat) nat => x
+fn (x nat) => x
 fn (x nat) => fn (y nat) => y
 ```
 
-Functions are applied to their arguments by juxtaposition.
+Functions are applied to their arguments like so:
 
 ```
-((\ x : nat -> x) Z)
+(fn (x nat) => x)(z)
 ```
 
 Here's a divide-by-two function:
@@ -53,14 +52,11 @@ Here's a divide-by-two function:
 ```
 fun divbytwo(n nat) nat:
     ifz n:
-        z:
-            z
+        z: z
         s(p):
             ifz p:
-                z:
-                    z
-                s(q):
-                    s(divbytwo(q))
+                z: z
+                s(q): s(divbytwo(q))
 
 divbytwo (s(s(s(s(z)))))
 ```
@@ -91,6 +87,8 @@ binds the name `x` in the expression `e`.
 Polymorphism lets us reuse code you wrote for many different types,
 with the guarantee that the code will behave the same for all types.
 
+(Legacy syntax)
+
 ```
 poly t -> \ x : t -> x
 ```
@@ -118,18 +116,20 @@ them.
 We have two implementations with two separate implementation
 types. The first just holds on to the number.
 ```
-((*set*) \ x : nat -> x,
- (*get*) \ x : nat -> x)
+(fn (x nat) => x,
+ fn (x nat) => x)
 ```
 The second stores in the number in a tuple (for no real good reason -
 you didn't write this code, it's not your fault it does it this way).
 
 ```
-((*set*) \ x : nat -> (x, Z),
- (*get*) \ tup : (nat * nat) -> fst tup)
+(fn (x nat) => (x, z),
+ fn (tup nat * nat) => fst tup)
 ```
+(The fst syntax is only implemented in the legacy syntax).
 
-Now each of these implementations can be packed away with the syntax
+Now each of these implementations can be packed away with the (legacy)
+syntax
 
 ```
 impl some t. ((nat -> t) * (t -> nat)) with nat as
@@ -172,24 +172,16 @@ g
 Note that since the type variable `t` declared in the `use` clause is
 abstract, we can equivalently use the other implementation.
 
-## recursive types
-
-`u nats. (unit | (nat * nats))` is the type of lists natural numbers.
+## binary data types
 
 ```
-fold u nats.  (unit | (nat * nats))
-with left unit : (unit | (nat * (u nats. (unit | (nat * nats)))))
+data list:
+    nil unit
+    cons nat * list
 ```
 
-is the empty list of natural numbers.
-
-```
-\ (nat * (u nats. (unit | nat * nats))) ->
-   fold u nats. (unit | nat * nats) with
-   right 0 : (unit | nat * (u nats. (unit | nat * nats)))
-```
-
-is a function that takes a pair (nat, natlist) and prepends nat to natlist.
+is a datatype for lists of the natural numbers. Thon currently
+supports two cases inside datatypes.
 
 ## thanks
 
@@ -220,36 +212,44 @@ A fun program I wrote after adding recursion. Pretty much all the code
 I've written in thon is available through the git repo.
 
 ```
-let isone : nat -> nat =
-  \ n : nat ->
-    ifz n of
-      Z -> Z (*false*)
-    | S p -> ifz p of Z -> S Z | S p -> Z
-in fun iseven : nat -> nat =
-  \ n : nat ->
-    ifz n of
-      Z -> S Z (*true*)
-    | S p -> ifz (iseven p) of Z -> S Z | S p -> Z
-in fun divbytwo : nat -> nat =
-  \ n : nat ->
-    ifz n of
-      Z -> Z
-    | S p -> ifz p of Z -> Z | S p' -> (S (divbytwo p'))
-in fun multbythree : nat -> nat =
-  \ n : nat ->
-    ifz n of
-      Z -> Z
-   | S nminusone -> S S S (multbythree nminusone)
-in fun collatz : nat -> nat =
-  \ n : nat ->
-    ifz (isone n) of
-      Z -> (
-        ifz (iseven n) of
-          Z -> collatz (S (multbythree n))
-        | S p -> (collatz (divbytwo n))
-      )
-    | S p -> (S Z)
-in (collatz (S S Z))
+fun isone(n nat) nat:
+    ifz n:
+        z: z
+        s(p):
+            ifz p:
+                z: s(z)
+                s(p): z
+
+fun iseven(n nat) nat:
+    ifz n:
+        z: s(z)
+        s(p):
+            ifz iseven(p):
+                z: s(z)
+                s(p): z
+
+fun divbytwo(n nat) nat:
+    ifz n:
+        z: z
+        s(p):
+            ifz p:
+                z: z
+                s(q): s(divbytwo(q))
+
+fun multbythree(n nat) nat:
+    ifz n:
+        z: z
+        s(p): s(s(s(multbythree(p))))
+
+fun collatz(n nat) nat:
+    ifz isone(n):
+        z:
+            ifz iseven(n):
+                z: collatz(s(multbythree(n)))
+                s(p): collatz(divbytwo(n))
+        s(p): s(z)
+
+collatz(s(s(z)))
 ```
 
 [relevant xkcd](https://xkcd.com/710/)
