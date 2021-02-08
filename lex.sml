@@ -103,7 +103,9 @@ fun onKeyword kw s =
     (debugPrint ("onKeyword " ^ kw);
     let val prefixOk = kw = (lookaheadN s (String.size kw))
         val afterChar = lookaheadOnlyN s ((String.size kw)+1)
-        val suffixOk = not (Char.isAlphaNum (Option.valOf afterChar))
+        val suffixOk = (case afterChar of
+                            NONE => true
+                          | SOME c => not (Char.isAlphaNum (c)))
     in
         prefixOk andalso suffixOk
     end)
@@ -115,15 +117,18 @@ fun eatWord w s = (
 
 (* TODO lets 0 be a keyword, which is jank *)
 fun eatKeywordOrName (w, tok) s indentLevel out =
+    (debugPrint ("eatKeywordOrName " ^ w);
     if onKeyword w s then (
+        debugPrint "confirmed on keyword";
         eatWord w s;
         lexLines' s (tok::out) indentLevel
     ) else (
+        debugPrint "not on keyword";
         let val name = getName s in
             eatWord name s;
             lexLines' s ((NAME name)::out) indentLevel
         end
-    )
+    ))
 
 and getIndentDedentTokens s out indentLevel =
     let

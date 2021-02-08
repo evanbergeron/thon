@@ -1,0 +1,10 @@
+fun isone(n nat) nat:
+    ifz n:
+        z: z
+        s(p):
+            ifz p:
+                z: s(z)
+                s(p): z
+
+fun id(n nat) nat:
+    n
