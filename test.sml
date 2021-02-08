@@ -630,6 +630,10 @@ val Succ (Succ Zero) : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/divby
 
 val Succ Zero : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/collatz-new.thon";
 
+val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "(fn (a nat) => a)(z)";
+val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "((fn (a nat) => a))(z)";
+val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "(((fn (a nat) => a))(z))";
+
 in
 ()
 end

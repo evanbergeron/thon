@@ -150,22 +150,22 @@ and parseExpr tokens i =
                                    A.Fn(argName, argType, body)), rest)
                    end
            end
-        )
+       )
         | Lex.DATA => (
-           let
-               val () = expect tokens Lex.DATA i
-               val datatypeName = consumeName tokens i
+            let
+                val () = expect tokens Lex.DATA i
+                val datatypeName = consumeName tokens i
 
-               val indents = consumeStartBlock tokens i
-               val fstTypeCtorName = consumeName tokens i
-               val fstTypeCtorType = parseType tokens i
-               val () = consumeNewlines tokens i
-               val sndTypeCtorName = consumeName tokens i
-               val sndTypeCtorType = parseType tokens i
-               val () = consumeEndBlock tokens i indents
+                val indents = consumeStartBlock tokens i
+                val fstTypeCtorName = consumeName tokens i
+                val fstTypeCtorType = parseType tokens i
+                val () = consumeNewlines tokens i
+                val sndTypeCtorName = consumeName tokens i
+                val sndTypeCtorType = parseType tokens i
+                val () = consumeEndBlock tokens i indents
 
-           in
-               (* TODO handle dedent again case *)
+            in
+                (* TODO handle dedent again case *)
                 let
                     val rest = parseExpr tokens i
                 in
@@ -174,10 +174,27 @@ and parseExpr tokens i =
                            sndTypeCtorName, sndTypeCtorType,
                            rest)
                 end
-           end
+            end
         )
         | Lex.UNIT => (incr(i); A.TmUnit)
         | Lex.ZERO => (incr(i); A.Zero)
+        | Lex.LPAREN =>
+          let
+              val () = expect tokens Lex.LPAREN i
+              val expr = parseExpr tokens i
+              val () = expect tokens Lex.RPAREN i
+          in
+              if (!i) < (List.length tokens) andalso
+                 List.nth (tokens, (!i))  = Lex.LPAREN then
+                  (* Function application *)
+                  let val () = expect tokens Lex.LPAREN i
+                      val arg = parseFuncCallParams tokens i
+                      val () = expect tokens Lex.RPAREN i
+                  in
+                      A.App(expr, arg)
+                  end
+              else expr
+          end
         | Lex.FN => (
             let
                 val () = expect tokens Lex.FN i
