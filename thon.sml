@@ -11,6 +11,7 @@ structure Thon : sig
               val step : A.exp -> A.exp
               val subst : A.exp -> A.exp -> A.exp
               val run : string -> A.exp
+              val newRun : string -> A.exp
               val eraseNamesInTyp : A.typ -> A.typ
               val runFile : string -> A.exp
               val newRunFile : string -> A.exp
@@ -44,6 +45,7 @@ fun get ctx i =
 
 fun istype typeCtx A.Nat = true
   | istype typeCtx A.Unit = true
+  | istype typeCtx A.Bool = true
   | istype typeCtx (A.TypVar (name, i)) = i < (length typeCtx)
   | istype typeCtx (A.Arr(d, c)) = (istype typeCtx d) andalso (istype typeCtx c)
   | istype typeCtx (A.Prod(l, r)) = (istype typeCtx l) andalso (istype typeCtx r)
@@ -171,6 +173,8 @@ fun substTypeInExp' srcType dstExp bindingDepth =
      of  A.Zero => A.Zero
        | A.Var (name, i) => A.Var (name, i)
        | A.TmUnit => A.TmUnit
+       | A.True => A.True
+       | A.False => A.False
        | A.Succ e2 => A.Succ (substTypeInExp' srcType e2 bindingDepth)
        | A.ProdLeft e => A.ProdLeft (substTypeInExp' srcType e bindingDepth)
        | A.ProdRight e => A.ProdRight (substTypeInExp' srcType e bindingDepth)
@@ -236,6 +240,7 @@ fun setDeBruijnIndexInType t varnames typnames =
     case t
      of  A.Nat => A.Nat
        | A.Unit => A.Unit
+       | A.Bool => A.Bool
        | A.TypVar (name, i) =>
          (case find name typnames of
              NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
@@ -267,6 +272,8 @@ fun setDeBruijnIndex e varnames typnames =
     case e
      of  A.Zero => e
        | A.TmUnit => e
+       | A.True => e
+       | A.False => e
        | A.Var (n, i) =>
          (case find n varnames of
              NONE => (print ("unknown var: "^ n); raise VarNotInContext)
@@ -425,6 +432,8 @@ fun typeEq (t : A.typ) (t' : A.typ) = ((eraseNamesInTyp t) = (eraseNamesInTyp t'
 
 fun typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx A.TmUnit = A.Unit
+  | typeof' ctx typCtx A.True = A.Bool
+  | typeof' ctx typCtx A.False = A.Bool
   | typeof' ctx typCtx (A.Var (name, i)) =
     if i < 0 then raise VarWithNegativeDeBruijinIndex(name, i) else get ctx i
   | typeof' ctx typCtx (A.Succ e2) = (typeof' ctx typCtx e2)
@@ -540,6 +549,8 @@ fun isval e =
     case e of
         A.Zero => true
       | A.TmUnit => true
+      | A.True => true
+      | A.False => true
       | A.Succ(n) => isval n
       | A.Fn(_, _, _) => true
       | A.Let(_, _, _, _) => false
@@ -556,6 +567,8 @@ fun subst' src dst bindingDepth =
     case dst
      of  A.Zero => A.Zero
        | A.TmUnit => A.TmUnit
+       | A.True => A.True
+       | A.False => A.False
        | A.Var (name, n)  => if n = bindingDepth then src else
                    if n > bindingDepth then A.Var(name, n-1) else
                    A.Var(name, n)
@@ -714,6 +727,13 @@ fun eval e = if isval e then e else eval (step e)
 
 fun run s =
     let val e' = parse s
+        val e = elaborateDatatypes e'
+    in
+        if isval e then e else eval (step e)
+    end
+
+fun newRun s =
+    let val e' = newParse s
         val e = elaborateDatatypes e'
     in
         if isval e then e else eval (step e)

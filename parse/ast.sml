@@ -12,6 +12,7 @@ sig
       | Plus of typ * typ (* sum type *)
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
+      | Bool
 
     datatype Idx = int
 
@@ -46,6 +47,8 @@ sig
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
+      | True 
+      | False
 
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
@@ -70,6 +73,7 @@ struct
       | Plus of typ * typ (* sum type *)
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
+      | Bool
 
     datatype Idx = int
 
@@ -104,12 +108,16 @@ struct
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
+      | True 
+      | False
 
     (* DEVNOTE this only applies f at the leaves *)
     fun expMap f e =
         case e
          of  Zero => f Zero
            | TmUnit => f TmUnit
+           | True => f True
+           | False => f False
            | Var (name, n)  => f (Var(name, n))
            | Succ e' => f (Succ (expMap f e'))
            | ProdLeft e' => f (ProdLeft(expMap f e'))
@@ -142,6 +150,7 @@ struct
         case t of
             Nat => f t
           | Unit => f t
+          | Bool => f t
           | TypVar (name, i) => f t
           | Arr(d, c) => f (Arr(typMap f d, typMap f c))
           | Prod(l, r) => f (Prod(typMap f l, typMap f r))

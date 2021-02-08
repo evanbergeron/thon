@@ -10,8 +10,8 @@ data list:
 
 fun isempty(l list) nat:
     case exposelist(l):
-        empty: s(z)
-        not: z
+        empty: true
+        not: false
 
 isempty(cons(z, nil(unit)))
 ```

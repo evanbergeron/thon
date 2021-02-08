@@ -78,6 +78,7 @@ fun parseType tokens i =
             (case List.nth (tokens, !i) of
                  Lex.NAT => (i := (!i) + 1; A.Nat)
                | Lex.NAME name => (i := (!i) + 1; A.TypVar(name, ~1))
+               | Lex.BOOL => (i := (!i) + 1; A.Bool)
                | Lex.UNIT => (i := (!i) + 1; A.Unit)
                | _ => raise Unimplemented("See token that is not nat or name in type"))
     in
@@ -315,6 +316,14 @@ and parseExpr tokens i =
             | SOME tok => raise UnexpectedToken("Expected ( after s, got " ^ (Lex.tokenToString tok))
             | NONE => raise UnexpectedToken("Unexpected EOF after s")
           )
+        | Lex.TRUE => (
+            expect tokens Lex.TRUE i;
+            A.True
+        )
+        | Lex.FALSE => (
+            expect tokens Lex.FALSE i;
+            A.False
+        )
         | tok => (raise UnexpectedToken("Got unexpected " ^ (Lex.tokenToString tok))))
     )
 

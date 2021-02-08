@@ -605,7 +605,7 @@ val Data ("list","nil",Unit,"cons",Prod (Nat,TypVar ("list",0)),
      Let ("isempty",Arr (TypVar ("list",0),Nat),
         Fix ("isempty",Arr (TypVar ("list",0),Nat),
            Fn ("l",TypVar ("list",0),
-              Case (App (Var ("exposelist",2),Var ("l",0)),"empty",Succ Zero, "not",Zero))),
+              Case (App (Var ("exposelist",2),Var ("l",0)),"empty",True, "not",False))),
         App (Var ("isempty",0),
            App (Var ("cons",2),Pair (Zero,App (Var ("nil",3),TmUnit))))))
   : Ast.exp
@@ -650,6 +650,10 @@ val Pair (Fn ("a",Nat,Pair (Zero,Zero)),Fn ("a",Nat,Zero)) : Ast.exp =
     Thon.newParse "(fn (a nat) => (z, z), fn (a nat) => z)";
 
 val Pair (Pair (Zero,Pair (Zero,Zero)),Zero) : Ast.exp = Thon.newParse "((z, (z, z)), z)";
+
+val Fn ("a",Bool,True) : Ast.exp = Thon.newParse "fn (a bool) => true";
+
+val True : Ast.exp = Thon.newRun "(fn (a bool) => true)(false)";
 
 in
 ()

@@ -1,5 +1,5 @@
 structure Lex : sig
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR | IFZ
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR | IFZ | TRUE | FALSE | BOOL
 val lex : string -> Token list
 val lexFile : string -> Token list
 val lexFileNoPrintErrMsg : string -> Token list
@@ -7,7 +7,7 @@ val tokenToString : Token -> string
 end  =
 struct
 
-datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR | IFZ
+datatype Token = FUN | FN | NAT | COLON | LPAREN | RPAREN | NAME of string | INDENT | DEDENT | RETURN | ZERO | SUCC | LET | SARROW | EQ | DARROW | IF | THEN | ELSE | DATA | BAR | CASE | COMMA | NEWLINE | UNIT | STAR | IFZ | TRUE | FALSE | BOOL
 
 exception No
 exception UnexpectedIndentLevel
@@ -47,6 +47,9 @@ fun tokenToString FUN = "FUN"
   | tokenToString NEWLINE = "NEWLINE"
   | tokenToString UNIT = "UNIT"
   | tokenToString STAR = "STAR"
+  | tokenToString TRUE = "TRUE"
+  | tokenToString FALSE = "FALSE"
+  | tokenToString BOOL = "BOOL"
 
 fun lookaheadN s n =
     (* Can raise Size *)
@@ -197,7 +200,19 @@ and lexLines' s out indentLevel =
                 lexLines' s ((NAME name)::out) indentLevel
             end
         )
-      | "t" => eatKeywordOrName ("then", THEN) s indentLevel out
+      | "t" =>
+        if onKeyword "true" s then (
+            eatWord "true" s;
+            lexLines' s (TRUE::out) indentLevel
+        ) else if onKeyword "then" s then (
+            eatWord "then" s;
+            lexLines' s (THEN::out) indentLevel
+        ) else (
+            let val name = getName s in
+                eatWord name s;
+                lexLines' s ((NAME name)::out) indentLevel
+            end
+        )
       | "e" => eatKeywordOrName ("else", ELSE) s indentLevel out
       | "d" => eatKeywordOrName ("data", DATA) s indentLevel out
       | "c" => eatKeywordOrName ("case", CASE) s indentLevel out
@@ -209,7 +224,10 @@ and lexLines' s out indentLevel =
       | "s" => eatKeywordOrName ("s", SUCC) s indentLevel out
       | "l" => eatKeywordOrName ("let", LET) s indentLevel out
       | "f" =>
-        if onKeyword "fun" s then (
+        if onKeyword "false" s then (
+            eatWord "false" s;
+            lexLines' s (FALSE::out) indentLevel
+        ) else if onKeyword "fun" s then (
             eatWord "fun" s;
             lexLines' s (FUN::out) indentLevel
         ) else if onKeyword "fn" s then (
@@ -222,6 +240,7 @@ and lexLines' s out indentLevel =
             end
         )
       | "n" => eatKeywordOrName ("nat", NAT) s indentLevel out
+      | "b" => eatKeywordOrName ("bool", BOOL) s indentLevel out
       | "r" => eatKeywordOrName ("return", RETURN) s indentLevel out
       | "(" => (
           eatWord "(" s;
