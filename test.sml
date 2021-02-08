@@ -634,6 +634,10 @@ val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "(fn (a nat) =
 val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "((fn (a nat) => a))(z)";
 val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "(((fn (a nat) => a))(z))";
 
+(* TODO is this a weird semantics? *)
+val App (Fn ("a",Prod (Nat,Nat),Zero),Pair (Zero,Zero)) : Ast.exp =
+    Thon.newParse "(fn (a nat * nat) => z)(z, z)";
+
 in
 ()
 end
