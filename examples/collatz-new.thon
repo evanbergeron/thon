@@ -1,52 +1,38 @@
 fun isone(n nat) nat:
     ifz n:
-        z:
-            z
+        z: z
         s(p):
             ifz p:
-                z:
-                    s(z)
-                s(p):
-                    z
+                z: s(z)
+                s(p): z
 
 fun iseven(n nat) nat:
     ifz n:
-        z:
-            s(z)
+        z: s(z)
         s(p):
             ifz iseven(p):
-                z:
-                    s(z)
-                s(p):
-                    z
+                z: s(z)
+                s(p): z
 
 fun divbytwo(n nat) nat:
     ifz n:
-        z:
-            z
+        z: z
         s(p):
             ifz p:
-                z:
-                    z
-                s(q):
-                    s(divbytwo(q))
+                z: z
+                s(q): s(divbytwo(q))
 
 fun multbythree(n nat) nat:
     ifz n:
-        z:
-            z
-        s(p):
-            s(s(s(multbythree(p))))
+        z: z
+        s(p): s(s(s(multbythree(p))))
 
 fun collatz(n nat) nat:
     ifz isone(n):
         z:
             ifz iseven(n):
-                z:
-                    collatz(s(multbythree(n)))
-                s(p):
-                    collatz(divbytwo(n))
-        s(p):
-            s(z)
+                z: collatz(s(multbythree(n)))
+                s(p): collatz(divbytwo(n))
+        s(p): s(z)
 
 collatz(s(s(z)))
