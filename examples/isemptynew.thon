@@ -2,7 +2,7 @@ data list:
     nil unit
     cons nat * list
 
-fun isempty(l list) nat:
+fun isempty(l list) bool:
     case exposelist(l):
         empty: true
         not: false

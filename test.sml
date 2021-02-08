@@ -602,8 +602,8 @@ val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,COLON,NEWLINE,INDE
     Lex.lexFile "/home/evan/thon/examples/lex04.thon";
 
 val Data ("list","nil",Unit,"cons",Prod (Nat,TypVar ("list",0)),
-     Let ("isempty",Arr (TypVar ("list",0),Nat),
-        Fix ("isempty",Arr (TypVar ("list",0),Nat),
+     Let ("isempty",Arr (TypVar ("list",0),Bool),
+        Fix ("isempty",Arr (TypVar ("list",0),Bool),
            Fn ("l",TypVar ("list",0),
               Case (App (Var ("exposelist",2),Var ("l",0)),"empty",True, "not",False))),
         App (Var ("isempty",0),
@@ -654,6 +654,8 @@ val Pair (Pair (Zero,Pair (Zero,Zero)),Zero) : Ast.exp = Thon.newParse "((z, (z,
 val Fn ("a",Bool,True) : Ast.exp = Thon.newParse "fn (a bool) => true";
 
 val True : Ast.exp = Thon.newRun "(fn (a bool) => true)(false)";
+
+val False : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/isemptynew.thon";
 
 in
 ()

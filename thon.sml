@@ -57,6 +57,7 @@ fun istype typeCtx A.Nat = true
 
 fun substType' src A.Nat bindingDepth = A.Nat
   | substType' src A.Unit bindingDepth = A.Unit
+  | substType' src A.Bool bindingDepth = A.Bool
   | substType' src (A.TypVar (name, n)) bindingDepth =
     if n = bindingDepth then src else
     if n > bindingDepth then A.TypVar (name, n-1) else
@@ -92,6 +93,7 @@ fun abstractOutType' name search t bindingDepth =
     case t
      of A.Nat => A.Nat
       | A.Unit => A.Unit
+      | A.Bool => A.Bool
       | A.TypVar (name, n)  => A.TypVar (name, n)
       | A.Arr(d, c) => A.Arr((abstractOutType' name search d bindingDepth),
                           (abstractOutType' name search c bindingDepth))
@@ -111,6 +113,7 @@ fun decrDeBruijinIndices t =
     case t of
         A.Nat => A.Nat
       | A.Unit => A.Unit
+      | A.Bool => A.Bool
       | A.TypVar (name, i) => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                     else A.TypVar (name, i -1)
       | A.Arr(d, c) => A.Arr(decrDeBruijinIndices d, decrDeBruijinIndices c)
@@ -125,6 +128,8 @@ fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
     case dst
      of  A.Zero => A.Zero
        | A.TmUnit => A.TmUnit
+       | A.True => A.True
+       | A.False => A.False
        | A.Var (name, n)  => if n >= bindingDepth then A.Var(name, n+shift) else
                              A.Var(name, n)
        | A.Succ e2 => A.Succ (shiftDeBruijinIndicesInExp shift e2 bindingDepth)
