@@ -71,6 +71,7 @@ recursive function, but it doesn't have to be a function, it can be
 any expression. Here's an amusing way to loop forever:
 
 ```
+(* Legacy syntax *)
 fix loop : nat in loop
 ```
 
@@ -87,7 +88,6 @@ binds the name `x` in the expression `e`.
 Polymorphism lets us reuse code you wrote for many different types,
 with the guarantee that the code will behave the same for all types.
 
-(Legacy syntax)
 
 ```
 poly t -> \ x : t -> x
@@ -96,6 +96,7 @@ is the polymorphic identity function. Feed it a type to get the
 identity function on that type. e.g.
 
 ```
+(* Legacy syntax *)
 (poly t -> \ x : t -> x) nat
 ```
 evaluates to the identity function on natural numbers.
@@ -132,6 +133,7 @@ Now each of these implementations can be packed away with the (legacy)
 syntax
 
 ```
+(* Legacy syntax *)
 impl some t. ((nat -> t) * (t -> nat)) with nat as
 (
     ((*set*) \ x : nat -> x,
@@ -141,6 +143,7 @@ impl some t. ((nat -> t) * (t -> nat)) with nat as
 and
 
 ```
+(* Legacy syntax *)
 impl some t. ((nat -> t) * (t -> nat)) with (nat, nat) as
 (
     ((*set*) \ x : nat -> (x, Z),
