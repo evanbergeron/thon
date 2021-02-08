@@ -49,7 +49,7 @@ fun consumeNewlines tokens i =
 (* TODO don't necassarily need to INDENT - output bool if it did and
  * feed that to consumeEndBlock *)
 fun consumeStartBlock tokens i =
-    let 
+    let
         val () = expect tokens Lex.COLON i
         val blockIndents = Lex.NEWLINE = List.nth (tokens, !i)
     in
@@ -67,7 +67,7 @@ fun consumeStartBlock tokens i =
 fun consumeEndBlock tokens i startIndented =
     if not startIndented then consumeNewlines tokens i
     else
-    let 
+    let
         val () = consumeNewlines tokens i
         val () = expect tokens Lex.DEDENT i
         val () = consumeNewlines tokens i
@@ -97,12 +97,13 @@ fun parseFuncCallParams tokens i =
         (* Also UNDONE handle more than two func call params *)
         case List.nth (tokens, !i) of
             Lex.COMMA =>
+            (debugPrint "see comma";
             let
                 val () = expect tokens Lex.COMMA i
                 val arg2 = parseExpr tokens i
             in
                 A.Pair(arg, arg2)
-            end
+            end)
            | Lex.RPAREN => arg
            | tok => raise UnexpectedToken("expected func param or LPAREN, got " ^
                                           (Lex.tokenToString tok))
@@ -182,18 +183,28 @@ and parseExpr tokens i =
           let
               val () = expect tokens Lex.LPAREN i
               val expr = parseExpr tokens i
-              val () = expect tokens Lex.RPAREN i
           in
               if (!i) < (List.length tokens) andalso
-                 List.nth (tokens, (!i))  = Lex.LPAREN then
-                  (* Function application *)
-                  let val () = expect tokens Lex.LPAREN i
-                      val arg = parseFuncCallParams tokens i
+                 List.nth (tokens, (!i)) = Lex.COMMA then
+                  let
+                      val () = expect tokens Lex.COMMA i
+                      val rightExpr = parseExpr tokens i
                       val () = expect tokens Lex.RPAREN i
                   in
-                      A.App(expr, arg)
+                      A.Pair(expr, rightExpr)
                   end
-              else expr
+              else (
+                  expect tokens Lex.RPAREN i;
+                  if (!i) < (List.length tokens) andalso
+                     List.nth (tokens, (!i)) = Lex.LPAREN then
+                      (* Function application *)
+                      let val () = expect tokens Lex.LPAREN i
+                          val arg = parseFuncCallParams tokens i
+                          val () = expect tokens Lex.RPAREN i
+                      in
+                          A.App(expr, arg)
+                      end
+                  else  expr)
           end
         | Lex.FN => (
             let

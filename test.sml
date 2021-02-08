@@ -601,9 +601,14 @@ val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,COLON,NEWLINE,INDE
   : Lex.Token list =
     Lex.lexFile "/home/evan/thon/examples/lex04.thon";
 
-
 val Data ("list","nil",Unit,"cons",Prod (Nat,TypVar ("list",0)),
-          App (Var ("cons",1),Pair (Zero,App (Var ("nil",2),TmUnit)))) : Ast.exp
+     Let ("isempty",Arr (TypVar ("list",0),Nat),
+        Fix ("isempty",Arr (TypVar ("list",0),Nat),
+           Fn ("l",TypVar ("list",0),
+              Case (App (Var ("exposelist",2),Var ("l",0)),"empty",Succ Zero, "not",Zero))),
+        App (Var ("isempty",0),
+           App (Var ("cons",2),Pair (Zero,App (Var ("nil",3),TmUnit))))))
+  : Ast.exp
     = newParseFile "/home/evan/thon/examples/isemptynew.thon";
 
 val Zero = newRunFile "/home/evan/thon/examples/isemptyagain.thon";
@@ -637,6 +642,14 @@ val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "(((fn (a nat)
 (* TODO is this a weird semantics? *)
 val App (Fn ("a",Prod (Nat,Nat),Zero),Pair (Zero,Zero)) : Ast.exp =
     Thon.newParse "(fn (a nat * nat) => z)(z, z)";
+
+val Pair (Fn ("a",Nat,Zero),Fn ("a",Nat,Zero)) : Ast.exp =
+    Thon.newParse "(fn (a nat) => z, fn (a nat) => z)";
+
+val Pair (Fn ("a",Nat,Pair (Zero,Zero)),Fn ("a",Nat,Zero)) : Ast.exp =
+    Thon.newParse "(fn (a nat) => (z, z), fn (a nat) => z)";
+
+val Pair (Pair (Zero,Pair (Zero,Zero)),Zero) : Ast.exp = Thon.newParse "((z, (z, z)), z)";
 
 in
 ()
