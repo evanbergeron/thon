@@ -27,7 +27,7 @@ is used).
 ## natural numbers
 
 `z` is the natural number 0. `s(z)` is 1 (the succesor of
-one). `s(s(z))` is 2, and so on.
+zero). `s(s(z))` is 2, and so on.
 
 ## functions
 
