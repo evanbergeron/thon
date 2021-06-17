@@ -50,6 +50,7 @@ sig
       | Dcl of string * exp * cmd
       | Get of string
       | Set of string * exp
+      | PrintInt of exp
 
     datatype top =
              Run of cmd
@@ -117,6 +118,7 @@ struct
       | Dcl of string * exp * cmd
       | Get of string
       | Set of string * exp
+      | PrintInt of exp
 
     datatype top =
              Run of cmd

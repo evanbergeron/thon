@@ -129,6 +129,7 @@ fun substTypeInCmd' srcType dstCmd bindingDepth =
               substTypeInCmd' srcType c bindingDepth)
       | A.Get name => A.Get name
       | A.Set(name, e) => A.Set(name, substTypeInExp' srcType e bindingDepth)
+      | A.PrintInt(e) => A.PrintInt(substTypeInExp' srcType e bindingDepth)
 
 
 and substTypeInExp' srcType dstExp bindingDepth =
@@ -237,6 +238,7 @@ fun setDeBruijnIndexInCmd c varnames typnames mutnames =
               setDeBruijnIndexInCmd c varnames typnames (name::mutnames))
       | A.Get name => A.Get name
       | A.Set(name, e) => A.Set(name, setDeBruijnIndexInExp e varnames typnames)
+      | A.PrintInt(e) => A.PrintInt(setDeBruijnIndexInExp e varnames typnames)
 
 and setDeBruijnIndexInExp e varnames typnames =
     let fun find name names =
@@ -347,6 +349,7 @@ fun cmdOk ctx typCtx mutCtx c =
         )
       | A.Get(name) => true
       | A.Set(name, e) => (case typeof' ctx typCtx mutCtx e of A.Nat => true | _ => false)
+      | A.PrintInt(e) => (case typeof' ctx typCtx mutCtx e of A.Nat => true | _ => false)
 
 and typeof' ctx typCtx mutCtx e =
     case e
@@ -500,6 +503,7 @@ fun substExpInCmd' src c bindingDepth =
       | A.Set(name, e) =>
         A.Set(name,
               subst' src e bindingDepth)
+      | A.PrintInt(e) => A.PrintInt(subst' src e bindingDepth)
 
 and subst' src dst bindingDepth =
     case dst
@@ -599,6 +603,12 @@ fun stepCmd' c expForSym =
         else
             (HashTable.insert expForSym (name, e);
              A.Ret e)
+      | A.PrintInt(e) =>
+        if not (isval e) then
+            A.PrintInt(step e)
+        else
+            (print (A.Print.pp e); print "\n";
+             A.Ret e) (* PrintInt evals to Ret-ing the int it prints *)
 
 
 and step e =
@@ -1277,6 +1287,13 @@ val cmd3 : cmd =
     Bnd ("x",Cmd (Set("sym", (Succ (Succ Zero)))),Ret (Var ("x",0)));
 val Bnd ("x",Cmd (Ret (Succ (Succ Zero))),Ret (Var ("x",0))) : cmd = stepCmd' cmd3 syms;
 val SOME(Succ (Succ Zero)) = HashTable.find syms "sym";
+
+(* PrintInt is like Set, but it prints to stdout
+   instead of writing an expression to an assignable.
+   It steps to Ret e where e is the int it printed *)
+val cmd4 : cmd =
+    Bnd ("x",Cmd (PrintInt((Succ (Succ Zero)))),Ret (Var ("x",0)));
+val Bnd ("x",Cmd (Ret (Succ (Succ Zero))),Ret (Var ("x",0))) : cmd = stepCmd cmd4;
 
 val Dcl ("foo",Succ Zero,Ret (Succ Zero)) : cmd =
     stepCmd (Dcl ("foo", Zero, Set("foo", Succ Zero)))
