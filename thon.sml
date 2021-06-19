@@ -7,8 +7,10 @@ structure Thon : sig
               val typeof : A.exp -> A.typ
               (* val test : unit -> unit *)
               val eval : A.exp -> A.exp
+              val evalCmd : A.cmd -> A.cmd
               val isval : A.exp -> bool
               val step : A.exp -> A.exp
+              val stepCmd : A.cmd -> A.cmd
               val subst : A.exp -> A.exp -> A.exp
               val run : string -> A.exp
               val newRun : string -> A.exp
@@ -171,9 +173,17 @@ fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
        | A.Unfold(e') => A.Unfold(shiftDeBruijinIndicesInExp shift e' (bindingDepth))
 
 
-
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
-fun substTypeInExp' srcType dstExp bindingDepth =
+fun substTypeInCmd' srcType dstCmd bindingDepth =
+    case dstCmd of
+        A.Ret e => A.Ret(substTypeInExp' srcType e bindingDepth)
+      | A.Bnd(name, e, c) =>
+        A.Bnd(name,
+              substTypeInExp' srcType e bindingDepth,
+              substTypeInCmd' srcType c (bindingDepth+1)) (* binds immutable var *)
+
+
+and substTypeInExp' srcType dstExp bindingDepth =
     case dstExp
      of  A.Zero => A.Zero
        | A.Var (name, i) => A.Var (name, i)
@@ -268,7 +278,16 @@ fun setDeBruijnIndexInType t varnames typnames =
        end
 
 
-fun setDeBruijnIndex e varnames typnames =
+fun setDeBruijnIndexInCmd c varnames typnames mutnames =
+    case c of
+        A.Ret e => A.Ret(setDeBruijnIndexInExp e varnames typnames)
+      | A.Bnd(name, e, c) =>
+        A.Bnd(name,
+              setDeBruijnIndexInExp e varnames typnames,
+              setDeBruijnIndexInCmd c (name::varnames) typnames mutnames) (* binds immutable var *)
+
+
+and setDeBruijnIndexInExp e varnames typnames =
     let fun find name names =
         (case List.findi (fn (_, n : string) => n = name) names
          of NONE => NONE
@@ -286,60 +305,60 @@ fun setDeBruijnIndex e varnames typnames =
        | A.Fn(name, argType, funcBody) =>
          A.Fn(name,
                setDeBruijnIndexInType argType varnames typnames,
-               setDeBruijnIndex funcBody (name::varnames) typnames)
+               setDeBruijnIndexInExp funcBody (name::varnames) typnames)
        | A.Let (varname, vartype, varval, varscope) =>
          A.Let(varname,
                setDeBruijnIndexInType vartype varnames typnames,
-               (setDeBruijnIndex varval (varnames) typnames),
-               setDeBruijnIndex varscope (varname::varnames) typnames)
-       | A.Succ e2 => A.Succ (setDeBruijnIndex e2 varnames typnames)
-       | A.ProdLeft e => A.ProdLeft (setDeBruijnIndex e varnames typnames)
-       | A.ProdRight e => A.ProdRight (setDeBruijnIndex e varnames typnames)
+               (setDeBruijnIndexInExp varval (varnames) typnames),
+               setDeBruijnIndexInExp varscope (varname::varnames) typnames)
+       | A.Succ e2 => A.Succ (setDeBruijnIndexInExp e2 varnames typnames)
+       | A.ProdLeft e => A.ProdLeft (setDeBruijnIndexInExp e varnames typnames)
+       | A.ProdRight e => A.ProdRight (setDeBruijnIndexInExp e varnames typnames)
        | A.PlusLeft (t, e) =>
             A.PlusLeft(setDeBruijnIndexInType t varnames typnames,
-                       setDeBruijnIndex e varnames typnames)
+                       setDeBruijnIndexInExp e varnames typnames)
        | A.PlusRight (t, e) =>
             A.PlusRight(setDeBruijnIndexInType t varnames typnames,
-                        setDeBruijnIndex e varnames typnames)
-       | A.App (f, n) => A.App (setDeBruijnIndex f varnames typnames,
-                                setDeBruijnIndex n varnames typnames)
-       | A.Ifz (i, t, prev, e) => A.Ifz (setDeBruijnIndex i varnames typnames,
-                                   setDeBruijnIndex t varnames typnames,
+                        setDeBruijnIndexInExp e varnames typnames)
+       | A.App (f, n) => A.App (setDeBruijnIndexInExp f varnames typnames,
+                                setDeBruijnIndexInExp n varnames typnames)
+       | A.Ifz (i, t, prev, e) => A.Ifz (setDeBruijnIndexInExp i varnames typnames,
+                                   setDeBruijnIndexInExp t varnames typnames,
                                    prev,
-                                   setDeBruijnIndex e (prev::varnames) typnames)
-       | A.Pair (l, r) => A.Pair (setDeBruijnIndex l varnames typnames,
-                                    setDeBruijnIndex r varnames typnames)
+                                   setDeBruijnIndexInExp e (prev::varnames) typnames)
+       | A.Pair (l, r) => A.Pair (setDeBruijnIndexInExp l varnames typnames,
+                                    setDeBruijnIndexInExp r varnames typnames)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
-            A.Rec (setDeBruijnIndex i varnames typnames,
-                   setDeBruijnIndex baseCase varnames typnames,
-                   prevCaseName, (setDeBruijnIndex recCase (prevCaseName::varnames) typnames))
+            A.Rec (setDeBruijnIndexInExp i varnames typnames,
+                   setDeBruijnIndexInExp baseCase varnames typnames,
+                   prevCaseName, (setDeBruijnIndexInExp recCase (prevCaseName::varnames) typnames))
        | A.Fix(name, t, e) =>
          A.Fix(name,
                setDeBruijnIndexInType t varnames typnames,
-               setDeBruijnIndex e (name::varnames) typnames)
+               setDeBruijnIndexInExp e (name::varnames) typnames)
        | A.Case (c, lname, l, rname, r) => A.Case(
-            setDeBruijnIndex c varnames typnames,
+            setDeBruijnIndexInExp c varnames typnames,
             lname,
-            setDeBruijnIndex l (lname::varnames) typnames,
+            setDeBruijnIndexInExp l (lname::varnames) typnames,
             rname,
-            setDeBruijnIndex r (rname::varnames) typnames)
+            setDeBruijnIndexInExp r (rname::varnames) typnames)
        | A.Use (pkg, clientName, typeName, client) => A.Use (
-            setDeBruijnIndex pkg varnames typnames,
+            setDeBruijnIndexInExp pkg varnames typnames,
             clientName,
             typeName,
-            setDeBruijnIndex client (clientName::varnames) (typeName::typnames))
+            setDeBruijnIndexInExp client (clientName::varnames) (typeName::typnames))
        | A.TypApp (appType, e) =>
             A.TypApp (setDeBruijnIndexInType appType varnames typnames,
-                      setDeBruijnIndex e varnames typnames)
-       | A.TypFn (name, e) => A.TypFn (name, setDeBruijnIndex e varnames (name::typnames))
+                      setDeBruijnIndexInExp e varnames typnames)
+       | A.TypFn (name, e) => A.TypFn (name, setDeBruijnIndexInExp e varnames (name::typnames))
        | A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *)) =>
          A.Fold (A.TyRec(name, setDeBruijnIndexInType t varnames (name::typnames)),
-                 setDeBruijnIndex e' varnames typnames)
+                 setDeBruijnIndexInExp e' varnames typnames)
        | A.Unfold(e') =>
-            A.Unfold (setDeBruijnIndex e' varnames typnames)
+            A.Unfold (setDeBruijnIndexInExp e' varnames typnames)
        | A.Impl (reprType, pkgImpl, pkgType) =>
             A.Impl(setDeBruijnIndexInType reprType varnames typnames,
-                   setDeBruijnIndex pkgImpl varnames typnames,
+                   setDeBruijnIndexInExp pkgImpl varnames typnames,
                    setDeBruijnIndexInType pkgType varnames typnames)
        | A.Data(dname, lname, ltyp, rname, rtyp, exp) =>
          A.Data(dname,
@@ -350,7 +369,7 @@ fun setDeBruijnIndex e varnames typnames =
                 (* binds a typ var*)
                 setDeBruijnIndexInType rtyp varnames (dname::typnames),
                 (* binds lname and rname and dname *)
-                setDeBruijnIndex exp (("expose" ^ dname)::rname::lname::varnames) (dname::typnames)
+                setDeBruijnIndexInExp exp (("expose" ^ dname)::rname::lname::varnames) (dname::typnames)
                )
        | _ => raise Unimplemented (* TODO *)
 end
@@ -434,8 +453,24 @@ fun eraseNamesInTyp t =
 
 fun typeEq (t : A.typ) (t' : A.typ) = ((eraseNamesInTyp t) = (eraseNamesInTyp t'))
 
+fun cmdOk ctx typCtx c =
+    case c of
+        A.Ret e => (case typeof' ctx typCtx e of A.Nat => true | _ => false)
+      | A.Bnd(name, e, c) => (
+       (* TODO guess this binds, need to bump debrui index?
+          can also toss this binding, i think it's a bit weird
+          yeah when having typed commands, can do dis. why would this
+          binding necassarily be a nat? seems unlikely
+          eventually typeof' will feed us a type and then we can feed that into cmdOk
+          recursive call
+        *)
+          case typeof' ctx typCtx e of
+              A.TypCmd => (cmdOk (A.Nat::ctx) typCtx c)
+            | _ => false
+      )
 
-fun typeof' ctx typCtx A.Zero = A.Nat
+
+and typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx A.TmUnit = A.Unit
   | typeof' ctx typCtx A.True = A.Bool
   | typeof' ctx typCtx A.False = A.Bool
@@ -545,6 +580,8 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     let val A.TyRec(name, t) = typeof' ctx typCtx e' in
         substType (A.TyRec(name, t)) t
     end
+  | typeof' ctx typCtx (A.Cmd c) =
+    if not (cmdOk ctx typCtx c) then raise IllTyped else A.TypCmd
 
 
 fun typeof e = typeof' [] [] e
@@ -565,10 +602,23 @@ fun isval e =
       | A.PlusLeft(_, e') => isval e'
       | A.PlusRight(_, e') => isval e'
       | A.Fold(t, e') => isval e'
+      | A.Cmd(_) => true
       | _ => false
 
+fun isfinal c =
+    case c of
+        A.Ret e => isval e
+      | _ => false
 
-fun subst' src dst bindingDepth =
+fun substExpInCmd' src c bindingDepth =
+    case c of
+        A.Ret e => A.Ret(subst' src e bindingDepth)
+      | A.Bnd(name, e, c') =>
+        A.Bnd(name,
+              subst' src e bindingDepth,
+              substExpInCmd' src c' (bindingDepth+1)) (* binds immutable var *)
+
+and subst' src dst bindingDepth =
     case dst
      of  A.Zero => A.Zero
        | A.TmUnit => A.TmUnit
@@ -614,12 +664,31 @@ fun subst' src dst bindingDepth =
        | A.Pair (l, r) => A.Pair (subst' src l bindingDepth, subst' src r bindingDepth)
        | A.Fold(t, e') => A.Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
        | A.Unfold(e') => A.Unfold(subst' src e' (bindingDepth))
+       | A.Cmd cmd => A.Cmd (substExpInCmd' src cmd bindingDepth)
 
 
 fun subst src dst = subst' src dst 0
 
+fun substExpInCmd src c = substExpInCmd' src c 0
 
-fun step e =
+fun stepCmd c =
+    case c of
+        A.Ret e => if not (isval e) then A.Ret (step e) else c
+      | A.Bnd(name, e, c') =>
+        if not (isval e) then
+            A.Bnd(name, step e, c')
+        else
+            (* ensured by typechecker *)
+            let val A.Cmd(c'') = e in
+            if not (isfinal c'') then
+                A.Bnd(name, A.Cmd(stepCmd c''), c')
+            else
+            (case c'' of
+                A.Ret e => substExpInCmd e c'
+              | _ => raise No)
+            end
+
+and step e =
     let val _ = typeof' [] [] e in
     if isval e then e else
     case e of
@@ -694,6 +763,7 @@ fun step e =
                         else (let val true = isval e in e end)
       | A.Unfold e' => if not (isval e') then A.Unfold (step e')
                      else (let val A.Fold(t, e'') = e' in e'' end)
+      | A.Cmd c => A.Cmd (stepCmd c)
       | _ => if (isval e) then e else raise No
     end
 
@@ -701,25 +771,25 @@ fun step e =
 fun parse s =
     let val ast : A.exp = Parse.parse s
     in
-        setDeBruijnIndex ast [] []
+        setDeBruijnIndexInExp ast [] []
     end
 
 fun newParse s =
     let val ast : A.exp = NewParse.parse s
     in
-        setDeBruijnIndex ast [] []
+        setDeBruijnIndexInExp ast [] []
     end
 
 fun parseFile filename =
     let val ast : A.exp = Parse.parseFile filename
     in
-        setDeBruijnIndex ast [] []
+        setDeBruijnIndexInExp ast [] []
     end
 
 fun newParseFile filename =
     let val ast : A.exp = NewParse.parseFile filename
     in
-        setDeBruijnIndex ast [] []
+        setDeBruijnIndexInExp ast [] []
     end
 
 fun findParseErrors filename =
@@ -729,6 +799,8 @@ fun findParseErrors filename =
     end
 
 fun eval e = if isval e then e else eval (step e)
+
+fun evalCmd c = if isfinal c then c else evalCmd (stepCmd c)
 
 fun run s =
     let val e' = parse s

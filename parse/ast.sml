@@ -13,6 +13,7 @@ sig
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
       | Bool
+      | TypCmd
 
     datatype Idx = int
 
@@ -49,6 +50,11 @@ sig
       | TmUnit
       | True 
       | False
+      | Cmd of cmd
+
+    and cmd =
+        Ret of exp
+      | Bnd of string * exp * cmd
 
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
@@ -74,6 +80,7 @@ struct
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
       | Bool
+      | TypCmd
 
     datatype Idx = int
 
@@ -110,6 +117,11 @@ struct
       | TmUnit
       | True 
       | False
+      | Cmd of cmd
+
+    and cmd =
+        Ret of exp
+      | Bnd of string * exp * cmd
 
     (* DEVNOTE this only applies f at the leaves *)
     fun expMap f e =
@@ -150,6 +162,7 @@ struct
         case t of
             Nat => f t
           | Unit => f t
+          | TypCmd => f t
           | Bool => f t
           | TypVar (name, i) => f t
           | Arr(d, c) => f (Arr(typMap f d, typMap f c))

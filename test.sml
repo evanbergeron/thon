@@ -657,6 +657,17 @@ val True : Ast.exp = Thon.newRun "(fn (a bool) => true)(false)";
 
 val False : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/isemptynew.thon";
 
+val cmd0 : cmd = Bnd ("x",Cmd (Ret Zero),Ret (Var ("x",0)));
+val Ret Zero = stepCmd cmd0;
+
+val ifcmd = (Bnd
+       ("cond",Cmd (Ret Zero),
+        Bnd
+          ("",Ifz (Var ("cond",0),Cmd (Ret Zero),"p",Cmd (Ret (Succ Zero))),
+           Ret (Var ("",0)))));
+
+val (Ret Zero) : cmd = evalCmd ifcmd;
+
 in
 ()
 end
