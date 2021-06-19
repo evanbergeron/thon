@@ -688,6 +688,10 @@ val nope =
 val Ret Zero = stepCmd nope handle
     (IllTypedMsg "Right hand side of bind is not a cmd") => Ret Zero;
 
+(* Finally *)
+val helloWorld = A.PrintStr (A.Str "Hello World");
+val Ret (Str "Hello World") : cmd = evalCmd helloWorld;
+
 in
 ()
 end

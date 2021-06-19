@@ -128,10 +128,11 @@ fun decrDeBruijinIndices t =
 
 fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
     case dst
-     of  A.Zero => A.Zero
-       | A.TmUnit => A.TmUnit
-       | A.True => A.True
-       | A.False => A.False
+     of  A.Zero => dst
+       | A.Str _ => dst
+       | A.TmUnit => dst
+       | A.True => dst
+       | A.False => dst
        | A.Var (name, n)  => if n >= bindingDepth then A.Var(name, n+shift) else
                              A.Var(name, n)
        | A.Succ e2 => A.Succ (shiftDeBruijinIndicesInExp shift e2 bindingDepth)
@@ -177,6 +178,7 @@ fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
 fun substTypeInCmd' srcType dstCmd bindingDepth =
     case dstCmd of
         A.Ret e => A.Ret(substTypeInExp' srcType e bindingDepth)
+      | A.PrintStr e => A.PrintStr(substTypeInExp' srcType e bindingDepth)
       | A.Bnd(name, e, c) =>
         A.Bnd(name,
               substTypeInExp' srcType e bindingDepth,
@@ -186,6 +188,7 @@ fun substTypeInCmd' srcType dstCmd bindingDepth =
 and substTypeInExp' srcType dstExp bindingDepth =
     case dstExp
      of  A.Zero => A.Zero
+       | A.Str s => A.Str s
        | A.Var (name, i) => A.Var (name, i)
        | A.TmUnit => A.TmUnit
        | A.True => A.True
@@ -281,6 +284,7 @@ fun setDeBruijnIndexInType t varnames typnames =
 fun setDeBruijnIndexInCmd c varnames typnames mutnames =
     case c of
         A.Ret e => A.Ret(setDeBruijnIndexInExp e varnames typnames)
+      | A.PrintStr e => A.PrintStr(setDeBruijnIndexInExp e varnames typnames)
       | A.Bnd(name, e, c) =>
         A.Bnd(name,
               setDeBruijnIndexInExp e varnames typnames,
@@ -295,6 +299,7 @@ and setDeBruijnIndexInExp e varnames typnames =
     in
     case e
      of  A.Zero => e
+       | A.Str _ => e
        | A.TmUnit => e
        | A.True => e
        | A.False => e
@@ -456,6 +461,7 @@ fun typeEq (t : A.typ) (t' : A.typ) = ((eraseNamesInTyp t) = (eraseNamesInTyp t'
 fun typeofCmdRet ctx typCtx c =
     case c of
         A.Ret e => typeof' ctx typCtx e
+      | A.PrintStr e => typeof' ctx typCtx e
       | A.Bnd(name, e, c) => (
           case typeof' ctx typCtx e of
               A.TypCmd t => (typeofCmdRet (t::ctx) typCtx c)
@@ -464,6 +470,7 @@ fun typeofCmdRet ctx typCtx c =
 
 
 and typeof' ctx typCtx A.Zero = A.Nat
+  | typeof' ctx typCtx (A.Str s) = A.Ascii
   | typeof' ctx typCtx A.TmUnit = A.Unit
   | typeof' ctx typCtx A.True = A.Bool
   | typeof' ctx typCtx A.False = A.Bool
@@ -582,6 +589,7 @@ fun typeof e = typeof' [] [] e
 fun isval e =
     case e of
         A.Zero => true
+      | A.Str s => true
       | A.TmUnit => true
       | A.True => true
       | A.False => true
@@ -605,6 +613,7 @@ fun isfinal c =
 fun substExpInCmd' src c bindingDepth =
     case c of
         A.Ret e => A.Ret(subst' src e bindingDepth)
+      | A.PrintStr e => A.PrintStr(subst' src e bindingDepth)
       | A.Bnd(name, e, c') =>
         A.Bnd(name,
               subst' src e bindingDepth,
@@ -613,6 +622,7 @@ fun substExpInCmd' src c bindingDepth =
 and subst' src dst bindingDepth =
     case dst
      of  A.Zero => A.Zero
+       | A.Str s => dst
        | A.TmUnit => A.TmUnit
        | A.True => A.True
        | A.False => A.False
@@ -667,6 +677,17 @@ fun stepCmd c =
     let val _ = typeofCmdRet [] [] c in (
     case c of
         A.Ret e => if not (isval e) then A.Ret (step e) else c
+      | A.PrintStr(e) =>
+        if not (isval e) then
+            A.PrintStr(step e)
+        else
+            let val A.Str s = e in
+            (print (s); print "\n";
+             A.Ret e) (* PrintInt evals to Ret-ing the int it prints *)
+            end
+
+
+
       | A.Bnd(name, e, c') =>
         if not (isval e) then
             A.Bnd(name, step e, c')

@@ -14,11 +14,13 @@ sig
       | Unit (* nullary sum *)
       | Bool
       | TypCmd of typ
+      | Ascii
 
     datatype Idx = int
 
     datatype exp =
         Zero
+      | Str of string
       | Var of string * int (* idx into ctx *)
       | Succ of exp
       | Fn of string * typ (*argType*) * exp (*funcBody*)
@@ -55,7 +57,7 @@ sig
     and cmd =
         Ret of exp
       | Bnd of string * exp * cmd
-      | PrintInt of exp
+      | PrintStr of exp
 
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
@@ -82,11 +84,13 @@ struct
       | Unit (* nullary sum *)
       | Bool
       | TypCmd of typ
+      | Ascii
 
     datatype Idx = int
 
     datatype exp =
         Zero
+      | Str of string
       | Var of string * int (* idx into ctx *)
       | Succ of exp
       | Fn of string * typ (*argType*) * exp (*funcBody*)
@@ -123,12 +127,13 @@ struct
     and cmd =
         Ret of exp
       | Bnd of string * exp * cmd
-      | PrintInt of exp
+      | PrintStr of exp
 
     (* DEVNOTE this only applies f at the leaves *)
     fun expMap f e =
         case e
          of  Zero => f Zero
+           | Str s => f (Str s)
            | TmUnit => f TmUnit
            | True => f True
            | False => f False
