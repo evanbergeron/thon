@@ -453,20 +453,13 @@ fun eraseNamesInTyp t =
 
 fun typeEq (t : A.typ) (t' : A.typ) = ((eraseNamesInTyp t) = (eraseNamesInTyp t'))
 
-fun cmdOk ctx typCtx c =
+fun typeofCmdRet ctx typCtx c =
     case c of
-        A.Ret e => (case typeof' ctx typCtx e of A.Nat => true | _ => false)
+        A.Ret e => typeof' ctx typCtx e
       | A.Bnd(name, e, c) => (
-       (* TODO guess this binds, need to bump debrui index?
-          can also toss this binding, i think it's a bit weird
-          yeah when having typed commands, can do dis. why would this
-          binding necassarily be a nat? seems unlikely
-          eventually typeof' will feed us a type and then we can feed that into cmdOk
-          recursive call
-        *)
           case typeof' ctx typCtx e of
-              A.TypCmd => (cmdOk (A.Nat::ctx) typCtx c)
-            | _ => false
+              A.TypCmd t => (typeofCmdRet (t::ctx) typCtx c)
+            | _ => raise IllTypedMsg "Right hand side of bind is not a cmd"
       )
 
 
@@ -580,8 +573,7 @@ and typeof' ctx typCtx A.Zero = A.Nat
     let val A.TyRec(name, t) = typeof' ctx typCtx e' in
         substType (A.TyRec(name, t)) t
     end
-  | typeof' ctx typCtx (A.Cmd c) =
-    if not (cmdOk ctx typCtx c) then raise IllTyped else A.TypCmd
+  | typeof' ctx typCtx (A.Cmd c) = A.TypCmd (typeofCmdRet ctx typCtx c)
 
 
 fun typeof e = typeof' [] [] e
@@ -672,6 +664,7 @@ fun subst src dst = subst' src dst 0
 fun substExpInCmd src c = substExpInCmd' src c 0
 
 fun stepCmd c =
+    let val _ = typeofCmdRet [] [] c in (
     case c of
         A.Ret e => if not (isval e) then A.Ret (step e) else c
       | A.Bnd(name, e, c') =>
@@ -687,6 +680,7 @@ fun stepCmd c =
                 A.Ret e => substExpInCmd e c'
               | _ => raise No)
             end
+    ) end
 
 and step e =
     let val _ = typeof' [] [] e in

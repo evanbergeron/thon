@@ -660,13 +660,33 @@ val False : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/isemptynew.thon"
 val cmd0 : cmd = Bnd ("x",Cmd (Ret Zero),Ret (Var ("x",0)));
 val Ret Zero = stepCmd cmd0;
 
-val ifcmd = (Bnd
-       ("cond",Cmd (Ret Zero),
-        Bnd
-          ("",Ifz (Var ("cond",0),Cmd (Ret Zero),"p",Cmd (Ret (Succ Zero))),
-           Ret (Var ("",0)))));
+(* Seems silly to have both bind and let *)
+(* Could maybe consider just having a bind that doesn't pass anything down? *)
+val ifcmd =
+    (Bnd ("cond",Cmd (Ret Zero),
+     Bnd ("",
+          Ifz (Var ("cond",0),
+               Cmd (Ret Zero),
+          (*else*)"p",
+               Cmd (Ret (Succ Zero))),
+          Ret (Var ("",0)))));
 
 val (Ret Zero) : cmd = evalCmd ifcmd;
+
+val apply =
+    (Bnd ("f", Cmd (Ret (Fn ("x", Nat,Zero))),
+     Bnd ("res", Cmd (Ret (App(Var("f", 0), (Succ Zero)))),
+     Ret (Var ("res",0)))));
+
+val (Ret Zero) : cmd = evalCmd apply;
+
+val nope =
+    (Bnd ("f", Cmd (Ret (Fn ("x", Nat,Zero))),
+     Bnd ("res", App(Var("f", 0), (Succ Zero)),
+     Ret (Var ("res",0)))));
+
+val Ret Zero = stepCmd nope handle
+    (IllTypedMsg "Right hand side of bind is not a cmd") => Ret Zero;
 
 in
 ()
