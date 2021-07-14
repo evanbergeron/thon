@@ -327,12 +327,13 @@ and parseExpr tokens i =
         | tok => (raise UnexpectedToken("Got unexpected " ^ (Lex.tokenToString tok))))
     )
 
+fun parseCmd tokens i = A.Ret A.Zero
 
 fun parse s =
     let val tokens = Lex.lex s
         val i = ref 0;
     in
-        parseExpr tokens i
+        parseCmd tokens i
     end
     handle UnexpectedToken msg => (print ("Parsing error: " ^ msg ^ "\n");
                                    raise (UnexpectedToken msg) )
@@ -342,7 +343,7 @@ fun parseFile filename =
     let val tokens = Lex.lexFile filename
         val i = ref 0;
     in
-        parseExpr tokens i
+        parseCmd tokens i
     end
     handle UnexpectedToken msg => (print ("Parsing error: " ^ msg ^ "\n");
                                    raise (UnexpectedToken msg) )

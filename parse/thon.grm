@@ -49,15 +49,22 @@ structure A = Ast
  | FIX
  | FUN
  | DATA
+ | LBRACE
+ | RBRACE
+ | DO
+ | PRINT
+ | RETURN
+ | DQUOTE
 
 %nonterm
    exp of A.exp
+ | cmd of A.cmd
  | typ of A.typ
  | program of A.exp
 
 %verbose
 %pos int
-%start exp (* i think likely this should be program, but I really dont like that hack *)
+%start cmd
 %eop EOF
 
 %name Thon
@@ -67,7 +74,7 @@ structure A = Ast
 
 (* The precedence grows down *)
 %nonassoc TYPEOR (* Deliberately first *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID STR REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX DO LBRACE RBRACE RETURN PRINT SQUOTE DQUOTE FUN DATA
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID STR REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX DO LBRACE RBRACE RETURN PRINT DQUOTE FUN DATA
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 

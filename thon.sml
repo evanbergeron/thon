@@ -1,8 +1,8 @@
 (* thon - a small functional language *)
 structure Thon : sig
-              val parse : string -> Ast.exp
-              val newParse : string -> Ast.exp
-              val parseFile : string -> Ast.exp
+              val parse : string -> Ast.cmd
+              val newParse : string -> Ast.cmd
+              val parseFile : string -> Ast.cmd
               val typeof' : A.typ list -> 'b option list -> A.exp -> A.typ
               val typeof : A.exp -> A.typ
               (* val test : unit -> unit *)
@@ -12,14 +12,15 @@ structure Thon : sig
               val step : A.exp -> A.exp
               val stepCmd : A.cmd -> A.cmd
               val subst : A.exp -> A.exp -> A.exp
-              val run : string -> A.exp
-              val newRun : string -> A.exp
+              val run : string -> A.cmd
+              val newRun : string -> A.cmd
               val eraseNamesInTyp : A.typ -> A.typ
-              val runFile : string -> A.exp
-              val newRunFile : string -> A.exp
-              val newParseFile : string -> A.exp
+              val runFile : string -> A.cmd
+              val newRunFile : string -> A.cmd
+              val newParseFile : string -> A.cmd
               val findParseErrors : string -> unit
               val elaborateDatatypes : A.exp -> A.exp
+              val elaborateDatatypesInCmd : A.cmd -> A.cmd
               val shiftDeBruijinIndicesInExp : int -> A.exp -> int -> A.exp
               val get : 'a list -> int -> 'a
               val istype : 'a option list -> A.typ -> bool
@@ -441,6 +442,11 @@ fun elaborateDatatype e =
 
 fun elaborateDatatypes e = A.expMap elaborateDatatype e
 
+fun elaborateDatatypesInCmd c =
+    case c of
+        A.Ret e => A.Ret (elaborateDatatypes e)
+      | A.PrintStr e => A.PrintStr (elaborateDatatypes e)
+      | A.Bnd(name, e, c) => A.Bnd(name, (elaborateDatatypes e), (elaborateDatatypesInCmd c))
 
 fun substTypeInExp srcType dstExp = substTypeInExp' srcType dstExp 0
 
@@ -782,27 +788,27 @@ and step e =
 
 
 fun parse s =
-    let val ast : A.exp = Parse.parse s
+    let val ast : A.cmd = Parse.parse s
     in
-        setDeBruijnIndexInExp ast [] []
+        setDeBruijnIndexInCmd ast [] [] []
     end
 
 fun newParse s =
-    let val ast : A.exp = NewParse.parse s
+    let val ast : A.cmd = NewParse.parse s
     in
-        setDeBruijnIndexInExp ast [] []
+        setDeBruijnIndexInCmd ast [] [] []
     end
 
 fun parseFile filename =
-    let val ast : A.exp = Parse.parseFile filename
+    let val ast : A.cmd = Parse.parseFile filename
     in
-        setDeBruijnIndexInExp ast [] []
+        setDeBruijnIndexInCmd ast [] [] []
     end
 
 fun newParseFile filename =
-    let val ast : A.exp = NewParse.parseFile filename
+    let val ast : A.cmd = NewParse.parseFile filename
     in
-        setDeBruijnIndexInExp ast [] []
+        setDeBruijnIndexInCmd ast [] [] []
     end
 
 fun findParseErrors filename =
@@ -816,31 +822,31 @@ fun eval e = if isval e then e else eval (step e)
 fun evalCmd c = if isfinal c then c else evalCmd (stepCmd c)
 
 fun run s =
-    let val e' = parse s
-        val e = elaborateDatatypes e'
+    let val e' : A.cmd = parse s
+        val e = elaborateDatatypesInCmd e'
     in
-        if isval e then e else eval (step e)
+        if isfinal e then e else evalCmd (stepCmd e)
     end
 
 fun newRun s =
     let val e' = newParse s
-        val e = elaborateDatatypes e'
+        val e = elaborateDatatypesInCmd e'
     in
-        if isval e then e else eval (step e)
+        if isfinal e then e else evalCmd (stepCmd e)
     end
 
 fun runFile s =
     let val e' = parseFile s
-        val e = elaborateDatatypes e'
+        val e = elaborateDatatypesInCmd e'
     in
-        if isval e then e else eval (step e)
+        if isfinal e then e else evalCmd (stepCmd e)
     end
 
 fun newRunFile s =
     let val e' = newParseFile s
-        val e = elaborateDatatypes e'
+        val e = elaborateDatatypesInCmd e'
     in
-        if isval e then e else eval (step e)
+        if isfinal e then e else evalCmd (stepCmd e)
     end
 
 end (* structure Thon *)
