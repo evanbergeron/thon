@@ -376,6 +376,7 @@ and setDeBruijnIndexInExp e varnames typnames =
                 (* binds lname and rname and dname *)
                 setDeBruijnIndexInExp exp (("expose" ^ dname)::rname::lname::varnames) (dname::typnames)
                )
+       | A.Cmd c => A.Cmd (setDeBruijnIndexInCmd c varnames typnames [])
        | _ => raise Unimplemented (* TODO *)
 end
 
@@ -683,11 +684,8 @@ fun stepCmd c =
         else
             let val A.Str s = e in
             (print (s); print "\n";
-             A.Ret e) (* PrintInt evals to Ret-ing the int it prints *)
+             A.Ret e) (* PrintStr evals to Ret-ing the str it prints *)
             end
-
-
-
       | A.Bnd(name, e, c') =>
         if not (isval e) then
             A.Bnd(name, step e, c')

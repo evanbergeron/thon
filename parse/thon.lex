@@ -10,7 +10,8 @@ type lexresult= (svalue,pos) token
 
 val pos = ref 0
 
-local val commentLevel = ref 0 in
+local val commentLevel = ref 0
+      val stringLevel = ref 0 in
 
   (* Thank you to Kaustuv Chaudhuri, Frank Pfenning, Anand
    * Subramanian, and/or Taegyun Kim for these enterComment,
@@ -28,6 +29,14 @@ local val commentLevel = ref 0 in
        then raise UnbalancedComments
        else ();
        Tokens.EOF(!pos,!pos))
+
+  fun enterString yypos =
+    (stringLevel := !stringLevel + 1)
+
+  fun exitString () =
+    (stringLevel := !stringLevel - 1;
+    !stringLevel = 0)
+
 end
 
 fun error (e,l : int,_) = TextIO.output (TextIO.stdOut, String.concat[
@@ -36,11 +45,12 @@ fun error (e,l : int,_) = TextIO.output (TextIO.stdOut, String.concat[
 
 %%
 %header (functor ThonLexFn(structure Tokens: Thon_TOKENS));
-%s COMMENT;
+%s COMMENT STRING;
 alpha=[A-Za-z];
 id=[A-Za-z_\']*;
 digit=[0-9];
 ws = [\ \t];
+str = [,A-Za-z\ \t]*;
 %%
 <INITIAL> \n       => (pos := (!pos) + 1; lex());
 <INITIAL> {ws}+    => (lex());
@@ -71,6 +81,9 @@ ws = [\ \t];
 <INITIAL> "case"   => (Tokens.CASE(!pos,!pos));
 <INITIAL> "data"   => (Tokens.DATA(!pos,!pos));
 <INITIAL> "as"     => (Tokens.AS(!pos,!pos));
+<INITIAL> "do"     => (Tokens.DO(!pos,!pos));
+<INITIAL> "return" => (Tokens.RETURN(!pos,!pos));
+<INITIAL> "print"  => (Tokens.PRINT(!pos,!pos));
 <INITIAL> "in"     => (Tokens.IN(!pos,!pos));
 <INITIAL> "of"     => (Tokens.OF(!pos,!pos));
 <INITIAL> "u"      => (Tokens.TYPEREC(!pos,!pos));
@@ -81,12 +94,18 @@ ws = [\ \t];
 <INITIAL> "="      => (Tokens.EQ(!pos,!pos));
 <INITIAL> "("      => (Tokens.LPAREN(!pos,!pos));
 <INITIAL> ")"      => (Tokens.RPAREN(!pos,!pos));
+<INITIAL> "{"      => (Tokens.LBRACE(!pos,!pos));
+<INITIAL> "}"      => (Tokens.RBRACE(!pos,!pos));
 <INITIAL> "|"      => (Tokens.PIPE(!pos,!pos));
 <INITIAL> {digit}+ => (Tokens.IDX (valOf (Int.fromString yytext), !pos, !pos));
 <INITIAL> {id}     => (Tokens.ID(yytext, !pos, !pos));
 
 <INITIAL> "(*"        => (YYBEGIN COMMENT; enterComment yypos; lex());
 <INITIAL> "*)"        => (raise UnbalancedComments);
+
+<INITIAL> "\""        => (YYBEGIN STRING; enterString yypos; lex());
+<STRING> {str}        => (Tokens.STR(yytext, !pos, !pos));
+<STRING> "\""         => (if exitString () then YYBEGIN INITIAL else ();lex());
 
 <COMMENT> "(*"        => (enterComment yypos; lex());
 <COMMENT> "*)"        => (if exitComment () then YYBEGIN INITIAL else ();lex());

@@ -163,6 +163,7 @@ struct
            | Unfold(e') => f (Unfold(expMap f e'))
            | Data(dataname, lname, ltyp, rname, rtyp, exp) =>
              f (Data(dataname, lname, ltyp, rname, rtyp, f exp))
+           | Cmd c => f (Cmd c) (* TODO should map into c? *)
 
     (* DEVNOTE this applies f at every node *)
     fun typMap f t =

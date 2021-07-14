@@ -692,6 +692,12 @@ val Ret Zero = stepCmd nope handle
 val helloWorld = A.PrintStr (A.Str "Hello World");
 val Ret (Str "Hello World") : cmd = evalCmd helloWorld;
 
+val Bnd ("x",Cmd (Ret (Str "Hello, world")),Ret Zero) : cmd = 
+    stepCmd (Bnd ("x", Cmd (PrintStr (Str "Hello, world")), (Ret Zero)));
+
+val Ret Zero : cmd = 
+    evalCmd (Bnd ("x", Cmd (PrintStr (Str "Hello, world")), (Ret Zero)));
+
 in
 ()
 end

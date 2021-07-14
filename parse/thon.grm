@@ -20,6 +20,7 @@ structure A = Ast
  | TYPEOR
  | IDX of int
  | ID of string
+ | STR of string
  | GO
  | POLY
  | LEFT
@@ -66,7 +67,7 @@ structure A = Ast
 
 (* The precedence grows down *)
 %nonassoc TYPEOR (* Deliberately first *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX FUN DATA
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID STR REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX DO LBRACE RBRACE RETURN PRINT SQUOTE DQUOTE FUN DATA
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -101,6 +102,12 @@ exp:
   | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
   | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
   | DATA ID EQ ID typ PIPE ID typ IN exp (A.Data(ID1, ID2, typ1, ID3, typ2, exp))
+  | DO LBRACE cmd RBRACE (A.Cmd (A.Bnd ("", (A.Cmd cmd), A.Ret (A.Var ("", ~1)))))
+  | STR (A.Str STR)
+
+cmd:
+    RETURN exp (A.Ret exp)
+  | PRINT exp (A.PrintStr exp)
 
 typ:
     NAT (A.Nat)
