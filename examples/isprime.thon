@@ -1,0 +1,26 @@
+let decr : nat -> nat =
+  \ x : nat ->
+    ifz x of
+      Z -> Z
+    | S p -> p
+
+in let sub : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+    rec y of
+      Z -> x
+    | prevRec -> (decr prevRec)
+
+in let lt : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+  ifz (sub y x) of
+    Z -> Z
+  | S p -> S Z
+
+(* 1 if a divides b, 0 otherwise *)
+in let divides : nat -> nat -> nat =
+    \ a : nat ->
+    \ b : nat ->
+
+    

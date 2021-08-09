@@ -1,0 +1,12 @@
+data list:
+    nil unit
+    cons nat * list
+
+fun isempty(l list) nat:
+    case exposelist(l):
+        empty:
+            s(z)
+        not:
+            z
+
+isempty(cons(z, nil(unit)))

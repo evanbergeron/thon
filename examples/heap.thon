@@ -1,0 +1,84 @@
+(*
+ * Implements leafist heaps. Uses "Purely Functional Data Structures"
+ * as reference.
+ *
+ *)
+
+(* Preliminary arithmetic functions *)
+let decr : nat -> nat =
+  \ x : nat ->
+    ifz x of
+      Z -> Z
+    | S p -> p
+
+(* Subtracts y from x. Returns zero if negative. *)
+in let sub : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+    rec y of
+      Z -> x
+    | prevRec -> (decr prevRec)
+
+(* x < y iff y - x is > 0 *)
+in let lt : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+  ifz (sub y x) of
+    Z -> Z
+  | S p -> S Z
+
+in
+
+(*
+ * A heap is empty or is a node with a rank, an elem, and two children.
+ *)
+data heap =
+    nil unit
+  | node (nat * nat) * (heap * heap)
+
+in fun rank : heap -> nat =
+    \ h : heap ->
+        case exposeheap h of empty -> Z | n -> fst (fst n)
+
+in fun makeTree : nat -> heap -> heap -> heap =
+   \ x : nat ->
+   \ h : heap ->
+   \ h' : heap ->
+    ifz (lt (rank h') (rank h)) of
+      Z -> node(((S (rank h')), x), (h, h'))
+    | S p -> (node(((S (rank h)), x), (h', h)))
+
+in fun merge : heap -> heap -> heap =
+    \ h : heap ->
+    \ h' : heap ->
+    case exposeheap h of empty -> h' | hRankElemTreeTree -> (
+    case exposeheap h' of empty -> h | hRankElemTreeTree'-> (
+    (* both nonempty *)
+    let x : nat = snd (fst hRankElemTreeTree) in
+    let y : nat = snd (fst hRankElemTreeTree') in
+    let l : heap = fst (snd hRankElemTreeTree) in
+    let l': heap = fst (snd hRankElemTreeTree') in
+    let r : heap = snd (snd hRankElemTreeTree) in
+    let r': heap = snd (snd hRankElemTreeTree') in
+    ifz (lt x y) of
+        Z -> (makeTree x l (merge r h'))
+      | S p -> (makeTree y l' (merge h r'))
+    ))
+
+in fun insert : nat -> heap -> heap =
+    \ n : nat -> 
+    \ h : heap -> (merge (node((S Z, n), ((nil unit), (nil unit)))) h)
+
+(* min elem at the top *)
+in fun findMin : heap -> nat =
+    \ h : heap -> case exposeheap h of
+        empty -> Z (*shouldn't happen?*)
+      | rankElemTreeTree -> snd (fst rankElemTreeTree)
+
+in fun deleteMin : heap -> heap =
+    \ h : heap -> case exposeheap h of
+        empty -> h (*shouldn't happen*)
+      | rankElemTreeTree ->
+        (merge (fst (snd rankElemTreeTree)) (snd (snd rankElemTreeTree)))
+
+in Z

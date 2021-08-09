@@ -1,0 +1,51 @@
+fun foo(a int) int:
+    val b int = 0
+    val f int -> int = \ x int -> x + 1
+    val t bool = true
+    if t:
+        val c int = f(b)
+    else:
+        val c int = f(a)
+    val p (bool, int) = (false, 0)
+    data tree = nil | node int tree tree
+    val n tree = nil
+    val n2 tree = node(0, nil, nil)
+    case n2:
+        nil: return b
+        node(val, l, r):
+            return f(b)
+    signature NatSig:
+        type nat
+        val Z nat
+        val S nat -> nat
+        
+    (* These are just named tuples, essentially *)
+    (* That can also contain types *)
+    (* Really it just contains a type variable *)
+    (* It provides some names and some values associated with those names.
+       Some of those names can be referring to type *)
+    struct SafeNat:
+        datatype nat = Z | S of nat
+        
+    struct FastNat:
+        type nat = int
+        val Z = z
+        val S = fn (x nat) nat => s(x)
+        
+    // could borrow some lua-ish-python-ish 
+    let SafeNat = { type nat = int, val Z = z, val S = fn(x nat) nat => s(x) }
+    // We wouldn't really need to do type inference here, cause it's provided to us. But I don't like the inconsistency with other let bindings. Which should maybe themselves be val bindings.
+    
+    Should just treat it like a compound definition.
+Blech but then 
+    fun foo():
+        val blah
+    looks the same as 
+    struct foo:
+        val blah
+        
+    but foo doesn't export the name blah.
+    
+    Maybe that's fine. Idk maybe it'd be good to have a universal decl syntax. I just don't like heavyweight inline decls.
+
+    return b

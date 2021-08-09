@@ -1,0 +1,64 @@
+fun foo(a int) int:
+    let b int = 0
+    let f int -> int = \ x int -> x + 1
+    let t bool = true
+    if t:
+        let c int = f(b)
+    else:
+        let c int = f(a)
+    let p (bool, int) = (false, 0)
+    data tree = nil | node int tree tree
+    let n tree = nil
+    let n2 tree = node(0, nil, nil)
+    case n2:
+        nil: return b
+        node(let, l, r):
+            return f(b)
+
+    (* Sugar for 
+     * type NatSig = some nat . (Z: nat * s: nat -> nat)
+     *)
+    signature NatSig:
+        type nat
+        val Z nat
+        val S nat -> nat
+        
+    some nat . (Z: nat * s: nat -> nat)
+
+    (* These are just named tuples, right *)
+    struct SafeNat:
+        datatype nat = Z | S of nat
+        val Z = z
+        val S = fn (x nat) nat => s(x)
+
+    struct FastNat:
+        type nat = int
+        val Z = 0
+        val S = fn (x nat) nat => x + 1
+        
+    struct Sg:
+        type container = (nat * nat)
+        val set = fn (x nat) container => (x, 0)
+        val get = fn (x container) nat => fst(x)
+        
+    (* Doesn't type-check, Sg.container is opaque *)
+    let x : Sg.container = (0, 0)
+
+    (* Though maybe we could force the user to specify a signature they ascribe to. *)
+    
+    (* Right, but if we don't force it, then there remains a many-to-many relationship between structure and signature. That's the key. That's flexibility *)
+    
+    
+structure Nat as sig type nat val Z end =
+    if (913 mod 7 = 5) then
+    [ struct type nat = int val Z = 0 end
+      as sig type nat val Z : nat end ]
+    else
+    [ struct datatype nat = Z | S p  end
+      as sig type nat val Z : nat end ]
+
+    
+structure SetGet as sig type elem
+
+
+and the magic happens when the programmer associates a structure with a signature. we get an expression of "the required signature" type. that's the polymorphism.

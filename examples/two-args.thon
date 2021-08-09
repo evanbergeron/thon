@@ -1,0 +1,4 @@
+fun twoargs(a nat * nat) nat:
+    z
+
+twoargs(z, z)

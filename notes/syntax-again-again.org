@@ -1,0 +1,20 @@
+signature tree = data
+    type list
+    con nil : list
+    con cons : nat * list -> list
+end
+
+data structure tree {
+    con nil
+    con node(
+    
+}
+
+fun foo(a int) int {
+    let b int = 0
+    let f int -> int = fn x int -> x + 1
+    let t bool = true
+    if t {
+        let c int = f(b)
+    }
+}
