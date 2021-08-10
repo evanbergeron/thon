@@ -9,23 +9,10 @@ open Thon;
 open A;
 (* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : typ = TyRec("natlist",Plus(Unit, Prod(Nat, TypVar ("natlist", 0))));
-val Fn ("natlist", TyRec ("l",Plus (Unit,Prod (Nat,TypVar ("l", 0)))),Var ("natlist",0)) =
-    parse "\\ natlist : (u l. (unit |  (nat * l))) -> natlist";
 
-(* id function on natlists *)
-val TypApp
-    (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-     TypFn ("s",Fn ("x",TypVar ("s",0),Var ("x",0)))) : Ast.exp =
-    parse "((poly s -> \\ x : s -> x) (u natlist. (unit | (nat * natlist))))";
 val nilNatList =
     Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
 
-(* TODO don't hardcode dir *)
-val parsedConsNatList = parseFile "/home/evan/thon/examples/emptynatlist.thon";
-
-val true = (nilNatList = parsedConsNatList);
-
-val TmUnit : Ast.exp = parse "unit";
 
 val singletonList =
     Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Pair(Zero,
@@ -42,17 +29,6 @@ val natlistCons =
              )
             )
        );
-
-val Fn("natAndNatlist",Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))),
-     Fold (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))),
-        PlusRight
-          (Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))),
-           Var ("natAndNatlist", 0)))) : Ast.exp =
-    parseFile "/home/evan/thon/examples/natlistcons.thon";
-
-val parsedNatlistCons =
-    parseFile "/home/evan/thon/examples/natlistcons.thon";
-val true = (parsedNatlistCons = natlistCons);
 
 val Arr (Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))),
          TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))) : typ =
@@ -102,26 +78,6 @@ val All("t", Arr(TypVar ("t", 0), Nat)) = abstractOutType "t" (Arr(Nat, Nat)) (A
 
 val e0 = Impl(Nat, Fn("x", Nat, Zero), Some("t", Arr(TypVar ("t", 0), TypVar ("t", 0))));
 val Some("t",Arr(TypVar ("t", 0), TypVar ("t", 0))) = typeof' [] [] e0;
-
-val Impl (Nat,Fn ("x",Nat,Zero),Some ("t",Arr (TypVar ("t",0),TypVar ("t",0)))) =
-    parse "impl (some t. t -> t) with nat as \\ x : nat -> Z";
-
-val Impl (Nat,Fn ("x",Nat,Zero),Some ("t",Arr (TypVar ("t",0),TypVar ("t",0)))) =
-    run "impl (some t. t -> t) with nat as \\ x : nat -> Z";
-
-val Impl
-    (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-     Fn
-       ("l",TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
-        Zero),Some ("s",Arr (TypVar ("s",0),TypVar ("s",0)))) : exp =
-    parse "impl (some s. s -> s) with (u natlist. (unit |  (nat * natlist))) as \\ l : (u natlist. (unit |  (nat * natlist))) -> Z";
-
-val Use (Impl (Nat,Fn ("x",Nat,Zero),Some ("t'",Arr (TypVar ("t'",0),TypVar ("t'",0)))),
-         "pkg","s", Var ("pkg",0)) : exp =
-    parse "use (impl (some t'. t' -> t') with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)";
-
-val Zero = run "use (impl (some t. t -> t) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)"
-           handle ClientTypeCannotEscapeClientScope => Zero;
 
 
 val e1 = Impl(Nat, Fn("x", Nat, Var ("x", 0)), Some("t", Arr(TypVar ("t", 0), TypVar ("t", 0))));
@@ -356,182 +312,7 @@ val Succ (Succ (Succ (Succ Zero))) = eval (Rec(Succ(Succ(Zero)), Zero, "prev", S
 
 val multByThree = Fn("x", Nat, Rec(Var ("x", 0), Zero, "prev", Succ(Succ(Succ(Var("prev", 0))))));
 
-val Fn ("n",Nat,Rec (Var ("n",0),Var ("n",0),"prev",Succ (Succ Zero))) =
-    parse "\\ n : nat -> rec n of Z -> n | prev -> S S Z ";
-
-val App (Fn ("n", Nat,Rec (Var ("n",0),Zero, "prev", Succ (Succ (Var ("prev", 0))))),Succ Zero) : Ast.exp =
-    parse "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
-
-val (Succ (Succ Zero)) =
-    run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
-
-val Succ (Succ (Succ (Succ Zero))) : Ast.exp =
-    run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S S Z))";
-
 val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero));
-
-val TypFn ("s", Fn("x",TypVar ("s", 0),Var ("x", 0))) : Ast.exp =
-    parse "poly s -> \\ x : s -> x";
-(* TODO also wrong *)
-val TypFn("t", TypFn ("t'",Fn ("x",Arr (TypVar ("t",1),TypVar ("t'",0)),Var ("x",0)))) =
-    parse "poly t -> poly t' -> \\ x : (t -> t') -> x";
-val TypApp (Nat,TypFn ("s", Fn("x",TypVar ("s", 0),Var ("x",0)))) =
-    parse "((poly s -> \\ x : s -> x) (nat))";
-val Fn ("x", Nat,Var ("x", 0)) : Ast.exp =
-    run "((poly s -> \\ x : s -> x) (nat))";
-
-val TypApp
-    (Nat,
-     TypFn("t",
-       (TypFn ("t'", Fn("f",Arr (TypVar ("t", 1),TypVar ("t'", 0)),Var ("f",0))))))
-  : Ast.exp =
-    parse "((poly t -> poly t' -> \\ f : (t -> t') -> f) (nat))";
-val TypFn ("t'", Fn ("f",Arr (Nat,TypVar ("t'",0)),Var ("f",0))) =
-    run "((poly t -> poly t' -> \\ f : (t -> t') -> f) (nat))";
-
-val Pair (Zero,Succ Zero) : Ast.exp =
-    parse "(Z, S Z)";
-
-val Pair (Zero,Pair (Succ Zero,Succ (Succ Zero))) : Ast.exp =
-    parse "(Z, (S Z, S S Z))";
-
-val Fn ("x", Prod (Nat,Nat),Var("x", 0)) : Ast.exp =
-    parse "\\ x : (nat * nat) -> x";
-
-val ProdLeft (Pair (Zero,Pair (Succ Zero,Succ (Succ Zero)))) : Ast.exp =
-    parse "fst (Z, (S Z, S S Z))";
-val ProdRight (Pair (Zero,Pair (Succ Zero,Succ (Succ Zero)))) : Ast.exp =
-    parse "snd (Z, (S Z, S S Z))";
-val Zero : Ast.exp =
-    run "fst (Z, (S Z, S S Z))";
-val Succ Zero : Ast.exp =
-    run "fst snd (Z, (S Z, S S Z))";
-
-val TypFn ("s",Fn("x",All ("t'", TypVar ("t'",0)),Var ("x",0))) : Ast.exp =
-    parse "poly s -> \\ x : (all t'. t') -> x"
-
-val Fn ("pkg", Some ("t'",TypVar ("t'", 0)),Var ("pkg",0)) : Ast.exp =
-    parse "\\ pkg : (some t'. t') -> pkg"
-
-val Fn ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Var ("natOrFunc",0)) : Ast.exp =
-    parse "\\ natOrFunc : (nat | nat -> nat) -> natOrFunc"
-
-val Fn ("natOrFunc", Plus (Nat,Arr (Nat,Nat)),Case (Var ("natOrFunc", 0),"l", Zero,"r", Succ Zero)) : exp =
-    run "\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z"
-
-val App
-    (Fn ("natOrFunc", Plus (Nat,Arr (Nat,Nat)), Case (Var ("natOrFunc",0),"l", Zero,"r", Succ Zero)),
-     PlusLeft (Plus (Nat,Arr (Nat,Nat)),Zero)) : Ast.exp =
-    parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
-
-val Zero : exp =
-    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
-
-val Succ Zero: exp =
-    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (right (\\ x : nat -> Z) : (nat | nat -> nat)))";
-
-val Fn ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))), Var ("natOrFuncOrProd",0)) : Ast.exp =
-    parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"
-
-val Some ("t",Prod (TypVar ("t", 0),Prod (Arr (Prod (Nat,TypVar ("t", 0)),TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)))) : typ =
-    typeof (parseFile "/home/evan/thon/examples/natlist.thon");
-
-val natList = (parseFile "/home/evan/thon/examples/natlist.thon");
-
-val Arr (Plus (Nat,Unit),Arr (Nat,Nat)) : Ast.typ =
-    typeof (parseFile "/home/evan/thon/examples/option.thon");
-
-val Fn
-    ("x",Plus (Nat,Unit),
-     Fn
-       ("y",Nat,Case (Var ("x",1),"somex",Var ("somex",0),"none",Var ("y",1))))
-  : exp =
-    parseFile "/home/evan/thon/examples/option.thon";
-
-val Let ("x",Nat,Zero,Var ("x",0)) : Ast.exp = parse "let x : nat = Z in x";
-val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.exp =
-    parse "let x : nat = Z in (let y : nat = S Z in x)";
-val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.exp =
-    parse "let x : nat = Z in let y : nat = S Z in x";
-
-val Zero : Ast.exp = run "let x : nat = Z in x";
-
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/nilisempty.thon";
-
-val Succ Zero : Ast.exp = run "ifz Z of Z -> S Z | S prev -> Z";
-val Zero : Ast.exp = run "ifz S Z of Z -> S Z | S prev -> prev";
-
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/decr.thon";
-
-val Succ (Succ Zero) : Ast.exp = runFile "/home/evan/thon/examples/add.thon";
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/sub.thon";
-val Zero : Ast.exp = runFile "/home/evan/thon/examples/eq.thon";
-
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/len.thon";
-
-val Fold
-    (TyRec
-       ("node",
-        Plus (Unit,Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0))))),
-     PlusLeft
-       (Plus
-          (Unit, (*empty base or... *)
-           Prod (* a nat and... *)
-             (Nat,
-              Prod (* a node and... *)
-                (TyRec
-                   ("node",
-                    Plus
-                      (Unit,
-                       Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0))))),
-                 TyRec (* a another node. *)
-                   ("node",
-                    Plus
-                      (Unit,
-                       Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))))),
-        TmUnit)) : Ast.exp = runFile "/home/evan/thon/examples/emptybst.thon";
-
-val bstType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/singletonbst.thon");
-
-val TyRec
-    ("node",Plus (Unit,Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))
-    : Ast.typ = bstType;
-
-val bstInsertType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/bst.thon");
-val Arr(Nat, (Arr(bstType1, bstType2))) = bstInsertType;
-val true = (bstType = bstType1);
-
-val true = (bstType = bstType2);
-
-val loop = parse "fix loop : nat in loop";
-val true = (loop) = (step loop);
-val Nat = typeof loop;
-(* 2 is even *)
-val Succ Zero = runFile "/home/evan/thon/examples/iseven.thon";;
-
-val bstinsert = parseFile "/home/evan/thon/examples/bst.thon";
-val emptybst = parseFile "/home/evan/thon/examples/emptybst.thon";
-val zerobst = parseFile "/home/evan/thon/examples/singletonbst.thon";
-
-val appbst = eval (A.App(A.App(bstinsert, A.Zero), emptybst));
-val true = (zerobst = appbst);
-
-val Succ (Succ Zero) = runFile "/home/evan/thon/examples/setget.thon";
-
-val TypFn ("t", Zero) = runFile "/home/evan/thon/examples/typnames.thon";
-
-val
-  Data
-    ("List","Nil",Unit,"Cons",
-     Prod (Nat,Some ("t",Arr (TypVar ("t",0),TypVar ("List",1)))),Zero)
-  : Ast.exp =
-    parse "data List = Nil unit | Cons nat * (some t. t -> List) in Z";
-
-val manualDatatype = parseFile "/home/evan/thon/examples/manual-datatype.thon";
-val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * List in Z");
-
-val Zero = runFile "/home/evan/thon/examples/auto-natlist.thon";
-val Succ (Succ Zero) = runFile "/home/evan/thon/examples/bst-depth.thon";
 
 (* Handwritten lexer tests *)
 open Lex;
@@ -567,13 +348,13 @@ val true = (Lex.lexFileNoPrintErrMsg "/home/evan/thon/examples/lex03.thon"; fals
 
 val Let ("zero",Arr (Nat,Nat),Fix ("zero",Arr (Nat,Nat),Fn ("a",Nat,Zero)),TmUnit)
     : Ast.exp =
-    newParseFile "/home/evan/thon/examples/parse00.thon";
+    parseFile "/home/evan/thon/examples/parse00.thon";
 
 val Let
     ("ident",Arr (Nat,Nat),
      Fix ("ident",Arr (Nat,Nat),Fn ("a",Nat,Var ("a",0))),
      App (Var ("ident",0),Zero)) : Ast.exp =
-    newParseFile "/home/evan/thon/examples/parse01.thon";
+    parseFile "/home/evan/thon/examples/parse01.thon";
 
 
 
@@ -593,7 +374,7 @@ val Let
               Fix ("bar",Arr (Nat,Nat),Fn ("b",Nat,Var ("a",2))),
               Var ("bar",0)))),
      TmUnit) : Ast.exp =
-    newParseFile "/home/evan/thon/examples/parse02.thon";
+    parseFile "/home/evan/thon/examples/parse02.thon";
 
 
 val [FUN,NAME "foo",LPAREN,NAME "a",NAT,RPAREN,NAT,SARROW,NAT,COLON,NEWLINE,INDENT,
@@ -609,9 +390,9 @@ val Data ("list","nil",Unit,"cons",Prod (Nat,TypVar ("list",0)),
         App (Var ("isempty",0),
            App (Var ("cons",2),Pair (Zero,App (Var ("nil",3),TmUnit))))))
   : Ast.exp
-    = newParseFile "/home/evan/thon/examples/isemptynew.thon";
+    = parseFile "/home/evan/thon/examples/isemptynew.thon";
 
-val Zero = newRunFile "/home/evan/thon/examples/isemptyagain.thon";
+val Zero = runFile "/home/evan/thon/examples/isemptyagain.thon";
 
 val Let
     ("foo",Arr (Nat,Nat),
@@ -625,37 +406,37 @@ val Let
                 ("bar",Arr (Nat,Nat),
                  Fix ("bar",Arr (Nat,Nat),Fn ("n",Nat,Var ("n",0))),
                  Var ("a",2))))),TmUnit) : Ast.exp =
-    newParseFile "/home/evan/thon/examples/lex01.thon";
+    parseFile "/home/evan/thon/examples/lex01.thon";
 
-val Fn ("x",Nat,Var ("x",0)) : Ast.exp = Thon.newParse "fn (x nat) => x";
+val Fn ("x",Nat,Var ("x",0)) : Ast.exp = Thon.parse "fn (x nat) => x";
 
-val Fn ("x",Nat,Fn ("y",Nat,Var ("y",0))) : Ast.exp = Thon.newParse "fn (x nat) => fn (y nat) => y";
+val Fn ("x",Nat,Fn ("y",Nat,Var ("y",0))) : Ast.exp = Thon.parse "fn (x nat) => fn (y nat) => y";
 
-val Succ (Succ Zero) : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/divbytwonew.thon";
+val Succ (Succ Zero) : Ast.exp = Thon.runFile "/home/evan/thon/examples/divbytwonew.thon";
 
-val Succ Zero : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/collatz-new.thon";
+val Succ Zero : Ast.exp = Thon.runFile "/home/evan/thon/examples/collatz-new.thon";
 
-val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "(fn (a nat) => a)(z)";
-val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "((fn (a nat) => a))(z)";
-val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.newParse "(((fn (a nat) => a))(z))";
+val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.parse "(fn (a nat) => a)(z)";
+val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.parse "((fn (a nat) => a))(z)";
+val App (Fn ("a",Nat,Var ("a",0)),Zero) : Ast.exp = Thon.parse "(((fn (a nat) => a))(z))";
 
 (* TODO is this a weird semantics? *)
 val App (Fn ("a",Prod (Nat,Nat),Zero),Pair (Zero,Zero)) : Ast.exp =
-    Thon.newParse "(fn (a nat * nat) => z)(z, z)";
+    Thon.parse "(fn (a nat * nat) => z)(z, z)";
 
 val Pair (Fn ("a",Nat,Zero),Fn ("a",Nat,Zero)) : Ast.exp =
-    Thon.newParse "(fn (a nat) => z, fn (a nat) => z)";
+    Thon.parse "(fn (a nat) => z, fn (a nat) => z)";
 
 val Pair (Fn ("a",Nat,Pair (Zero,Zero)),Fn ("a",Nat,Zero)) : Ast.exp =
-    Thon.newParse "(fn (a nat) => (z, z), fn (a nat) => z)";
+    Thon.parse "(fn (a nat) => (z, z), fn (a nat) => z)";
 
-val Pair (Pair (Zero,Pair (Zero,Zero)),Zero) : Ast.exp = Thon.newParse "((z, (z, z)), z)";
+val Pair (Pair (Zero,Pair (Zero,Zero)),Zero) : Ast.exp = Thon.parse "((z, (z, z)), z)";
 
-val Fn ("a",Bool,True) : Ast.exp = Thon.newParse "fn (a bool) => true";
+val Fn ("a",Bool,True) : Ast.exp = Thon.parse "fn (a bool) => true";
 
-val True : Ast.exp = Thon.newRun "(fn (a bool) => true)(false)";
+val True : Ast.exp = Thon.run "(fn (a bool) => true)(false)";
 
-val False : Ast.exp = Thon.newRunFile "/home/evan/thon/examples/isemptynew.thon";
+val False : Ast.exp = Thon.runFile "/home/evan/thon/examples/isemptynew.thon";
 
 val cmd0 : cmd = Bnd ("x",Cmd (Ret Zero),Ret (Var ("x",0)));
 val Ret Zero = stepCmd cmd0;
