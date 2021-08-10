@@ -65,6 +65,7 @@ sig
   structure Print :
   sig
     val pp : exp -> string
+    val typToString : typ -> string
   end
 
 end
@@ -187,6 +188,18 @@ struct
         case e of
             Zero => "Z"
           | Succ e => "S (" ^ (pp e) ^ ")"
+
+    fun typToString Nat = "Nat"
+      | typToString Unit = "Unit"
+      | typToString (TypCmd t') = "TypCmd(" ^ (typToString t') ^ ")"
+      | typToString Bool = "Bool"
+      | typToString (TypVar (name, i)) = "TypVar(" ^ name ^ ", " ^ (Int.toString i) ^ ")"
+      | typToString (Arr(d, c)) = "Arr(" ^ (typToString d) ^ (typToString c) ^ ")"
+      | typToString (Prod(l, r)) = "Prod(" ^ (typToString l) ^ (typToString r) ^ ")"
+      | typToString (Plus(l, r)) = "Plus(" ^ (typToString l) ^ (typToString r) ^ ")"
+      | typToString (All (name, t')) = "All(" ^ name ^ (typToString t') ^ ")"
+      | typToString (Some (name, t')) = "Some(" ^ name ^ (typToString t')^ ")"
+      | typToString (TyRec (name, t')) = "TyRec(" ^ name ^ (typToString t')^ ")"
   end
 
 end
