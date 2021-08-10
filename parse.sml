@@ -26,10 +26,13 @@ fun errMsg (expectedToken, actualToken) =
      ", got " ^ (Lex.tokenToString actualToken) ^ "\n")
 
 fun expect tokens (token : Lex.Token) i =
-    if List.nth (tokens, !i) <> token then
+    if (List.nth (tokens, !i) <> token) then
         (print (errMsg(token,  List.nth (tokens, !i)));
          raise UnexpectedToken(errMsg(token,  List.nth (tokens, !i))))
     else (i := !i + 1)
+
+fun expectOrEof tokens token i =
+    if !i > (List.length tokens - 1) then true else ((expect tokens token i); false)
 
 fun lookahead tokens i =
     if ((!i)+1) > ((List.length tokens) - 1)
@@ -76,8 +79,8 @@ fun consumeEndBlock tokens i startIndented =
     else
     let
         val () = consumeNewlines tokens i
-        val () = expect tokens Lex.DEDENT i
-        val () = consumeNewlines tokens i
+        val eof = expectOrEof tokens Lex.DEDENT i
+        val () = if not eof then consumeNewlines tokens i else ()
     in () end
 
 fun parseType tokens i =
@@ -87,12 +90,12 @@ fun parseType tokens i =
                | Lex.NAME name => (i := (!i) + 1; A.TypVar(name, ~1))
                | Lex.BOOL => (i := (!i) + 1; A.Bool)
                | Lex.UNIT => (i := (!i) + 1; A.Unit)
-               | _ => raise Unimplemented("See token that is not nat or name in type"))
+               | a => (raise Unimplemented("See token that is not nat or name in type")))
     in
-        case List.nth (tokens, !i) of
+        (case List.nth (tokens, !i) of
             Lex.SARROW => (incr(i); A.Arr(this, (parseType tokens i)))
           | Lex.STAR => (incr(i); A.Prod(this, (parseType tokens i)))
-          | _ => this
+          | _ => this)
     end
 
 
@@ -103,7 +106,7 @@ fun parseFuncCallParams tokens i =
     in
         (* TODO eventually got clean up all these unguarded array accesses *)
         (* Also UNDONE handle more than two func call params *)
-        case List.nth (tokens, !i) of
+        (case List.nth (tokens, !i) of
             Lex.COMMA =>
             (debugPrint "see comma";
             let
@@ -114,7 +117,7 @@ fun parseFuncCallParams tokens i =
             end)
            | Lex.RPAREN => arg
            | tok => raise UnexpectedToken("expected func param or LPAREN, got " ^
-                                          (Lex.tokenToString tok))
+                                          (Lex.tokenToString tok)))
     end
 
 
@@ -351,8 +354,5 @@ fun parseFile filename =
     in
         parseExpr tokens i
     end
-    handle UnexpectedToken msg => (print ("Parsing error: " ^ msg ^ "\n");
-                                   raise (UnexpectedToken msg) )
-
 
 end
