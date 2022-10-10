@@ -1,11 +1,4 @@
-structure A = Ast
-
-signature PARSE = sig
-  val parse : string -> Ast.exp
-  val parseFile : string -> Ast.exp
-end
-
-structure Parse : PARSE =
+structure NewParse : PARSE =
 struct
 
 exception UnexpectedToken of string

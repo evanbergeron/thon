@@ -1,7 +1,8 @@
 (* thon - a small functional language *)
 structure Thon : sig
               val parse : string -> Ast.exp
-              val parseFile : string -> A.exp
+              val newParse : string -> Ast.exp
+              val parseFile : string -> Ast.exp
               val typeof' : A.typ list -> 'b option list -> A.exp -> A.typ
               val typeof : A.exp -> A.typ
               (* val test : unit -> unit *)
@@ -12,8 +13,12 @@ structure Thon : sig
               val stepCmd : A.cmd -> A.cmd
               val subst : A.exp -> A.exp -> A.exp
               val run : string -> A.exp
+              val newRun : string -> A.exp
               val eraseNamesInTyp : A.typ -> A.typ
               val runFile : string -> A.exp
+              val newRunFile : string -> A.exp
+              val newParseFile : string -> A.exp
+              val findParseErrors : string -> unit
               val elaborateDatatypes : A.exp -> A.exp
               val shiftDeBruijinIndicesInExp : int -> A.exp -> int -> A.exp
               val get : 'a list -> int -> 'a
@@ -815,6 +820,12 @@ fun parse s =
         setDeBruijnIndexInExp ast [] []
     end
 
+fun newParse s =
+    let val ast : A.exp = NewParse.parse s
+    in
+        setDeBruijnIndexInExp ast [] []
+    end
+
 fun parseFile filename =
     let val ast : A.exp = Parse.parseFile filename
         val dbi = setDeBruijnIndexInExp ast [] []
@@ -822,6 +833,18 @@ fun parseFile filename =
         (* val () = checkUndeclaredTypVars elb *)
     in
         elb
+    end
+
+fun newParseFile filename =
+    let val ast : A.exp = NewParse.parseFile filename
+    in
+        setDeBruijnIndexInExp ast [] []
+    end
+
+fun findParseErrors filename =
+    let val _ = parseFile filename
+    in
+        ()
     end
 
 fun eval e = if isval e then e else eval (step e)
@@ -835,8 +858,22 @@ fun run s =
         if isval e then e else eval (step e)
     end
 
+fun newRun s =
+    let val e' = newParse s
+        val e = elaborateDatatypes e'
+    in
+        if isval e then e else eval (step e)
+    end
+
 fun runFile s =
     let val e' = parseFile s
+        val e = elaborateDatatypes e'
+    in
+        if isval e then e else eval (step e)
+    end
+
+fun newRunFile s =
+    let val e' = newParseFile s
         val e = elaborateDatatypes e'
     in
         if isval e then e else eval (step e)

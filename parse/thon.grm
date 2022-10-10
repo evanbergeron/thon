@@ -1,0 +1,123 @@
+structure A = Ast
+
+%%
+%header (functor ThonLrValsFn (structure Token : TOKEN))
+
+%eop EOF
+
+%term
+   EOF
+ | ZERO
+ | SUCC
+ | LPAREN | RPAREN
+ | PIPE
+ | LAM
+ | SARROW
+ | COLON
+ | NAT
+ | REC
+ | APP
+ | TYPEOR
+ | IDX of int
+ | ID of string
+ | STR of string
+ | GO
+ | POLY
+ | LEFT
+ | RIGHT
+ | FST
+ | SND
+ | COMMA
+ | STAR
+ | ALL
+ | SOME
+ | TYPEREC
+ | DOT
+ | UNIT
+ | FOLD
+ | UNFOLD
+ | WITH
+ | IMPL
+ | AS
+ | USE
+ | IN
+ | CASE
+ | OF
+ | LET
+ | EQ
+ | IFZ
+ | FIX
+ | FUN
+ | DATA
+
+%nonterm
+   exp of A.exp
+ | typ of A.typ
+ | program of A.exp
+
+%verbose
+%pos int
+%start exp (* i think likely this should be program, but I really dont like that hack *)
+%eop EOF
+
+%name Thon
+
+(* Each rule is then assigned the precedence of its rightmost terminal *)
+(* If the rule has the higher precedence, the reduction is chosen. *)
+
+(* The precedence grows down *)
+%nonassoc TYPEOR (* Deliberately first *)
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID STR REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX DO LBRACE RBRACE RETURN PRINT SQUOTE DQUOTE FUN DATA
+%right SARROW
+%nonassoc APP GO (* Deliberately last *)
+
+%%
+
+(* program: *)
+(*     GO exp (exp) *)
+
+exp:
+    LPAREN exp RPAREN (exp)
+  | exp exp %prec APP (A.App(exp1, exp2))
+  | exp typ %prec APP (A.TypApp(typ, exp))
+  | ID (A.Var (ID, ~1))
+  | ZERO (A.Zero)
+  | SUCC exp (A.Succ exp)
+  | UNIT (A.TmUnit)
+  | LAM ID COLON typ SARROW exp (A.Fn (ID, typ, exp))
+  | LET ID COLON typ EQ exp IN exp (A.Let (ID, typ, exp1, exp2))
+  | IFZ exp OF ZERO SARROW exp PIPE SUCC ID SARROW exp (A.Ifz (exp1, exp2, ID, exp3))
+  | REC exp OF ZERO SARROW exp PIPE ID SARROW exp (A.Rec (exp1, exp2, ID, exp3))
+  | FUN ID COLON typ EQ exp IN exp (A.Let(ID1, typ1, A.Fix(ID1, typ1, exp1), exp2))
+  | FIX ID COLON typ IN exp (A.Fix (ID, typ, exp))
+  | POLY ID SARROW exp (A.TypFn (ID, exp))
+  | LPAREN exp COMMA exp RPAREN (A.Pair(exp1, exp2))
+  | FST exp (A.ProdLeft exp)
+  | SND exp (A.ProdRight exp)
+  | LEFT exp COLON typ (A.PlusLeft(typ, exp))
+  | RIGHT exp COLON typ (A.PlusRight(typ, exp))
+  | FOLD typ WITH exp (A.Fold(typ, exp))
+  | UNFOLD exp (A.Unfold(exp))
+  | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
+  | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
+  | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
+  | DATA ID EQ ID typ PIPE ID typ IN exp (A.Data(ID1, ID2, typ1, ID3, typ2, exp))
+  | DO LBRACE cmd RBRACE (A.Cmd (A.Bnd ("", (A.Cmd cmd), A.Ret (A.Var ("", ~1)))))
+  | STR (A.Str STR)
+
+cmd:
+    RETURN exp (A.Ret exp)
+  | PRINT exp (A.PrintStr exp)
+
+typ:
+    NAT (A.Nat)
+  | UNIT (A.Unit)
+  | typ SARROW typ (A.Arr(typ1, typ2))
+  | typ STAR typ (A.Prod(typ1, typ2))
+  | LPAREN typ RPAREN (typ)
+  | ID (A.TypVar (ID, ~1)) 
+  | ALL ID DOT typ (A.All (ID, typ))
+  | SOME ID DOT typ (A.Some (ID, typ))
+  | TYPEREC ID DOT typ (A.TyRec (ID, typ))
+  (* TODO should this take precedence below star and arrow? *)
+  | typ PIPE typ %prec TYPEOR (A.Plus (typ1, typ2))
