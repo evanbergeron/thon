@@ -479,6 +479,17 @@ val Bnd ("x",Cmd (Ret (Str "Hello, world")),Ret Zero) : cmd =
 val Ret Zero : cmd = 
     evalCmd (Bnd ("x", Cmd (PrintStr (Str "Hello, world")), (Ret Zero)));
 
+(* Elaborate polymorphic function definitions *)
+val
+  Let
+    ("id",All ("a",Arr (TypVar ("a",0),TypVar ("a",0))),
+     TypFn
+       ("a",
+        Fix
+          ("id",Arr (TypVar ("a",0),TypVar ("a",0)),
+           Fn ("x",TypVar ("a",0),Var ("x",0)))),TmUnit) : Ast.exp
+    = Thon.parseFile "/home/evan/thon/examples/poly.tn"
+
 in
 ()
 end

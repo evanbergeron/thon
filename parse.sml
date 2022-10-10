@@ -157,6 +157,7 @@ and parseExpr tokens i =
                    let
                        val rest = parseExpr tokens i
                    in
+                       (* Can't transform here - we dont know yet about dbi *)
                        A.Let(funcName, funcType,
                              A.Fix(funcName, funcType,
                                    A.Fn(argName, argType, body)), rest)

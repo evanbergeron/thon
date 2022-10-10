@@ -33,6 +33,7 @@ exception VarWithNegativeDeBruijinIndex of string * int
 exception ClientTypeCannotEscapeClientScope
 exception Unimplemented
 
+fun println s = print (s  ^ "\n")
 
 fun get ctx i =
     case (List.findi (fn (j, _) => j = i) ctx) of
@@ -121,6 +122,7 @@ fun decrDeBruijinIndices t =
       | A.TyRec (name, t') => A.TyRec(name, decrDeBruijinIndices t')
 
 
+(* Would be nice to have a expMap that maintains bindingDepth internally *)
 fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
     case dst
      of  A.Zero => dst
@@ -255,8 +257,10 @@ fun setDeBruijnIndexInType t varnames typnames =
        | A.Unit => A.Unit
        | A.Bool => A.Bool
        | A.TypVar (name, i) =>
-         (case find name typnames of
-             NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
+         (println name; case find name typnames of
+            (* TODO check this after elaboratePolyFun to find undeclared *)
+             NONE => A.TypVar(name, ~2)
+                                            (* (print ("unknown type var: "^ name); raise VarNotInContext) *)
            | SOME i => A.TypVar (name, i))
        | A.Arr(d, c) =>
             A.Arr(setDeBruijnIndexInType d varnames typnames,
@@ -374,6 +378,36 @@ and setDeBruijnIndexInExp e varnames typnames =
        | A.Cmd c => A.Cmd (setDeBruijnIndexInCmd c varnames typnames [])
        | _ => raise Unimplemented (* TODO *)
 end
+
+
+fun rewriteDeclared name t =
+    let val f = fn t =>
+    (case t of
+        (* This only works because we've already setDeBruijnIndexInType.
+         * A var of the same name "further into" the type that shadows
+         * this name will have its dbi set already. *)
+        A.TypVar(name', ~2) => if name = name' then A.TypVar(name', 0) else t | _ => t)
+    in
+        A.typMap f t 
+    end
+        
+(* Hmm will need to elaborate call sites as well *)
+fun elaboratePolyFun e =
+    let val f = fn e =>
+    (case e of
+        A.Let (funcName, funcType, A.Fix(funcName2, funcType2, A.Fn(argName, argType, body)), rest) =>
+        if funcName = funcName2 andalso funcType = funcType2 then
+            (let
+                val newTypVarName = "a" (* TODO getNewTypeVarFromPolyFun funcType *)
+                val newFuncType = rewriteDeclared newTypVarName funcType
+                val newArgType = rewriteDeclared newTypVarName argType
+            in
+                (* need to go setDbi in funcType *)
+                A.Let (funcName, A.All(newTypVarName, newFuncType), A.TypFn(newTypVarName, A.Fix(funcName2, newFuncType, A.Fn(argName, newArgType, body))), rest)
+            end)
+        else e
+      | _ => e)
+        in A.expMap f e end
 
 fun elaborateDatatype e =
     case e of
@@ -775,7 +809,6 @@ and step e =
       | _ => if (isval e) then e else raise No
     end
 
-
 fun parse s =
     let val ast : A.exp = Parse.parse s
     in
@@ -784,8 +817,11 @@ fun parse s =
 
 fun parseFile filename =
     let val ast : A.exp = Parse.parseFile filename
+        val dbi = setDeBruijnIndexInExp ast [] []
+        val elb = elaboratePolyFun dbi (* TODO only call this if we need to *)
+        (* val () = checkUndeclaredTypVars elb *)
     in
-        setDeBruijnIndexInExp ast [] []
+        elb
     end
 
 fun eval e = if isval e then e else eval (step e)

@@ -50,6 +50,7 @@ fun tokenToString FUN = "FUN"
   | tokenToString TRUE = "TRUE"
   | tokenToString FALSE = "FALSE"
   | tokenToString BOOL = "BOOL"
+  | tokenToString BOOL = "BOOL"
 
 fun lookaheadN s n =
     (* Can raise Size *)
