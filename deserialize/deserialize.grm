@@ -1,0 +1,94 @@
+structure A = Ast
+
+%%
+%header (functor ThonLrValsFn (structure Token : TOKEN))
+
+%eop EOF
+
+%term
+   EOF
+ | ZERO
+ | SUCC
+ | LP | RP
+ | FN 
+ | NAT
+ | REC
+ | APP
+ | ID of string
+ | POLY
+ | LEFT
+ | RIGHT
+ | FST
+ | SND
+ | COMMA
+ | ALL
+ | SOME
+ | TYPEVAR 
+ | TYPEREC
+ | UNIT
+ | FOLD
+ | UNFOLD
+ | IMPL
+ | USE
+ | IN
+ | CASE
+ | LET
+ | EQ
+ | IFZ
+ | FIX
+ | FUN
+ | DATA
+ | PAIR
+
+%nonterm
+   exp of A.exp
+ | typ of A.typ
+
+%verbose
+%pos int
+%start exp
+%eop EOF
+
+%name Thon
+
+%nonassoc EOF ZERO SUCC LP RP FN COLON NAT ID REC PIPE POLY COMMA LEFT RIGHT FST SND ALL SOME TYPEREC UNIT FOLD UNFOLD USE IN CASE IMPL LET EQ IFZ FIX DO LBRACE RBRACE RETURN PRINT SQUOTE DQUOTE FUN DATA
+
+%%
+
+exp:
+    ZERO (A.Zero)
+  | VAR LP ID RP (A.Var (ID, ~1))
+  | SUCC LP exp RP (A.Succ exp)
+  | FN LP ID COMMA typ COMMA exp RP (A.Fn (ID, typ, exp))
+  | LET LP ID COMMA typ COMMA exp COMMA exp RP (A.Let (ID, typ, exp1, exp2))
+  | APP LP exp COMMA exp RP (A.App(exp1, exp2))
+  | REC LP exp COMMA exp COMMA ID COMMA exp RP (A.Rec (exp1, exp2, ID, exp3))
+  | FIX LP ID COMMA typ COMMA exp RP (A.Fix (ID, typ, exp))
+  | POLY LP ID COMMA exp RP (A.TypFn (ID, exp))
+  | IFZ LP exp COMMA exp COMMA ID COMMA exp RP (A.Ifz (exp1, exp2, ID, exp3))
+  | TYPEAPP LP typ COMMA exp RP (A.TypApp(typ, exp))
+  | IMPL RP typ COMMA typ COMMA exp RP (A.Impl(typ2, exp, typ1))
+  | USE LP exp COMMA ID COMMA ID COMMA exp RP (A.Use(exp1, ID1, ID2, exp2))
+  | PAIR LP exp COMMA exp RP (A.Pair(exp1, exp2))
+  | FST LP exp RP (A.ProdLeft exp)
+  | SND LP exp RP (A.ProdRight exp)
+  | LEFT LP exp COMMA typ RP (A.PlusLeft(typ, exp))
+  | RIGHT LP exp COMMA typ RP (A.PlusRight(typ, exp))
+  | CASE LP exp COMMA ID COMMA exp COMMA ID COMMA exp RP (A.Case(exp1, ID1, exp2, ID2, exp3))
+  | FOLD LP typ COMMA exp RP (A.Fold(typ, exp))
+  | UNFOLD LP exp RP (A.Unfold(exp))
+  | UNIT (A.TmUnit)
+  | FUN LP ID COMMA typ COMMA exp COMMA exp RP (A.Let(ID1, typ1, A.Fix(ID1, typ1, exp1), exp2))
+  | DATA LP ID COMMA ID COMMA typ COMMA ID COMMA typ COMMA exp RP (A.Data(ID1, ID2, typ1, ID3, typ2, exp))
+
+typ:
+    NAT (A.Nat)
+  | TYPEVAR LP ID RP (A.TypVar (ID, ~1)) 
+  | ARROW LP typ COMMA typ RP (A.Arr(typ1, typ2))
+  | ALL LP ID COMMA typ RP (A.All (ID, typ))
+  | SOME LP ID COMMA typ RP (A.Some (ID, typ))
+  | PROD LP typ COMMA typ RP (A.Prod(typ1, typ2))
+  | PLUS LP typ COMMA typ RP (A.Plus (typ1, typ2))
+  | TYPEREC LP ID COMMA typ RP (A.TyRec (ID, typ))
+  | UNIT (A.Unit)
+  | BOOL (A.Bool)
