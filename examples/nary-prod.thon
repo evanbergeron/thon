@@ -1,0 +1,2 @@
+data ternaryTree = Nil unit | Node nat * (ternaryTree * ternaryTree * ternaryTree)
+in Z

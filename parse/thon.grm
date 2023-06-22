@@ -52,6 +52,7 @@ structure A = Ast
 %nonterm
    exp of A.exp
  | typ of A.typ
+ | starTyps of A.typ list
  | program of A.exp
 
 %verbose
@@ -106,11 +107,15 @@ typ:
     NAT (A.Nat)
   | UNIT (A.Unit)
   | typ SARROW typ (A.Arr(typ1, typ2))
-  | typ STAR typ (A.Prod(typ1, typ2))
+  | typ STAR starTyps (A.Prod (typ::starTyps))
   | LPAREN typ RPAREN (typ)
-  | ID (A.TypVar (ID, ~1)) 
+  | ID (A.TypVar (ID, ~1))
   | ALL ID DOT typ (A.All (ID, typ))
   | SOME ID DOT typ (A.Some (ID, typ))
   | TYPEREC ID DOT typ (A.TyRec (ID, typ))
   (* TODO should this take precedence below star and arrow? *)
   | typ PIPE typ %prec TYPEOR (A.Plus (typ1, typ2))
+
+starTyps:
+    typ STAR starTyps (typ::starTyps)
+  | typ ([typ])

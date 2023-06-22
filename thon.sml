@@ -36,7 +36,7 @@ fun istype typeCtx A.Nat = true
   | istype typeCtx A.Unit = true
   | istype typeCtx (A.TypVar (name, i)) = i < (length typeCtx)
   | istype typeCtx (A.Arr(d, c)) = (istype typeCtx d) andalso (istype typeCtx c)
-  | istype typeCtx (A.Prod(l, r)) = (istype typeCtx l) andalso (istype typeCtx r)
+  | istype typeCtx (A.Prod types) = List.all (istype typeCtx) types
   | istype typeCtx (A.Plus(l, r)) = (istype typeCtx l) andalso (istype typeCtx r)
   | istype typeCtx (A.All (name, t')) = istype (NONE::typeCtx) t'
   | istype typeCtx (A.Some (name, t')) = istype (NONE::typeCtx) t'
@@ -51,8 +51,7 @@ fun substType' src A.Nat bindingDepth = A.Nat
     (A.TypVar (name, n))
   | substType' src (A.Arr(t, t')) bindingDepth = A.Arr((substType' src t bindingDepth),
                                                        (substType' src t' bindingDepth))
-  | substType' src (A.Prod(l, r)) bindingDepth = A.Prod((substType' src l bindingDepth),
-                                                        (substType' src r bindingDepth))
+  | substType' src (A.Prod types) bindingDepth = A.Prod(List.map (fn t => substType' src t bindingDepth) types)
   | substType' src (A.Plus(l, r)) bindingDepth = A.Plus((substType' src l bindingDepth),
                                                         (substType' src r bindingDepth))
   | substType' src (A.All (name, t)) bindingDepth =
@@ -83,8 +82,7 @@ fun abstractOutType' name search t bindingDepth =
       | A.TypVar (name, n)  => A.TypVar (name, n)
       | A.Arr(d, c) => A.Arr((abstractOutType' name search d bindingDepth),
                           (abstractOutType' name search c bindingDepth))
-      | A.Prod(l, r) => A.Prod((abstractOutType' name search l bindingDepth),
-                           (abstractOutType' name search r bindingDepth))
+      | A.Prod types => A.Prod(List.map (fn t => abstractOutType' name search t bindingDepth) types)
       | A.Plus(l, r) => A.Plus((abstractOutType' name search l bindingDepth),
                            (abstractOutType' name search r bindingDepth))
       | A.All (name, t') => A.All(name, abstractOutType' name search t' (bindingDepth+1))
@@ -102,7 +100,7 @@ fun decrDeBruijinIndices t =
       | A.TypVar (name, i) => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
                     else A.TypVar (name, i -1)
       | A.Arr(d, c) => A.Arr(decrDeBruijinIndices d, decrDeBruijinIndices c)
-      | A.Prod(l, r) => A.Prod(decrDeBruijinIndices l, decrDeBruijinIndices r)
+      | A.Prod types => A.Prod(List.map decrDeBruijinIndices types)
       | A.Plus(l, r) => A.Plus(decrDeBruijinIndices l, decrDeBruijinIndices r)
       | A.All (name, t') => A.All(name, decrDeBruijinIndices t')
       | A.Some (name, t') => A.Some(name, decrDeBruijinIndices t')
@@ -233,9 +231,7 @@ fun setDeBruijnIndexInType t varnames typnames =
        | A.Arr(d, c) =>
             A.Arr(setDeBruijnIndexInType d varnames typnames,
                   setDeBruijnIndexInType c varnames typnames)
-       | A.Prod(l, r) =>
-            A.Prod(setDeBruijnIndexInType l varnames typnames,
-                   setDeBruijnIndexInType r varnames typnames)
+       | A.Prod types  => A.Prod(List.map (fn t => setDeBruijnIndexInType t varnames typnames) types)
        | A.Plus(l, r) =>
             A.Plus(setDeBruijnIndexInType l varnames typnames,
                    setDeBruijnIndexInType r varnames typnames)
@@ -347,9 +343,10 @@ fun elaborateDatatype e =
                                      A.Plus(tInLtyp, tInRtyp))
             val exposeFn = A.Fn(dataname ^ "exp", withType, A.Unfold(A.Var(dataname ^ "exp", 0)))
             val pkgType = A.Some("t", (*arbitrary name ok here *)
-                                 A.Prod(A.Prod(A.Arr(tInLtyp, A.TypVar("t", 0)),
-                                               A.Arr(tInRtyp, A.TypVar("t", 0))),
-                                 exposeFnType)
+                                 A.Prod(
+                                     [A.Prod([A.Arr(tInLtyp, A.TypVar("t", 0)),
+                                              A.Arr(tInRtyp, A.TypVar("t", 0))]),
+                                      exposeFnType])
                                 )
             val lfn = A.Fn("foo", substType withType ltyp,
                            A.Fold(withType, A.PlusLeft(
@@ -418,8 +415,8 @@ fun typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx (A.Var (name, i)) =
     if i < 0 then raise VarWithNegativeDeBruijinIndex(name, i) else get ctx i
   | typeof' ctx typCtx (A.Succ e2) = (typeof' ctx typCtx e2)
-  | typeof' ctx typCtx (A.ProdLeft e) = let val A.Prod(l, r) = (typeof' ctx typCtx e) in l end
-  | typeof' ctx typCtx (A.ProdRight e) = let val A.Prod(l, r) = (typeof' ctx typCtx e) in r end
+  | typeof' ctx typCtx (A.ProdLeft e) = let val A.Prod [l, r] = (typeof' ctx typCtx e) in l end
+  | typeof' ctx typCtx (A.ProdRight e) = let val A.Prod [l, r] = (typeof' ctx typCtx e) in r end
   | typeof' ctx typCtx (A.PlusLeft (t, e)) =
     let val A.Plus(l, r) = t in
         if not (typeEq l (typeof' ctx typCtx e)) then
@@ -470,7 +467,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         if not (typeEq thenType elseType) then raise IllTyped
         else thenType
     end
-  | typeof' ctx typCtx (A.Pair (l, r)) = A.Prod(typeof' ctx typCtx l, typeof' ctx typCtx r)
+  | typeof' ctx typCtx (A.Pair (l, r)) = A.Prod [typeof' ctx typCtx l, typeof' ctx typCtx r]
   | typeof' ctx typCtx (A.Rec (i, baseCase, prevCaseName, recCase)) =
     let val A.Nat = typeof' ctx typCtx i
         val t = typeof' ctx typCtx baseCase
@@ -710,17 +707,17 @@ fun runFile s =
 fun test() = let
 open A;
 (* Data Natlist = None | Some(Nat, Natlist) *)
-val natlist : typ = TyRec("natlist",Plus(Unit, Prod(Nat, TypVar ("natlist", 0))));
-val Fn ("natlist", TyRec ("l",Plus (Unit,Prod (Nat,TypVar ("l", 0)))),Var ("natlist",0)) =
+val natlist : typ = TyRec("natlist",Plus(Unit, Prod [Nat, TypVar ("natlist", 0)]));
+val Fn ("natlist", TyRec ("l",Plus (Unit,Prod [Nat,TypVar ("l", 0)])),Var ("natlist",0)) =
     parse "\\ natlist : (u l. (unit |  (nat * l))) -> natlist";
 
 (* id function on natlists *)
 val TypApp
-    (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
+    (TyRec ("natlist",Plus (Unit,Prod ([Nat,TypVar ("natlist",0)]))),
      TypFn ("s",Fn ("x",TypVar ("s",0),Var ("x",0)))) : Ast.exp =
     parse "((poly s -> \\ x : s -> x) (u natlist. (unit | (nat * natlist))))";
 val nilNatList =
-    Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit));
+    Fold(natlist, PlusLeft(Plus(Unit, Prod([Nat, natlist])), TmUnit));
 
 (* TODO don't hardcode dir *)
 val parsedConsNatList = parseFile "/home/evan/thon/examples/emptynatlist.thon";
@@ -730,25 +727,25 @@ val true = (nilNatList = parsedConsNatList);
 val TmUnit : Ast.exp = parse "unit";
 
 val singletonList =
-    Fold(natlist, PlusRight(Plus(Unit, Prod(Nat, natlist)), Pair(Zero,
-    Fold(natlist, PlusLeft(Plus(Unit, Prod(Nat, natlist)), TmUnit)))));
+    Fold(natlist, PlusRight(Plus(Unit, Prod([Nat, natlist])), Pair(Zero,
+    Fold(natlist, PlusLeft(Plus(Unit, Prod([Nat, natlist])), TmUnit)))));
 
-val TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))) = typeof' [] [] singletonList;
+val TyRec ("natlist",Plus (Unit,Prod ([Nat,TypVar ("natlist", 0)]))) = typeof' [] [] singletonList;
 
 val natlistCons =
-    Fn("natAndNatlist", Prod(Nat, natlist),
+    Fn("natAndNatlist", Prod([Nat, natlist]),
         Fold(natlist,
              PlusRight(
-                 Plus(Unit, Prod(Nat, natlist)),
+                 Plus(Unit, Prod([Nat, natlist])),
                  Var ("natAndNatlist", 0)
              )
             )
        );
 
-val Fn("natAndNatlist",Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))),
-     Fold (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))),
+val Fn("natAndNatlist", Prod [Nat,TyRec ("natlist",Plus (Unit, Prod [Nat,TypVar ("natlist", 0)]))],
+     Fold (TyRec ("natlist",Plus (Unit, Prod [Nat,TypVar ("natlist", 0)])),
         PlusRight
-          (Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))),
+          (Plus (Unit, Prod [Nat,TyRec ("natlist",Plus (Unit, Prod [Nat,TypVar ("natlist", 0)]))]),
            Var ("natAndNatlist", 0)))) : Ast.exp =
     parseFile "/home/evan/thon/examples/natlistcons.thon";
 
@@ -756,8 +753,8 @@ val parsedNatlistCons =
     parseFile "/home/evan/thon/examples/natlistcons.thon";
 val true = (parsedNatlistCons = natlistCons);
 
-val Arr (Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))),
-         TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0))))) : typ =
+val Arr (Prod ([Nat,TyRec ("natlist",Plus (Unit,Prod [Nat,TypVar ("natlist", 0)]))]),
+         TyRec ("natlist",Plus (Unit,Prod [Nat,TypVar ("natlist", 0)]))) : typ =
     typeof' [] [] natlistCons;
 
 val deducedSingleListAppResType = typeof' [] [] (App(natlistCons, Pair(Zero, nilNatList)));
@@ -766,11 +763,11 @@ val true = (deducedSingleListAppResType = natlist);
 val deducedNatlist = typeof' [] [] nilNatList;
 val true = (natlist = deducedNatlist);
 
-val Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))) : typ =
+val Plus (Unit,Prod ([Nat,TyRec ("natlist",Plus (Unit,Prod [Nat,TypVar ("natlist", 0)]))])) : typ =
     typeof' [] [] (Unfold(nilNatList));
 
 val PlusLeft
-    (Plus (Unit,Prod (Nat,TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist", 0)))))),TmUnit) : exp = eval (Unfold(nilNatList));
+    (Plus (Unit,Prod ([Nat,TyRec ("natlist",Plus (Unit,Prod [Nat,TypVar ("natlist", 0)]))])),TmUnit) : exp = eval (Unfold(nilNatList));
 
 val isnil = Fn("x", natlist, Case(Unfold(Var ("x", 0)), "l", Succ Zero, "r", Zero));
 val Nat = typeof' [] [] (App(isnil, nilNatList));
@@ -778,18 +775,20 @@ val Nat = typeof' [] [] (App(isnil, nilNatList));
 val Succ Zero = eval (App(isnil, nilNatList));
 
 (* natlistConsType*)
-val natlistConstype = Arr(Prod(Nat, natlist), natlist);
+val natlistConstype = Arr(Prod([Nat, natlist]), natlist);
 
 (* Defines a type of natural number queues. Can wrap in an existential type, also. *)
-val natQueueType = Prod(
+val natQueueType = Prod [
     (* empty queue *) natlist,
-    Prod((* insert *) (Arr(Prod(Nat, natlist), natlist)),
-        (* remove*) Arr(natlist, (Plus((*None*) Unit, (*Some(Nat, natlist)*)Prod(Nat, natlist))))
-    )
-);
+    Prod [
+          (* insert *) Arr(Prod[Nat, natlist], natlist),
+          (* remove*) Arr(natlist, (Plus((*None*) Unit, (*Some(Nat, natlist)*)Prod[Nat, natlist])))
+         ]
+    ]
+;
 
 val Plus(Nat, Nat) = typeof' [] [] (PlusLeft (Plus(Nat, Nat), Zero));
-val Plus(Nat, Prod(Nat, Nat)) = typeof' [] [] (PlusLeft (Plus(Nat, Prod(Nat, Nat)), Zero));
+val Plus(Nat, Prod[Nat, Nat]) = typeof' [] [] (PlusLeft (Plus(Nat, Prod([Nat, Nat])), Zero));
 val Zero = step (Case(PlusLeft (Plus(Nat, Nat), Zero), "l", Var ("l", 0), "r", Succ(Var ("r", 0))));
 val (Succ Zero) = step (Case(PlusRight (Plus(Nat, Nat), Zero), "l", Var ("l", 0), "r", Succ(Var ("r", 0))));
 
@@ -812,9 +811,9 @@ val Impl (Nat,Fn ("x",Nat,Zero),Some ("t",Arr (TypVar ("t",0),TypVar ("t",0)))) 
     run "impl (some t. t -> t) with nat as \\ x : nat -> Z";
 
 val Impl
-    (TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
+    (TyRec ("natlist",Plus (Unit,Prod ([Nat,TypVar ("natlist",0)]))),
      Fn
-       ("l",TyRec ("natlist",Plus (Unit,Prod (Nat,TypVar ("natlist",0)))),
+       ("l",TyRec ("natlist",Plus (Unit,Prod ([Nat,TypVar ("natlist",0)]))),
         Zero),Some ("s",Arr (TypVar ("s",0),TypVar ("s",0)))) : exp =
     parse "impl (some s. s -> s) with (u natlist. (unit |  (nat * natlist))) as \\ l : (u natlist. (unit |  (nat * natlist))) -> Z";
 
@@ -854,9 +853,9 @@ val zeroFnPkg2 = Impl(Nat, Fn("x", Nat, Zero), Some("t", Arr(Nat, TypVar ("t", 0
 
 (* Define identity package; can convert Nat to internal repr type and back. *)
 val idid = Pair(Fn("x", Nat, Var ("x", 0)), Fn("x", Nat, Var ("x", 0)));
-val Prod(Arr(Nat, Nat), Arr(Nat, Nat)) = typeof' [] [] idid;
-val inoutpkg = Impl(Nat, idid, Some("t", Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))));
-val Some("t",Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))) = typeof' [] [] inoutpkg;
+val Prod([Arr(Nat, Nat), Arr(Nat, Nat)]) = typeof' [] [] idid;
+val inoutpkg = Impl(Nat, idid, Some("t", Prod([Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat)])));
+val Some("t",Prod([Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat)])) = typeof' [] [] inoutpkg;
 val Nat = typeof' [] [] (Use(inoutpkg, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 val true = isval inoutpkg;
 (* Dynamics *)
@@ -867,10 +866,10 @@ val App
 
 val Zero = eval (Use(inoutpkg, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 
-val leftandback = Pair(Fn("x", Nat, Pair(Var ("x", 0), Zero)), Fn("x", Prod(Nat, Nat), ProdLeft (Var ("x", 0))));
-val Prod (Arr (Nat,Prod (Nat, Nat)),Arr (Prod (Nat, Nat),Nat)) = typeof' [] [] leftandback;
-val inoutpkg2 = Impl(Prod(Nat, Nat), leftandback, Some("t", Prod (Arr (Nat,TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat))));
-val Some("t",Prod(Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat))) = typeof' [] [] inoutpkg2;
+val leftandback = Pair(Fn("x", Nat, Pair(Var ("x", 0), Zero)), Fn("x", Prod([Nat, Nat]), ProdLeft (Var ("x", 0))));
+val Prod ([Arr (Nat,Prod [Nat, Nat]),Arr (Prod [Nat, Nat],Nat)]) = typeof' [] [] leftandback;
+val inoutpkg2 = Impl(Prod([Nat, Nat]), leftandback, Some("t", Prod ([Arr (Nat,TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)])));
+val Some("t",Prod([Arr(Nat, TypVar ("t", 0)), Arr(TypVar ("t", 0), Nat)])) = typeof' [] [] inoutpkg2;
 val Nat = typeof' [] [] (Use(inoutpkg2, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 val Zero = eval (Use(inoutpkg2, "pkg", "s", App(ProdRight(Var ("x", 0)), App(ProdLeft(Var ("x", 0)), Zero))));
 
@@ -1097,7 +1096,7 @@ val Pair (Zero,Succ Zero) : Ast.exp =
 val Pair (Zero,Pair (Succ Zero,Succ (Succ Zero))) : Ast.exp =
     parse "(Z, (S Z, S S Z))";
 
-val Fn ("x", Prod (Nat,Nat),Var("x", 0)) : Ast.exp =
+val Fn ("x", Prod ([Nat,Nat]),Var("x", 0)) : Ast.exp =
     parse "\\ x : (nat * nat) -> x";
 
 val ProdLeft (Pair (Zero,Pair (Succ Zero,Succ (Succ Zero)))) : Ast.exp =
@@ -1132,10 +1131,10 @@ val Zero : exp =
 val Succ Zero: exp =
     run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (right (\\ x : nat -> Z) : (nat | nat -> nat)))";
 
-val Fn ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod (Nat,Nat))), Var ("natOrFuncOrProd",0)) : Ast.exp =
+val Fn ("natOrFuncOrProd", Plus (Nat,Plus (Arr (Nat,Nat),Prod ([Nat,Nat]))), Var ("natOrFuncOrProd",0)) : Ast.exp =
     parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"
 
-val Some ("t",Prod (TypVar ("t", 0),Prod (Arr (Prod (Nat,TypVar ("t", 0)),TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)))) : typ =
+val Some ("t",Prod ([TypVar ("t", 0),Prod ([Arr (Prod [Nat,TypVar ("t", 0)],TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)])])) : typ =
     typeof (parseFile "/home/evan/thon/examples/natlist.thon");
 
 val natList = (parseFile "/home/evan/thon/examples/natlist.thon");
@@ -1174,29 +1173,29 @@ val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/len.thon";
 val Fold
     (TyRec
        ("node",
-        Plus (Unit,Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0))))),
+        Plus (Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]])),
      PlusLeft
        (Plus
           (Unit, (*empty base or... *)
            Prod (* a nat and... *)
-             (Nat,
+             [Nat,
               Prod (* a node and... *)
-                (TyRec
+                [TyRec
                    ("node",
                     Plus
                       (Unit,
-                       Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0))))),
+                       Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]])),
                  TyRec (* a another node. *)
                    ("node",
                     Plus
                       (Unit,
-                       Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))))),
+                       Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]))]]),
         TmUnit)) : Ast.exp = runFile "/home/evan/thon/examples/emptybst.thon";
 
 val bstType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/singletonbst.thon");
 
 val TyRec
-    ("node",Plus (Unit,Prod (Nat,Prod (TypVar ("node",0),TypVar ("node",0)))))
+    ("node",Plus (Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]))
     : Ast.typ = bstType;
 
 val bstInsertType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/bst.thon");
@@ -1225,7 +1224,7 @@ val TypFn ("t", Zero) = runFile "/home/evan/thon/examples/typnames.thon";
 val
   Data
     ("List","Nil",Unit,"Cons",
-     Prod (Nat,Some ("t",Arr (TypVar ("t",0),TypVar ("List",1)))),Zero)
+     Prod [Nat,Some ("t",Arr (TypVar ("t",0),TypVar ("List",1)))],Zero)
   : Ast.exp =
     parse "data List = Nil unit | Cons nat * (some t. t -> List) in Z";
 
@@ -1234,6 +1233,8 @@ val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * 
 
 val Zero = runFile "/home/evan/thon/examples/auto-natlist.thon";
 val Succ (Succ Zero) = runFile "/home/evan/thon/examples/bst-depth.thon";
+
+val Zero = runFile "/home/evan/thon/examples/nary-prod.thon";
 
 in
 ()
