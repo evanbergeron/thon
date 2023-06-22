@@ -9,7 +9,7 @@ sig
       | All of string * typ (* binds *)
       | Some of string * typ (* binds *)
       | Prod of typ list
-      | Plus of typ * typ (* sum type *)
+      | Plus of typ list (* sum type *)
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
 
@@ -67,7 +67,7 @@ struct
       | All of string * typ (* binds *)
       | Some of string * typ (* binds *)
       | Prod of typ list
-      | Plus of typ * typ (* sum type *)
+      | Plus of typ list (* sum type *)
       | TyRec of string * typ (* binds *)
       | Unit (* nullary sum *)
 
@@ -145,7 +145,7 @@ struct
           | TypVar (name, i) => f t
           | Arr(d, c) => f (Arr(typMap f d, typMap f c))
           | Prod types  => f (Prod(map (typMap f) types))
-          | Plus(l, r) => f (Plus(typMap f l, typMap f r))
+          | Plus types  => f (Plus(map (typMap f) types))
           | All (name, t') => f (All(name, typMap f t'))
           | Some (name, t') => f (Some(name, typMap f t'))
           | TyRec (name, t') => f (TyRec(name, typMap f t'))

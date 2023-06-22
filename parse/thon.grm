@@ -53,6 +53,7 @@ structure A = Ast
    exp of A.exp
  | typ of A.typ
  | starTyps of A.typ list
+ | pipeTyps of A.typ list
  | program of A.exp
 
 %verbose
@@ -114,8 +115,12 @@ typ:
   | SOME ID DOT typ (A.Some (ID, typ))
   | TYPEREC ID DOT typ (A.TyRec (ID, typ))
   (* TODO should this take precedence below star and arrow? *)
-  | typ PIPE typ %prec TYPEOR (A.Plus (typ1, typ2))
+  | typ PIPE pipeTyps %prec TYPEOR (A.Plus (typ::pipeTyps))
 
 starTyps:
     typ STAR starTyps (typ::starTyps)
+  | typ ([typ])
+
+pipeTyps:
+    typ PIPE pipeTyps (typ::pipeTyps)
   | typ ([typ])
