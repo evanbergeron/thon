@@ -175,6 +175,75 @@ is the empty list of natural numbers.
 
 is a function that takes a pair (nat, natlist) and prepends nat to natlist.
 
+## algebraic datatypes
+
+Algebraic datatypes are a combination of three different language
+features: sum types, recursive types, and existential types.
+
+Quoting from "A type-theoretic interpretation of standard ML",
+
+> The underlying implementation type is defined to be a recursive sum type, with one summand corresponding to each constructor in the declaration. The constructors are represented by total functions that inject values into the appropriate summand of the recursive type.
+
+`examples/manual-datatype.thon` provides an example of how a `data List = Nil | Cons of int * List` is elaborated.
+
+Here's an example in thon of calculating the depth of a binary search tree.
+
+```
+data tree = Nil unit | Node nat * (tree * tree)
+
+in let decr : nat -> nat =
+  \ x : nat ->
+    ifz x of
+      Z -> Z
+    | S p -> p
+
+in let sub : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+    rec y of
+      Z -> x
+    | prevRec -> (decr prevRec)
+
+in let lt : nat -> nat -> nat =
+  \ x : nat ->
+  \ y : nat ->
+  ifz (sub y x) of
+    Z -> Z
+  | S p -> S Z
+
+in fun insert : nat -> tree -> tree =
+    \ n : nat ->
+    \ bst : tree ->
+    case exposetree bst of
+        empty -> Node(n, ((Nil unit), (Nil unit)))
+      | natAndNodeAndNode ->
+        let thisNode : nat = fst natAndNodeAndNode in
+        let leftNode : tree = fst (snd natAndNodeAndNode) in
+        let rightNode : tree = snd (snd natAndNodeAndNode) in
+        ifz (lt n thisNode) of
+            Z -> Node(n, (leftNode, (insert n rightNode)))
+          | S p -> (Node(n, ((insert n leftNode), rightNode)))
+
+in fun depth : tree -> nat =
+    \ t : tree ->
+    case exposetree t of
+        empty -> Z
+      | natAndNodeAndNode ->
+        let leftDepth : nat = depth (fst (snd natAndNodeAndNode)) in
+        let rightDepth : nat = depth (snd (snd natAndNodeAndNode)) in
+        ifz (lt leftDepth rightDepth) of
+            Z -> S leftDepth
+          | S p -> S rightDepth
+
+(* This tree has depth 2.
+ *
+ *     1
+ *    / \
+ *   0   2
+ *)
+in (depth (insert (S S Z) (insert (Z) (insert (S Z) (Nil unit)))))
+```
+
 ## thanks
 
 I've mostly been working out of Bob Harper's "Practical Foundations for
