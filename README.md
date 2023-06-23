@@ -255,17 +255,14 @@ code for CMU's Fall 2016 compilers course.
 ## install (ubuntu 20)
 
 Wow, you read this far! (or scrolled this far, at least) If you'd like
-to program in thon, the code is publicly available.
+to program in thon, here's how I use it.
 
-    $ git clone https://git.sr.ht/~thon/thon
+    $ git clone git@github.com:evanbergeron/thon.git
     $ sudo apt install smlnj ml-yaxx ml-lex ml-lpt
     $ sml
     - CM.make "path/to/your/git/clone/thon.cm";
     - Thon.run "some thon program here";
-
-If you figure out install instructions on mac or windows or have any
-other questions or comments, please email me at
-bergeronej@gmail.com. I would love to hear from you!
+    - Thon.runFile "path/to/foo.thon";
 
 ## collatz conjecture
 
