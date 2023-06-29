@@ -145,7 +145,9 @@ fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
                clientName,
                typeName,
                shiftDeBruijinIndicesInExp shift client (bindingDepth+1))
-       | A.Pair (l, r) => A.Pair (shiftDeBruijinIndicesInExp shift l bindingDepth, shiftDeBruijinIndicesInExp shift r bindingDepth)
+       | A.Pair (l, r) => A.Pair (shiftDeBruijinIndicesInExp shift l bindingDepth,
+                                  shiftDeBruijinIndicesInExp shift r bindingDepth)
+       | A.Tuple exps => A.Tuple (List.map (fn e => shiftDeBruijinIndicesInExp shift e bindingDepth) exps)
        | A.Fold(t, e') => A.Fold(t, (shiftDeBruijinIndicesInExp shift e' (bindingDepth))) (* binds a typ var *)
        | A.Unfold(e') => A.Unfold(shiftDeBruijinIndicesInExp shift e' (bindingDepth))
 
@@ -187,6 +189,7 @@ fun substTypeInExp' srcType dstExp bindingDepth =
        | A.Pair (l, r) =>
             A.Pair (substTypeInExp' srcType l bindingDepth,
                    substTypeInExp' srcType r bindingDepth)
+       | A.Tuple exps => A.Tuple (List.map (fn e => substTypeInExp' srcType e bindingDepth) exps)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec(substTypeInExp' srcType i bindingDepth,
                 substTypeInExp' srcType baseCase bindingDepth,
@@ -278,7 +281,8 @@ fun setDeBruijnIndex e varnames typnames =
                                    prev,
                                    setDeBruijnIndex e (prev::varnames) typnames)
        | A.Pair (l, r) => A.Pair (setDeBruijnIndex l varnames typnames,
-                                    setDeBruijnIndex r varnames typnames)
+                                  setDeBruijnIndex r varnames typnames)
+       | A.Tuple exps => A.Tuple (List.map (fn e => setDeBruijnIndex e varnames typnames) exps)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
             A.Rec (setDeBruijnIndex i varnames typnames,
                    setDeBruijnIndex baseCase varnames typnames,
@@ -463,6 +467,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         else thenType
     end
   | typeof' ctx typCtx (A.Pair (l, r)) = A.Prod [typeof' ctx typCtx l, typeof' ctx typCtx r]
+  | typeof' ctx typCtx (A.Tuple exps) = A.Prod (List.map (typeof' ctx typCtx) exps)
   | typeof' ctx typCtx (A.Rec (i, baseCase, prevCaseName, recCase)) =
     let val A.Nat = typeof' ctx typCtx i
         val t = typeof' ctx typCtx baseCase
@@ -526,6 +531,7 @@ fun isval e =
       | A.Fn(_, _, _) => true
       | A.Let(_, _, _, _) => false
       | A.Pair(l, r) => (isval l) andalso (isval r)
+      | A.Tuple exps => List.all isval exps
       | A.TypFn (_, _)  => true
       | A.Impl(_, pkgImpl, _) => isval pkgImpl
       | A.PlusLeft(_, e') => isval e'
@@ -576,6 +582,7 @@ fun subst' src dst bindingDepth =
                typeName,
                subst' src client (bindingDepth+1))
        | A.Pair (l, r) => A.Pair (subst' src l bindingDepth, subst' src r bindingDepth)
+       | A.Tuple exps => A.Tuple (List.map (fn e => subst' src e bindingDepth) exps)
        | A.Fold(t, e') => A.Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
        | A.Unfold(e') => A.Unfold(subst' src e' (bindingDepth))
 
@@ -595,6 +602,12 @@ fun step e =
       | A.Pair(l, r) => if not (isval l) then A.Pair(step l, r) else
                        if not (isval r) then A.Pair(l, step r) else
                        e
+      | A.Tuple exps =>
+        let fun recr [] = []
+              | recr (e::es) = if isval e then e::(recr es) else (step e)::es
+        in
+            A.Tuple (recr exps)
+        end
       | A.App(f, n) => if not (isval f) then A.App(step f, n)
                      else (if not (isval n) then A.App(f, step n)
                            else let val A.Fn(argName, t, f') = f
@@ -1238,6 +1251,13 @@ val Fn
 val Fn
     ("natOrFuncOrProd",Plus [Nat,Plus [Arr (Nat,Nat),Prod [Nat,Nat]]],
      Var ("natOrFuncOrProd",0)) = runFile "/home/evan/thon/examples/ternary-sum-type.thon";
+
+val
+  Tuple
+      [TypFn ("t",Fn ("x",TypVar ("t",0),Var ("x",0))),
+       Fn ("x",Nat,Var ("x",0)),
+       TypFn ("t",Fn ("x",TypVar ("t",0),Var ("x",0)))] : exp =
+step (A.Tuple [polymorphicIdFn, A.TypApp(Nat, polymorphicIdFn), polymorphicIdFn]);
 
 in
 ()

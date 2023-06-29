@@ -34,6 +34,7 @@ sig
                 typ list *
                 exp (*TODO non-binary datatypes*)
       | Pair of exp * exp
+      | Tuple of exp list
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of exp
       | ProdRight of exp
@@ -92,6 +93,7 @@ struct
                 typ list *
                 exp (*TODO non-binary datatypes*)
       | Pair of exp * exp
+      | Tuple of exp list
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of exp
       | ProdRight of exp
@@ -132,6 +134,7 @@ struct
            | Use(pkg, clientName, typeName, client) =>
              f (Use(expMap f pkg, clientName, typeName, expMap f client))
            | Pair(l, r) => f (Pair(expMap f l, expMap f r))
+           | Tuple exps => f (Tuple (List.map (expMap f) exps))
            | Fold(t, e') => f (Fold(t, (expMap f e')))
            | Unfold(e') => f (Unfold(expMap f e'))
            | Data(dataname, names, types, exp) =>
