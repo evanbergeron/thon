@@ -311,51 +311,50 @@ fun setDeBruijnIndex e varnames typnames =
             A.Impl(setDeBruijnIndexInType reprType varnames typnames,
                    setDeBruijnIndex pkgImpl varnames typnames,
                    setDeBruijnIndexInType pkgType varnames typnames)
-       | A.Data(dname, lname, ltyp, rname, rtyp, exp) =>
+       | A.Data(dname, names, types, exp) =>
+         let val [lname, rname] = names in
          A.Data(dname,
-                lname,
-                (* binds a typ var*)
-                setDeBruijnIndexInType ltyp varnames (dname::typnames),
-                rname,
-                (* binds a typ var*)
-                setDeBruijnIndexInType rtyp varnames (dname::typnames),
+                names,
+                (* binds a typ var for each name in names *)
+                List.map (fn t => setDeBruijnIndexInType t varnames (dname::typnames)) types,
                 (* binds lname and rname and dname *)
-                setDeBruijnIndex exp (("expose" ^ dname)::rname::lname::varnames) (dname::typnames)
+                setDeBruijnIndex exp (("expose" ^ dname)::((List.rev names)@varnames)) (dname::typnames)
                )
+         end
        | _ => raise Unimplemented (* TODO *)
 end
 
 fun elaborateDatatype e =
     case e of
-        A.Data(dataname, lname, ltyp, rname, rtyp, exp) =>
+        A.Data(dataname, names, types, exp) =>
         let
+            val [lname, rname] = names;
+            val [ltyp, rtyp] = types;
             val datanameimpl = dataname ^ "Impl"
-            val withType = A.TyRec(dataname, A.Plus[ltyp, rtyp])
+            val withType = A.TyRec(dataname, A.Plus types)
             (* dataname is not bound here - the recursive reference is bound to the abstract
              * type bound in the Some *)
-            val tInLtyp = substType (A.TypVar("t", 0)) ltyp
-            val tInRtyp = substType (A.TypVar("t", 0)) rtyp
-            val exposeFnType = A.Arr(A.TypVar("t", 0),
-                                     A.Plus[tInLtyp, tInRtyp])
+            val tInTypes = List.map (substType (A.TypVar("t", 0))) types
+            val exposeFnType = A.Arr(A.TypVar("t", 0), A.Plus tInTypes)
             val exposeFn = A.Fn(dataname ^ "exp", withType, A.Unfold(A.Var(dataname ^ "exp", 0)))
             val pkgType = A.Some("t", (*arbitrary name ok here *)
-                                 A.Prod(
-                                     [A.Prod([A.Arr(tInLtyp, A.TypVar("t", 0)),
-                                              A.Arr(tInRtyp, A.TypVar("t", 0))]),
-                                      exposeFnType])
+                                 A.Prod([A.Prod(
+                                              List.map (fn t => A.Arr(t, A.TypVar("t", 0))) tInTypes),
+                                         exposeFnType])
                                 )
+            val sumTypeForInjection = List.map (substType withType) types;
             val lfn = A.Fn("foo", substType withType ltyp,
-                           A.Fold(withType, A.PlusLeft(
-                                      A.Plus[substType withType ltyp,
-                                             substType withType rtyp],
-                                      A.Var("foo", 0)
-                                  )))
+                           A.Fold(withType,
+                                  A.PlusLeft(A.Plus sumTypeForInjection,
+                                             A.Var("foo", 0))
+                                 )
+                          )
             val rfn = A.Fn("natAndNatList", substType withType rtyp,
-                           A.Fold(withType, A.PlusRight(
-                                      A.Plus[substType withType ltyp,
-                                             substType withType rtyp],
-                                      A.Var("natAndNatList", 0)
-                                  )))
+                           A.Fold(withType,
+                                  A.PlusRight(A.Plus sumTypeForInjection,
+                                              A.Var("natAndNatList", 0))
+                                 )
+                          )
             val dtval = A.Impl(withType,
                                A.Pair(A.Pair(lfn, rfn), exposeFn),
                                pkgType)
@@ -1219,8 +1218,8 @@ val TypFn ("t", Zero) = runFile "/home/evan/thon/examples/typnames.thon";
 
 val
   Data
-    ("List","Nil",Unit,"Cons",
-     Prod [Nat,Some ("t",Arr (TypVar ("t",0),TypVar ("List",1)))],Zero)
+    ("List",["Nil", Cons], [Unit,
+     Prod [Nat,Some ("t",Arr (TypVar ("t",0),TypVar ("List",1)))]],Zero)
   : Ast.exp =
     parse "data List = Nil unit | Cons nat * (some t. t -> List) in Z";
 

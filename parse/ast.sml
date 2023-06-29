@@ -30,8 +30,8 @@ sig
       | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
       | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
       | Data of string *
-                string * typ *
-                string * typ *
+                string list *
+                typ list *
                 exp (*TODO non-binary datatypes*)
       | Pair of exp * exp
       (* Elimination forms for terms of Prod type *)
@@ -88,8 +88,8 @@ struct
       | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
       | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
       | Data of string *
-                string * typ *
-                string * typ *
+                string list *
+                typ list *
                 exp (*TODO non-binary datatypes*)
       | Pair of exp * exp
       (* Elimination forms for terms of Prod type *)
@@ -134,8 +134,8 @@ struct
            | Pair(l, r) => f (Pair(expMap f l, expMap f r))
            | Fold(t, e') => f (Fold(t, (expMap f e')))
            | Unfold(e') => f (Unfold(expMap f e'))
-           | Data(dataname, lname, ltyp, rname, rtyp, exp) =>
-             f (Data(dataname, lname, ltyp, rname, rtyp, f exp))
+           | Data(dataname, names, types, exp) =>
+             f (Data(dataname, names, types, f exp))
 
     (* DEVNOTE this applies f at every node *)
     fun typMap f t =
