@@ -114,8 +114,10 @@ fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
        | A.Succ e2 => A.Succ (shiftDeBruijinIndicesInExp shift e2 bindingDepth)
        | A.ProdLeft e => A.ProdLeft (shiftDeBruijinIndicesInExp shift e bindingDepth)
        | A.ProdRight e => A.ProdRight (shiftDeBruijinIndicesInExp shift e bindingDepth)
+       | A.ProdNth (i, e) => A.ProdNth (i, shiftDeBruijinIndicesInExp shift e bindingDepth)
        | A.PlusLeft (t, e) => A.PlusLeft (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
+       | A.PlusNth (i, t, e) => A.PlusNth (i, t, shiftDeBruijinIndicesInExp shift e bindingDepth)
        | A.Case(c, lname, l, rname, r) =>
          A.Case(shiftDeBruijinIndicesInExp shift c bindingDepth,
                 lname, shiftDeBruijinIndicesInExp shift l (bindingDepth+1),
@@ -162,8 +164,10 @@ fun substTypeInExp' srcType dstExp bindingDepth =
        | A.Succ e2 => A.Succ (substTypeInExp' srcType e2 bindingDepth)
        | A.ProdLeft e => A.ProdLeft (substTypeInExp' srcType e bindingDepth)
        | A.ProdRight e => A.ProdRight (substTypeInExp' srcType e bindingDepth)
+       | A.ProdNth (i, e) => A.ProdNth (i, substTypeInExp' srcType e bindingDepth)
        | A.PlusLeft (t, e) => A.PlusLeft (t, substTypeInExp' srcType e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, substTypeInExp' srcType e bindingDepth)
+       | A.PlusNth (i, t, e) => A.PlusNth (i, t, substTypeInExp' srcType e bindingDepth)
        | A.Case(c, lname, l, rname, r) =>
             A.Case(substTypeInExp' srcType c bindingDepth,
                    lname,
@@ -268,11 +272,15 @@ fun setDeBruijnIndex e varnames typnames =
        | A.Succ e2 => A.Succ (setDeBruijnIndex e2 varnames typnames)
        | A.ProdLeft e => A.ProdLeft (setDeBruijnIndex e varnames typnames)
        | A.ProdRight e => A.ProdRight (setDeBruijnIndex e varnames typnames)
+       | A.ProdNth (i, e) => A.ProdNth (i, setDeBruijnIndex e varnames typnames)
        | A.PlusLeft (t, e) =>
             A.PlusLeft(setDeBruijnIndexInType t varnames typnames,
                        setDeBruijnIndex e varnames typnames)
        | A.PlusRight (t, e) =>
             A.PlusRight(setDeBruijnIndexInType t varnames typnames,
+                        setDeBruijnIndex e varnames typnames)
+       | A.PlusNth (i, t, e) =>
+            A.PlusNth(i, setDeBruijnIndexInType t varnames typnames,
                         setDeBruijnIndex e varnames typnames)
        | A.App (f, n) => A.App (setDeBruijnIndex f varnames typnames,
                                 setDeBruijnIndex n varnames typnames)
@@ -347,43 +355,51 @@ fun elaborateDatatype e =
                                          exposeFnType])
                                 )
             val sumTypeForInjection = List.map (substType withType) types;
-            val lfn = A.Fn("foo", substType withType ltyp,
-                           A.Fold(withType,
-                                  A.PlusLeft(A.Plus sumTypeForInjection,
-                                             A.Var("foo", 0))
-                                 )
-                          )
-            val rfn = A.Fn("natAndNatList", substType withType rtyp,
-                           A.Fold(withType,
-                                  A.PlusRight(A.Plus sumTypeForInjection,
-                                              A.Var("natAndNatList", 0))
-                                 )
-                          )
+            fun makeInjectionExprFromSummandType (i, t) =
+                let val name = "summand" ^ Int.toString i
+                in
+                A.Fn(name,
+                     substType withType t,
+                     A.Fold(withType,
+                            (* UNDONE is DeBruijin index 0 ok here?
+                             * Do we need to be incrementing a bindingDepth somewhere else?
+                             *)
+                            A.PlusNth(i, A.Plus sumTypeForInjection, A.Var(name, 0))))
+                end
+
+            val fns = List.mapi makeInjectionExprFromSummandType types;
             val dtval = A.Impl(withType,
-                               A.Pair(A.Pair(lfn, rfn), exposeFn),
+                               A.Tuple[A.Tuple fns, exposeFn],
                                pkgType)
-            val useExp =
-                A.Use(A.Var(datanameimpl, 0), "li", dataname,
-                A.Let(lname, (A.Arr(ltyp, A.TypVar(dataname, 0))), A.ProdLeft(A.ProdLeft(A.Var("li", 0))),
-               (A.Let(rname, (A.Arr(rtyp, A.TypVar(dataname, 0))), A.ProdRight(A.ProdLeft(A.Var("li", 1))),
-                A.Let("expose" ^ dataname,
-                      (A.Arr(A.TypVar(dataname, 0), A.Plus[ltyp, rtyp])),
-                      A.ProdRight(A.Var("li", 2)),
-                (* We've already bound term vars lname and rname, and type var dname.
-                 *
-                 * We have package impl to bind still, the use impl pkg exp to bind,
-                 * the use impl pkg typ var is already bound as dname, and lname and
-                 * rname are already bound.
-                 *
-                 * Just bump by two. Just a term rewrite, no new type variables are
-                 * created in this rewrite.
-                 *
-                 * Need to bind impl and use vars. (Which are bound immediately before
-                 * the two sides of the datatype declaration).
-                 *)
-                (shiftDeBruijinIndicesInExp 3 exp 3))))))
+
+            (* We've already bound term vars lname and rname, and type var dname.
+             *
+             * We have package impl to bind still, the use impl pkg exp to bind,
+             * the use impl pkg typ var is already bound as dname, and lname and
+             * rname are already bound.
+             *
+             * Just bump by two. Just a term rewrite, no new type variables are
+             * created in this rewrite.
+             *
+             * Need to bind impl and use vars. (Which are bound immediately before
+             * the two sides of the datatype declaration).
+             *
+             * UNDONE need to bump by something parametrized on the length of the list
+             *)
+            val shift = (List.length types) + 1;
+            val innerExp = A.Let("expose" ^ dataname,
+                                 A.Arr(A.TypVar(dataname, 0), A.Plus[ltyp, rtyp]),
+                                 A.ProdNth(1, A.Var("li", (List.length types))),
+                                 shiftDeBruijinIndicesInExp shift exp shift);
+            fun makeDecls i =
+                if i = (List.length types) then innerExp
+                else
+                    A.Let(List.nth (names, i),
+                          A.Arr(List.nth (types, i), A.TypVar(dataname, 0)),
+                          A.ProdNth(i, A.ProdNth(0, A.Var("li", i))),
+                          makeDecls (i+1))
         in
-            A.Let(datanameimpl, pkgType, dtval, useExp)
+            A.Let(datanameimpl, pkgType, dtval, A.Use(A.Var(datanameimpl, 0), "li", dataname, makeDecls 0))
         end
       | _ => e
 
@@ -416,6 +432,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx (A.Succ e2) = (typeof' ctx typCtx e2)
   | typeof' ctx typCtx (A.ProdLeft e) = let val A.Prod [l, r] = (typeof' ctx typCtx e) in l end
   | typeof' ctx typCtx (A.ProdRight e) = let val A.Prod [l, r] = (typeof' ctx typCtx e) in r end
+  | typeof' ctx typCtx (A.ProdNth (i,e)) = let val A.Prod types = (typeof' ctx typCtx e) in List.nth (types, i) end
   | typeof' ctx typCtx (A.PlusLeft (t, e)) =
     let val A.Plus[l, r] = t in
         if not (typeEq l (typeof' ctx typCtx e)) then
@@ -429,6 +446,13 @@ fun typeof' ctx typCtx A.Zero = A.Nat
             raise IllTypedMsg "Sum type annotation does not match deduced type"
         else
             A.Plus[l, r]
+    end
+  | typeof' ctx typCtx (A.PlusNth (i, t, e)) =
+    let val A.Plus types = t in
+        if not (typeEq (List.nth (types, i)) (typeof' ctx typCtx e)) then
+            raise IllTypedMsg "Sum type annotation does not match deduced type"
+        else
+            A.Plus types
     end
   | typeof' ctx typCtx (A.Case (c, lname, l, rname, r)) =
     let val A.Plus[lt, rt] = typeof' ctx typCtx c
@@ -536,6 +560,7 @@ fun isval e =
       | A.Impl(_, pkgImpl, _) => isval pkgImpl
       | A.PlusLeft(_, e') => isval e'
       | A.PlusRight(_, e') => isval e'
+      | A.PlusNth(_, _, e') => isval e'
       | A.Fold(t, e') => isval e'
       | _ => false
 
@@ -550,8 +575,10 @@ fun subst' src dst bindingDepth =
        | A.Succ e2 => A.Succ (subst' src e2 bindingDepth)
        | A.ProdLeft e => A.ProdLeft (subst' src e bindingDepth)
        | A.ProdRight e => A.ProdRight (subst' src e bindingDepth)
+       | A.ProdNth (i, e) => A.ProdNth (i, subst' src e bindingDepth)
        | A.PlusLeft (t, e) => A.PlusLeft (t, subst' src e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, subst' src e bindingDepth)
+       | A.PlusNth (i, t, e) => A.PlusNth (i, t, subst' src e bindingDepth)
        | A.Case(c, lname, l, rname, r) =>
             A.Case(subst' src c bindingDepth,
                    lname, subst' src l (bindingDepth+1),
@@ -599,6 +626,8 @@ fun step e =
                    let val A.Pair(l, r) = n in l end
       | A.ProdRight n  => if not (isval n) then A.ProdRight(step n) else
                     let val A.Pair(l, r) = n in r end
+      | A.ProdNth (i, n)  => if not (isval n) then A.ProdNth(i, step n) else
+                    let val A.Tuple exps = n in List.nth (exps, i) end
       | A.Pair(l, r) => if not (isval l) then A.Pair(step l, r) else
                        if not (isval r) then A.Pair(l, step r) else
                        e
@@ -654,17 +683,23 @@ fun step e =
               | _ => raise No
            )
       | A.PlusLeft (t, e') =>
-            if not (isval e) then A.PlusLeft(t, step e')
+            if not (isval e') then A.PlusLeft(t, step e')
             else e
       | A.PlusRight (t, e') =>
-            if not (isval e) then A.PlusRight(t, step e')
+            if not (isval e') then A.PlusRight(t, step e')
             else e
+      | A.PlusNth (i, t, e') =>
+        (print "plusnth";
+            if not (isval e') then A.PlusNth(i, t, step e')
+            else e)
       | A.Case (c, lname, l, rname, r) =>
         if not (isval c) then A.Case(step c, lname, l, rname, r)
         else (
             case c of
                  A.PlusLeft(_, e) => subst e l
                | A.PlusRight(_, e) => subst e r
+               (* UNDONE n-nary case *)
+               | A.PlusNth(i, _, e) => subst e (if i = 0 then l else r)
                | _ => raise IllTyped
         )
       | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')

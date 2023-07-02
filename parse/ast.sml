@@ -38,9 +38,11 @@ sig
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of exp
       | ProdRight of exp
+      | ProdNth of int * exp
       (* Elimination forms for terms of Plus type *)
       | PlusLeft of typ * exp
       | PlusRight of typ * exp
+      | PlusNth of int * typ * exp (* Internal *)
       | Case of exp (* thing being cased on*) *
                 string * exp (* Left binds term var *) *
                 string * exp (* Right binds term var *)
@@ -53,7 +55,8 @@ sig
 
   structure Print :
   sig
-    val pp : exp -> string
+    val expToString : exp -> string
+    val typToString: typ -> string
   end
 
 end
@@ -97,9 +100,11 @@ struct
       (* Elimination forms for terms of Prod type *)
       | ProdLeft of exp
       | ProdRight of exp
+      | ProdNth of int * exp
       (* Elimination forms for terms of Plus type *)
       | PlusLeft of typ * exp
       | PlusRight of typ * exp
+      | PlusNth of int * typ * exp (* Internal *)
       | Case of exp (* thing being cased on*) *
                 string * exp (* Left binds term var *) *
                 string * exp (* Right binds term var *)
@@ -116,8 +121,10 @@ struct
            | Succ e' => f (Succ (expMap f e'))
            | ProdLeft e' => f (ProdLeft(expMap f e'))
            | ProdRight e' => f (ProdRight(expMap f e'))
+           | ProdNth(i, e') => f (ProdNth(i, expMap f e'))
            | PlusLeft(t, e') => f (PlusLeft(t, expMap f e'))
            | PlusRight(t, e') => f (PlusRight(t, expMap f e'))
+           | PlusNth(i, t, e') => f (PlusNth(i, t, expMap f e'))
            | Case(c, lname, l, rname, r) =>
              f (Case(expMap f c, lname, expMap f l, rname, expMap f r))
            | Fn(argName, t, f') => f (Fn(argName, t, (expMap f f')))
@@ -156,10 +163,23 @@ struct
 
   structure Print =
   struct
-    fun pp e =
+    fun expToString e =
         case e of
             Zero => "Z"
-          | Succ e => "S (" ^ (pp e) ^ ")"
+          | Succ e => "S (" ^ (expToString e) ^ ")"
+
+    fun typToString Nat = "Nat"
+      | typToString (TypVar(s, i)) = "TypVar(" ^ s ^ "," ^ Int.toString(i) ^ ")"
+
+      | typToString (Arr(t, t')) = "Arr(" ^ typToString(t) ^ "," ^ typToString(t') ^ ")"
+      | typToString (All(s, t)) = "All(" ^ s ^ "," ^ typToString(t) ^ ")"
+      | typToString (Some(s, t)) = "Some(" ^ s ^ "," ^ typToString(t) ^ ")"
+      | typToString (Prod types) = "Prod[" ^ (String.concatWith "," (List.map typToString types))
+      | typToString (Plus types) = "Plus[" ^ (String.concatWith "," (List.map typToString types))
+      | typToString (TyRec(s, t)) = "TyRec(" ^ s ^ "," ^ typToString(t) ^ ")"
+      | typToString Unit = "Unit"
+
   end
+
 
 end
