@@ -1,0 +1,9 @@
+data tree = nil unit | two nat * nat * tree | cons nat * tree in
+fun isempty : tree -> nat =
+  \ t : tree ->
+  case exposetree t of
+      empty => S Z
+    | twocase => Z
+    | conscase => Z
+  end
+in (isempty (cons (Z, (nil unit))))

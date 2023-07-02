@@ -26,7 +26,7 @@ in fun insert : nat
     \ n : nat ->
     \ bst : (u node. (unit | (nat * (node * node)))) ->
     case (unfold bst) of
-        empty -> (
+        empty => (
             fold u node. (unit | (nat * (node * node)))
             with right
             (n, (* put the number in the tree *)
@@ -59,7 +59,7 @@ in fun insert : nat
                 )
             )
         )
-    | natAndNodeAndNode -> (
+    | natAndNodeAndNode => (
         let thisNode : nat = fst natAndNodeAndNode in
         let leftNode : (u node. (unit | (nat * (node * node)))) = fst (snd natAndNodeAndNode) in
         let rightNode : (u node. (unit | (nat * (node * node)))) = snd (snd natAndNodeAndNode) in
@@ -91,4 +91,5 @@ in fun insert : nat
                 )
         )
     )
+    end
 in insert

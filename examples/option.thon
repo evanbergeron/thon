@@ -1,5 +1,6 @@
 \ x : ((*some*) nat | (*none*) unit) -> (\ y : nat ->
 case x of
-    somex -> somex
-  | none -> y
+    somex => somex
+  | none => y
+end
 )

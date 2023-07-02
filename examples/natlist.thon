@@ -11,8 +11,8 @@ impl (some t. (t * (((nat * t) -> t) * (t -> nat)))) with (u l. (unit |  (nat * 
     (*isempty*)
     \ natlist : (u l. (unit |  (nat * l))) ->
         (case (unfold natlist) of
-           empty -> Z
-         | hdAndTl -> S Z))
+           empty => Z
+         | hdAndTl => S Z end))
 )
 (*
 data natlist = Nil | Cons of nat * natlist;

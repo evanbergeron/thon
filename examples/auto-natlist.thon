@@ -2,6 +2,7 @@ data list = nil unit | cons nat * list in
 fun isempty : list -> nat =
   \ natlist : list ->
   case exposelist natlist of
-      empty -> S Z
-    | not -> Z
+      empty => S Z
+    | not => Z
+  end
 in (isempty (cons (Z, (nil unit))))

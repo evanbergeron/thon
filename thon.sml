@@ -1151,18 +1151,18 @@ val Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)],Var ("natOrFunc",0)) : Ast.exp =
     parse "\\ natOrFunc : (nat | nat -> nat) -> natOrFunc"
 
 val Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)],Case (Var ("natOrFunc", 0),["l", "r"], [Zero, Succ Zero])) : exp =
-    run "\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z"
+    run "\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end"
 
 val App
     (Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)], Case (Var ("natOrFunc",0),["l", "r"], [Zero, Succ Zero])),
      PlusLeft (Plus [Nat,Arr (Nat,Nat)],Zero)) : Ast.exp =
-    parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
+    parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat | nat -> nat)))";
 
 val Zero : exp =
-    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
+    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat | nat -> nat)))";
 
 val Succ Zero: exp =
-    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (right (\\ x : nat -> Z) : (nat | nat -> nat)))";
+    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (right (\\ x : nat -> Z) : (nat | nat -> nat)))";
 
 val Fn ("natOrFuncOrProd", Plus [Nat,Plus [Arr (Nat,Nat),Prod ([Nat,Nat])]], Var ("natOrFuncOrProd",0)) : Ast.exp =
     parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"

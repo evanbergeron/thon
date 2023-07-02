@@ -1,8 +1,8 @@
 fun isempty : (u l. (unit | nat * l)) -> nat =
   \ natlist : (u l. (unit | nat * l)) ->
         (case (unfold natlist) of
-           empty -> S Z
-         | not -> Z)
+           empty => S Z
+         | not => Z end)
 in let nil : (u l. (unit | nat * l)) =
     fold u l. (unit | nat * l) with
     left unit : (unit

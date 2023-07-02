@@ -24,25 +24,27 @@ in fun insert : nat -> tree -> tree =
     \ n : nat ->
     \ bst : tree ->
     case exposetree bst of
-        empty -> Node(n, ((Nil unit), (Nil unit)))
-      | natAndNodeAndNode ->
+        empty => Node(n, ((Nil unit), (Nil unit)))
+      | natAndNodeAndNode =>
         let thisNode : nat = fst natAndNodeAndNode in
         let leftNode : tree = fst (snd natAndNodeAndNode) in
         let rightNode : tree = snd (snd natAndNodeAndNode) in
         ifz (lt n thisNode) of
             Z -> Node(n, (leftNode, (insert n rightNode)))
           | S p -> (Node(n, ((insert n leftNode), rightNode)))
+    end
 
 in fun depth : tree -> nat =
     \ t : tree ->
     case exposetree t of
-        empty -> Z
-      | natAndNodeAndNode ->
+        empty => Z
+      | natAndNodeAndNode =>
         let leftDepth : nat = depth (fst (snd natAndNodeAndNode)) in
         let rightDepth : nat = depth (snd (snd natAndNodeAndNode)) in
         ifz (lt leftDepth rightDepth) of
             Z -> S leftDepth
           | S p -> S rightDepth
+    end
 
 (* This tree has depth 2.
  *

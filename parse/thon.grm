@@ -13,6 +13,7 @@ structure A = Ast
  | PIPE
  | LAM
  | SARROW
+ | DARROW
  | COLON
  | NAT
  | REC
@@ -48,6 +49,7 @@ structure A = Ast
  | FIX
  | FUN
  | DATA
+ | END
 
 %nonterm
    exp of A.exp
@@ -55,6 +57,7 @@ structure A = Ast
  | starTyps of A.typ list
  | pipeTyps of A.typ list
  | dataSummands of (string list) * (A.typ list)
+ | caseBranches of (string list) * (A.exp list)
  | program of A.exp
 
 %verbose
@@ -69,7 +72,7 @@ structure A = Ast
 
 (* The precedence grows down *)
 %nonassoc TYPEOR (* Deliberately first *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX FUN DATA
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX FUN DATA DARROW END
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -102,8 +105,8 @@ exp:
   | UNFOLD exp (A.Unfold(exp))
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
-  | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, [ID1, ID2], [exp2, exp3]))
-  | DATA ID EQ dataSummands IN exp (let val (ids, types) = dataSummands in A.Data(ID1, ids, types, exp) end)
+  | CASE exp OF caseBranches END (let val (ids, exps) = caseBranches in A.Case(exp, ids, exps) end)
+  | DATA ID EQ dataSummands IN exp (let val (ids, types) = dataSummands in A.Data(ID, ids, types, exp) end)
 
 typ:
     NAT (A.Nat)
@@ -129,3 +132,7 @@ pipeTyps:
 dataSummands:
     ID typ PIPE dataSummands (let val (ids, types) = dataSummands in (ID::ids, typ::types) end)
   | ID typ ([ID], [typ])
+
+caseBranches:
+    ID DARROW exp PIPE caseBranches (let val (ids, exps) = caseBranches in (ID::ids, exp::exps) end)
+  | ID DARROW exp ([ID], [exp])
