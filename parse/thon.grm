@@ -54,6 +54,7 @@ structure A = Ast
  | typ of A.typ
  | starTyps of A.typ list
  | pipeTyps of A.typ list
+ | dataSummands of (string list) * (A.typ list)
  | program of A.exp
 
 %verbose
@@ -102,7 +103,7 @@ exp:
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
   | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
-  | DATA ID EQ ID typ PIPE ID typ IN exp (A.Data(ID1, [ID2, ID3], [typ1, typ2], exp))
+  | DATA ID EQ dataSummands IN exp (let val (ids, types) = dataSummands in A.Data(ID1, ids, types, exp) end)
 
 typ:
     NAT (A.Nat)
@@ -124,3 +125,7 @@ starTyps:
 pipeTyps:
     typ PIPE pipeTyps (typ::pipeTyps)
   | typ ([typ])
+
+dataSummands:
+    ID typ PIPE dataSummands (let val (ids, types) = dataSummands in (ID::ids, typ::types) end)
+  | ID typ ([ID], [typ])

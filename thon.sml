@@ -324,15 +324,13 @@ fun setDeBruijnIndex e varnames typnames =
                    setDeBruijnIndex pkgImpl varnames typnames,
                    setDeBruijnIndexInType pkgType varnames typnames)
        | A.Data(dname, names, types, exp) =>
-         let val [lname, rname] = names in
          A.Data(dname,
                 names,
                 (* binds a typ var for each name in names *)
                 List.map (fn t => setDeBruijnIndexInType t varnames (dname::typnames)) types,
-                (* binds lname and rname and dname *)
+                (* binds *)
                 setDeBruijnIndex exp (("expose" ^ dname)::((List.rev names)@varnames)) (dname::typnames)
                )
-         end
        | _ => raise Unimplemented (* TODO *)
 end
 
@@ -340,8 +338,6 @@ fun elaborateDatatype e =
     case e of
         A.Data(dataname, names, types, exp) =>
         let
-            val [lname, rname] = names;
-            val [ltyp, rtyp] = types;
             val datanameimpl = dataname ^ "Impl"
             val withType = A.TyRec(dataname, A.Plus types)
             (* dataname is not bound here - the recursive reference is bound to the abstract
@@ -388,7 +384,7 @@ fun elaborateDatatype e =
              *)
             val shift = (List.length types) + 1;
             val innerExp = A.Let("expose" ^ dataname,
-                                 A.Arr(A.TypVar(dataname, 0), A.Plus[ltyp, rtyp]),
+                                 A.Arr(A.TypVar(dataname, 0), A.Plus types),
                                  A.ProdNth(1, A.Var("li", (List.length types))),
                                  shiftDeBruijinIndicesInExp shift exp shift);
             fun makeDecls i =
@@ -1278,6 +1274,8 @@ val Zero = runFile "/home/evan/thon/examples/auto-natlist.thon";
 val Succ (Succ Zero) = runFile "/home/evan/thon/examples/bst-depth.thon";
 
 val Zero = runFile "/home/evan/thon/examples/ternary-tree.thon";
+val Zero = runFile "/home/evan/thon/examples/three-summands-to-data.thon";
+val Zero = runFile "/home/evan/thon/examples/one-summand-to-data.thon";
 
 val Fn
     ("natOrFuncOrProd",Prod [Nat,Prod [Arr (Nat,Nat),Prod [Nat,Nat]]],
