@@ -118,10 +118,10 @@ fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
        | A.PlusLeft (t, e) => A.PlusLeft (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
        | A.PlusNth (i, t, e) => A.PlusNth (i, t, shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.Case(c, lname, l, rname, r) =>
+       | A.Case(c, names, exps) =>
          A.Case(shiftDeBruijinIndicesInExp shift c bindingDepth,
-                lname, shiftDeBruijinIndicesInExp shift l (bindingDepth+1),
-                rname, shiftDeBruijinIndicesInExp shift r (bindingDepth+1))
+                names,
+                List.map (fn e => shiftDeBruijinIndicesInExp shift e (bindingDepth+1)) exps)
        | A.Fn (argName, t, f) => A.Fn(argName, t, (shiftDeBruijinIndicesInExp shift f (bindingDepth+1)))
        | A.Let (varname, vartype, varval, varscope) =>
          A.Let(varname,
@@ -168,12 +168,10 @@ fun substTypeInExp' srcType dstExp bindingDepth =
        | A.PlusLeft (t, e) => A.PlusLeft (t, substTypeInExp' srcType e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, substTypeInExp' srcType e bindingDepth)
        | A.PlusNth (i, t, e) => A.PlusNth (i, t, substTypeInExp' srcType e bindingDepth)
-       | A.Case(c, lname, l, rname, r) =>
+       | A.Case(c, names, exps) =>
             A.Case(substTypeInExp' srcType c bindingDepth,
-                   lname,
-                   substTypeInExp' srcType l bindingDepth,
-                   rname,
-                   substTypeInExp' srcType r bindingDepth)
+                   names,
+                   List.map (fn e => substTypeInExp' srcType e bindingDepth) exps)
        | A.Fn (argName, argType, funcBody) =>
             A.Fn(argName, (substType' srcType argType bindingDepth),
                 substTypeInExp' srcType funcBody bindingDepth)
@@ -299,12 +297,10 @@ fun setDeBruijnIndex e varnames typnames =
          A.Fix(name,
                setDeBruijnIndexInType t varnames typnames,
                setDeBruijnIndex e (name::varnames) typnames)
-       | A.Case (c, lname, l, rname, r) => A.Case(
+       | A.Case (c, names, exps) => A.Case(
             setDeBruijnIndex c varnames typnames,
-            lname,
-            setDeBruijnIndex l (lname::varnames) typnames,
-            rname,
-            setDeBruijnIndex r (rname::varnames) typnames)
+            names,
+            List.mapi (fn (i, e) => setDeBruijnIndex e ((List.nth (names, i))::varnames) typnames) exps)
        | A.Use (pkg, clientName, typeName, client) => A.Use (
             setDeBruijnIndex pkg varnames typnames,
             clientName,
@@ -450,16 +446,16 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         else
             A.Plus types
     end
-  | typeof' ctx typCtx (A.Case (c, lname, l, rname, r)) =
-    let val A.Plus[lt, rt] = typeof' ctx typCtx c
-        (* both bind a term var *)
-        val typeofLeftBranch = typeof' (lt::ctx) typCtx l
-        val typeofRightBranch= typeof' (rt::ctx) typCtx r
+  | typeof' ctx typCtx (A.Case (c, names, exps)) =
+    let
+        val A.Plus types = typeof' ctx typCtx c
+        val typeofFirstBranch = typeof' ((* binds exp var *) List.nth(types, 0)::ctx) typCtx (List.nth (exps, 0))
+        val typesExps = List.mapi (fn (i, _) => (List.nth (types, i), List.nth(exps, i))) types;
     in
-        if not (typeEq (typeofLeftBranch) (typeofRightBranch)) then
+        if not (List.all (fn (t, e) => (typeEq typeofFirstBranch (typeof' (t::ctx) typCtx e))) typesExps) then
             raise IllTypedMsg "Case statement branches types do not agree"
         else
-            typeofLeftBranch
+            typeofFirstBranch
     end
   | typeof' ctx typCtx (A.Fn (argName, argType, funcBody)) =
     if not (istype typCtx argType) then raise IllTypedMsg "Function arg type is not a type."
@@ -575,10 +571,9 @@ fun subst' src dst bindingDepth =
        | A.PlusLeft (t, e) => A.PlusLeft (t, subst' src e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, subst' src e bindingDepth)
        | A.PlusNth (i, t, e) => A.PlusNth (i, t, subst' src e bindingDepth)
-       | A.Case(c, lname, l, rname, r) =>
+       | A.Case(c, names, exps) =>
             A.Case(subst' src c bindingDepth,
-                   lname, subst' src l (bindingDepth+1),
-                   rname, subst' src r (bindingDepth+1))
+                   names, List.map (fn e => subst' src e (bindingDepth+1)) exps)
        | A.Fn (argName, t, f) => A.Fn(argName, t, (subst' src f (bindingDepth+1)))
        | A.Let (varname, vartype, varval, varscope) =>
             A.Let(varname,
@@ -688,14 +683,13 @@ fun step e =
         (print "plusnth";
             if not (isval e') then A.PlusNth(i, t, step e')
             else e)
-      | A.Case (c, lname, l, rname, r) =>
-        if not (isval c) then A.Case(step c, lname, l, rname, r)
+      | A.Case (c, names, exps) =>
+        if not (isval c) then A.Case(step c, names, exps)
         else (
             case c of
-                 A.PlusLeft(_, e) => subst e l
-               | A.PlusRight(_, e) => subst e r
-               (* UNDONE n-nary case *)
-               | A.PlusNth(i, _, e) => subst e (if i = 0 then l else r)
+                 A.PlusLeft(_, e) => subst e (List.nth (exps, 0))
+               | A.PlusRight(_, e) => subst e (List.nth (exps, 1))
+               | A.PlusNth(i, _, e) => subst e (List.nth (exps, i))
                | _ => raise IllTyped
         )
       | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')
@@ -808,7 +802,7 @@ val Plus [Unit,Prod ([Nat,TyRec ("natlist",Plus [Unit,Prod [Nat,TypVar ("natlist
 val PlusLeft
     (Plus [Unit,Prod ([Nat,TyRec ("natlist",Plus [Unit,Prod [Nat,TypVar ("natlist", 0)]])])],TmUnit) : exp = eval (Unfold(nilNatList));
 
-val isnil = Fn("x", natlist, Case(Unfold(Var ("x", 0)), "l", Succ Zero, "r", Zero));
+val isnil = Fn("x", natlist, Case(Unfold(Var ("x", 0)), ["l", "r"], [Succ Zero, Zero]));
 val Nat = typeof' [] [] (App(isnil, nilNatList));
 (* isnil nilNatList == 1. *)
 val Succ Zero = eval (App(isnil, nilNatList));
@@ -828,8 +822,8 @@ val natQueueType = Prod [
 
 val Plus[Nat, Nat] = typeof' [] [] (PlusLeft (Plus[Nat, Nat], Zero));
 val Plus[Nat, Prod[Nat, Nat]] = typeof' [] [] (PlusLeft (Plus[Nat, Prod([Nat, Nat])], Zero));
-val Zero = step (Case(PlusLeft (Plus[Nat, Nat], Zero), "l", Var ("l", 0), "r", Succ(Var ("r", 0))));
-val (Succ Zero) = step (Case(PlusRight (Plus[Nat, Nat], Zero), "l", Var ("l", 0), "r", Succ(Var ("r", 0))));
+val Zero = step (Case(PlusLeft (Plus[Nat, Nat], Zero), ["l", "r"], [Var ("l", 0), Succ(Var ("r", 0))]));
+val (Succ Zero) = step (Case(PlusRight (Plus[Nat, Nat], Zero), ["l", "r"], [Var ("l", 0), Succ(Var ("r", 0))]));
 
 (* Seems there are multiple valid typings of this expression. Up *)
 (* front, I thought Some(Arr(TypVar ("t", 0), Nat)) is the only correct typing, *)
@@ -1156,11 +1150,11 @@ val Fn ("pkg", Some ("t'",TypVar ("t'", 0)),Var ("pkg",0)) : Ast.exp =
 val Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)],Var ("natOrFunc",0)) : Ast.exp =
     parse "\\ natOrFunc : (nat | nat -> nat) -> natOrFunc"
 
-val Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)],Case (Var ("natOrFunc", 0),"l", Zero,"r", Succ Zero)) : exp =
+val Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)],Case (Var ("natOrFunc", 0),["l", "r"], [Zero, Succ Zero])) : exp =
     run "\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z"
 
 val App
-    (Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)], Case (Var ("natOrFunc",0),"l", Zero,"r", Succ Zero)),
+    (Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)], Case (Var ("natOrFunc",0),["l", "r"], [Zero, Succ Zero])),
      PlusLeft (Plus [Nat,Arr (Nat,Nat)],Zero)) : Ast.exp =
     parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l -> Z | r -> S Z) (left Z : (nat | nat -> nat)))";
 
@@ -1184,7 +1178,7 @@ val Arr (Plus [Nat,Unit],Arr (Nat,Nat)) : Ast.typ =
 val Fn
     ("x",Plus [Nat,Unit],
      Fn
-       ("y",Nat,Case (Var ("x",1),"somex",Var ("somex",0),"none",Var ("y",1))))
+       ("y",Nat,Case (Var ("x",1),["somex", "none"],[Var ("somex",0),Var ("y",1)])))
   : exp =
     parseFile "/home/evan/thon/examples/option.thon";
 

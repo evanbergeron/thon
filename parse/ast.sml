@@ -44,8 +44,8 @@ sig
       | PlusRight of typ * exp
       | PlusNth of int * typ * exp (* Internal *)
       | Case of exp (* thing being cased on*) *
-                string * exp (* Left binds term var *) *
-                string * exp (* Right binds term var *)
+                string list *
+                exp list (* each exp binds *)
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
@@ -106,8 +106,8 @@ struct
       | PlusRight of typ * exp
       | PlusNth of int * typ * exp (* Internal *)
       | Case of exp (* thing being cased on*) *
-                string * exp (* Left binds term var *) *
-                string * exp (* Right binds term var *)
+                string list *
+                exp list (* each exp binds *)
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
@@ -125,8 +125,8 @@ struct
            | PlusLeft(t, e') => f (PlusLeft(t, expMap f e'))
            | PlusRight(t, e') => f (PlusRight(t, expMap f e'))
            | PlusNth(i, t, e') => f (PlusNth(i, t, expMap f e'))
-           | Case(c, lname, l, rname, r) =>
-             f (Case(expMap f c, lname, expMap f l, rname, expMap f r))
+           | Case(c, names, exps) =>
+             f (Case(expMap f c, names, List.map (expMap f) exps))
            | Fn(argName, t, f') => f (Fn(argName, t, (expMap f f')))
            | Let(varname, vartype, varval, varscope) =>
              f (Let(varname, vartype, (expMap f varval), (expMap f varscope)))

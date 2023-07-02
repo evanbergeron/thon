@@ -102,7 +102,7 @@ exp:
   | UNFOLD exp (A.Unfold(exp))
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
   | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
-  | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, ID1, exp2, ID2, exp3))
+  | CASE exp OF ID SARROW exp PIPE ID SARROW exp (A.Case(exp1, [ID1, ID2], [exp2, exp3]))
   | DATA ID EQ dataSummands IN exp (let val (ids, types) = dataSummands in A.Data(ID1, ids, types, exp) end)
 
 typ:
