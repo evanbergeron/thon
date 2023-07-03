@@ -1,0 +1,3 @@
+data typ = Arr typ in
+data exp = Fn typ in
+Z    

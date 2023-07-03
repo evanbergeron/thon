@@ -8,10 +8,12 @@ structure Thon : sig
                    val isval : A.exp -> bool
                    val step : A.exp -> A.exp
                    val subst : A.exp -> A.exp -> A.exp
+                   val substType : A.typ -> A.typ -> A.typ
                    val run : string -> A.exp
                    val eraseNamesInTyp : A.typ -> A.typ
                    val runFile : string -> A.exp
                    val findParseErrors : string -> unit
+                   val elaborateDatatype : A.exp -> A.exp
                    val elaborateDatatypes : A.exp -> A.exp
                    val shiftDeBruijinIndicesInExp : int -> A.exp -> int -> A.exp
                  end =
@@ -32,6 +34,10 @@ fun get ctx i =
       | SOME (j,v) => v
 
 
+fun printlnType t = (print (A.Print.typToString t); print "\n")
+fun printlnExp t = (print (A.Print.expToString t); print "\n")
+fun println s = (print s; print "\n")
+
 fun istype typeCtx A.Nat = true
   | istype typeCtx A.Unit = true
   | istype typeCtx (A.TypVar (name, i)) = i < (length typeCtx)
@@ -47,8 +53,7 @@ fun substType' src A.Nat bindingDepth = A.Nat
   | substType' src A.Unit bindingDepth = A.Unit
   | substType' src (A.TypVar (name, n)) bindingDepth =
     if n = bindingDepth then src else
-    if n > bindingDepth then A.TypVar (name, n-1) else
-    (A.TypVar (name, n))
+    if n > bindingDepth then A.TypVar(name, n-1) else A.TypVar(name, n)
   | substType' src (A.Arr(t, t')) bindingDepth = A.Arr((substType' src t bindingDepth),
                                                        (substType' src t' bindingDepth))
   | substType' src (A.Prod types) bindingDepth = A.Prod(List.map (fn t => substType' src t bindingDepth) types)
@@ -62,7 +67,6 @@ fun substType' src A.Nat bindingDepth = A.Nat
 
 
 fun substType src dst = substType' src dst 0
-
 
 (* Turns search to A.Var bindingDepth
  *
@@ -152,7 +156,7 @@ fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
        | A.Tuple exps => A.Tuple (List.map (fn e => shiftDeBruijinIndicesInExp shift e bindingDepth) exps)
        | A.Fold(t, e') => A.Fold(t, (shiftDeBruijinIndicesInExp shift e' (bindingDepth))) (* binds a typ var *)
        | A.Unfold(e') => A.Unfold(shiftDeBruijinIndicesInExp shift e' (bindingDepth))
-
+       | A.Data(dname, names, types, e') => A.Data(dname, names, types, shiftDeBruijinIndicesInExp shift e' (bindingDepth+1+(List.length names)))
 
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
@@ -351,7 +355,7 @@ fun elaborateDatatype e =
                 let val name = "summand" ^ Int.toString i
                 in
                 A.Fn(name,
-                     substType withType t,
+                     substType withType t, (* getting typ, 0 instead of typ,1 here *)
                      A.Fold(withType,
                             (* UNDONE is DeBruijin index 0 ok here?
                              * Do we need to be incrementing a bindingDepth somewhere else?
@@ -441,9 +445,13 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     end
   | typeof' ctx typCtx (A.PlusNth (i, t, e)) =
     let val A.Plus types = t in
-        if not (typeEq (List.nth (types, i)) (typeof' ctx typCtx e)) then
-            raise IllTypedMsg "Sum type annotation does not match deduced type"
-        else
+        if not (typeEq (List.nth (types, i)) (typeof' ctx typCtx e)) then (
+            print "Sum type annotation:\n";
+            printlnType (List.nth (types, i));
+            print "does not match deduced type:\n";
+            printlnType ((typeof' ctx typCtx e));
+            raise IllTyped
+        ) else
             A.Plus types
     end
   | typeof' ctx typCtx (A.Case (c, names, exps)) =
@@ -500,7 +508,10 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         substType appType t
     end
   | typeof' ctx typCtx (A.Impl (reprType, pkgImpl, pkgType)) =
-    if not (istype [] reprType) then raise IllTyped else
+    if not (istype typCtx reprType) then (
+        print ("Package implementation representation type:\n" ^ A.Print.typToString(reprType) ^ "\nis not a type.\n");
+        raise IllTyped
+    ) else
     (* pkgType : [reprType/A.TypVar 0](t') *)
     let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
         val A.Some(name, pkgType') = pkgType
@@ -522,11 +533,17 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     end
   | typeof' ctx typCtx (A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *))) =
     let val deduced = typeof' ctx (NONE::typCtx) e'
-        val absDeduced = A.TyRec(name, abstractOutType name (A.TyRec(name, t)) (deduced))
-        val absT = abstractOutType name (A.TyRec(name, t)) (A.TyRec(name, t))
+        val finalType = A.TyRec(name, t)
+        val absDeduced = A.TyRec(name, abstractOutType name finalType deduced)
     in
-        if not (typeEq absDeduced (A.TyRec(name, t))) then raise IllTyped
-        else A.TyRec(name, t)
+        if not (typeEq absDeduced finalType) then (
+            print "Recursive type deduced type:\n";
+            print (A.Print.typToString absDeduced);
+            print "\nis not type-equal to declared type:\n";
+            printlnType (A.TyRec(name, t));
+            raise IllTyped
+         ) else
+            finalType
     end
   | typeof' ctx typCtx (A.Fold(_ , e'(* binds a typ var *))) =
     raise IllTypedMsg "Fold type argument must be a recursive type"
@@ -1306,6 +1323,31 @@ val
   : exp = parseFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
 
 val Zero = runFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
+
+val simpleNestedDatatypes =
+  Data
+    ("typ",["Arr"],[TypVar ("typ",0)],
+     Data ("exp",["Fn"],[TypVar ("typ",1)],Zero));
+
+val elaborated = elaborateDatatypes simpleNestedDatatypes;
+
+val Nat = substType Nat (TypVar ("typ",0));
+val Nat = substType' Nat (TypVar ("typ",1)) 1;
+val Zero = subst Zero (Var("x", 0));
+
+(* WRONG WE SHOULD NOT CHANGE THE DBI
+ * Only decr dbi if we have actually subst'd something
+ *)
+val TypVar("typ", 0) = substType Nat (TypVar ("typ",1));
+(* WRONG WE SHOULD NOT CHANGE THE DBI
+ * We are substituting for depth 1.
+ * There is not a depth 1 variable in the dst expression.
+ *)
+val TypVar("typ", 1) = substType' Nat (TypVar ("typ",2)) 1;
+(* WRONG *)
+val Var("x", 0) = subst Zero (Var("x", 1));
+(* WRONG *)
+val Var("x", 1) = subst' Zero (Var("x", 2)) 1;
 
 in
 ()

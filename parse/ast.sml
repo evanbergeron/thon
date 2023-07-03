@@ -91,7 +91,7 @@ struct
       | TypApp of typ * exp
       | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
       | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
-      | Data of string *
+      | Data of string * (* binds type variable *)
                 string list *
                 typ list *
                 exp (*TODO non-binary datatypes*)
@@ -163,10 +163,6 @@ struct
 
   structure Print =
   struct
-    fun expToString e =
-        case e of
-            Zero => "Z"
-          | Succ e => "S (" ^ (expToString e) ^ ")"
 
     fun typToString Nat = "Nat"
       | typToString (TypVar(s, i)) = "TypVar(" ^ s ^ "," ^ Int.toString(i) ^ ")"
@@ -174,10 +170,38 @@ struct
       | typToString (Arr(t, t')) = "Arr(" ^ typToString(t) ^ "," ^ typToString(t') ^ ")"
       | typToString (All(s, t)) = "All(" ^ s ^ "," ^ typToString(t) ^ ")"
       | typToString (Some(s, t)) = "Some(" ^ s ^ "," ^ typToString(t) ^ ")"
-      | typToString (Prod types) = "Prod[" ^ (String.concatWith "," (List.map typToString types))
-      | typToString (Plus types) = "Plus[" ^ (String.concatWith "," (List.map typToString types))
+      | typToString (Prod types) = "Prod[" ^ (String.concatWith "," (List.map typToString types)) ^ "]"
+      | typToString (Plus types) = "Plus[" ^ (String.concatWith "," (List.map typToString types)) ^ "]"
       | typToString (TyRec(s, t)) = "TyRec(" ^ s ^ "," ^ typToString(t) ^ ")"
       | typToString Unit = "Unit"
+
+
+    fun expToString Zero = "Z"
+      | expToString TmUnit = "unit"
+      | expToString (Var (name, n))  = "Var(" ^ name ^ "," ^ (Int.toString n) ^ ")"
+      | expToString (Succ e') = "Succ(" ^ (expToString e') ^ ")"
+      | expToString (ProdLeft e') = "ProdLeft(" ^ (expToString e') ^ ")"
+      | expToString (ProdRight e') = "ProdRight(" ^ (expToString e') ^ ")"
+      | expToString (ProdNth(i, e')) = "ProdNth(" ^ (Int.toString i) ^ "," ^ (expToString e') ^ ")"
+      | expToString (PlusLeft(t, e')) = "PlusLeft(" ^ (typToString t) ^ (expToString e') ^ ")"
+      | expToString (PlusRight(t, e')) = "PlusRight(" ^ (typToString t) ^ (expToString e') ^ ")"
+      | expToString (PlusNth(i, t, e')) = "PlusNth(" ^ (Int.toString i) ^ "," ^ (typToString t) ^ (expToString e') ^ ")"
+      | expToString (Case(c, names, exps)) = "TODO"
+      | expToString (Fn(argName, t, f')) = "TODO"
+      | expToString (Let(varname, vartype, varval, varscope)) = "TODO"
+      | expToString (App(f', n)) =  "TODO"
+      | expToString (Ifz(i, t, prev, e)) =  "TODO"
+      | expToString (Rec(i, baseCase, prevCaseName, recCase)) = "TODO"
+      | expToString (Fix(name, t, e')) =  "TODO"
+      | expToString (TypFn (name, e')) = "TODO"
+      | expToString (TypApp (appType, e')) = "TODO"
+      | expToString (Impl(reprType, pkgImpl, t)) = "TODO"
+      | expToString (Use(pkg, clientName, typeName, client)) = "TODO"
+      | expToString (Pair(l, r)) = "TODO"
+      | expToString (Tuple exps) = "TODO"
+      | expToString (Fold(t, e')) = "TODO"
+      | expToString (Unfold(e')) = "TODO"
+      | expToString (Data(dataname, names, types, exp)) = "TODO"
 
   end
 

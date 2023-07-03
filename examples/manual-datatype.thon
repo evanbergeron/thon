@@ -8,7 +8,7 @@
  *     a type together with operations to create and analyze values of
  *     the type. ... The underlying implementation type is defined to
  *     be a recursive sum type, with one summand corresponding to each
- *     constructor in the declaration. The constructores are
+ *     constructor in the declaration. The constructors are
  *     represented by total functions that inject values into the
  *     appropriate summand of the recursive type. ... The structure is
  *     sealed with a signature derived from the datatype declaration 

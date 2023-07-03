@@ -1,0 +1,4 @@
+data typ = Nat unit | Arr typ * typ in
+data exp = Zero unit | Var nat | Succ exp | Fn typ * exp (* | App exp * exp *) in
+Z
+
