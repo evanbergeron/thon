@@ -15,77 +15,77 @@ in let lt : nat -> nat -> nat =
   ifz (sub y x) of
     Z -> Z
   | S p -> S Z
-in let nil : u node. (unit | (nat * (node * node))) =
-  fold u node. (unit | (nat * (node * node)))
+in let nil : u node. (unit || (nat * (node * node))) =
+  fold u node. (unit || (nat * (node * node)))
   with left unit : (unit
-                 | (nat * ((u node. (unit | (nat * (node * node)))) *
-                           (u node. (unit | (nat * (node * node)))))))
+                 || (nat * ((u node. (unit || (nat * (node * node)))) *
+                           (u node. (unit || (nat * (node * node)))))))
 in fun insert : nat
-                -> (u node. (unit | (nat * (node * node))))
-                -> (u node. (unit | (nat * (node * node)))) =
+                -> (u node. (unit || (nat * (node * node))))
+                -> (u node. (unit || (nat * (node * node)))) =
     \ n : nat ->
-    \ bst : (u node. (unit | (nat * (node * node)))) ->
+    \ bst : (u node. (unit || (nat * (node * node)))) ->
     case (unfold bst) of
         empty => (
-            fold u node. (unit | (nat * (node * node)))
+            fold u node. (unit || (nat * (node * node)))
             with right
             (n, (* put the number in the tree *)
                 (
                     (*nil node*)
-                    fold u node. (unit | (nat * (node * node)))
+                    fold u node. (unit || (nat * (node * node)))
                     with left unit : (
                         unit
-                    | (nat * ((u node. (unit | (nat * (node * node)))) *
-                                (u node. (unit | (nat * (node * node))))
+                    || (nat * ((u node. (unit || (nat * (node * node)))) *
+                                (u node. (unit || (nat * (node * node))))
                             )
                         )
                     )
                     ,
                     (*nil node*)
-                    fold u node. (unit | (nat * (node * node)))
+                    fold u node. (unit || (nat * (node * node)))
                     with left unit : (
                         unit
-                    | (nat * ((u node. (unit | (nat * (node * node)))) *
-                                (u node. (unit | (nat * (node * node))))
+                    || (nat * ((u node. (unit || (nat * (node * node)))) *
+                                (u node. (unit || (nat * (node * node))))
                             )
                         )
                     )
                 )
             ) : (
                 unit
-            | (nat * ((u node. (unit | (nat * (node * node)))) *
-                        (u node. (unit | (nat * (node * node))))
+            || (nat * ((u node. (unit || (nat * (node * node)))) *
+                        (u node. (unit || (nat * (node * node))))
                     )
                 )
             )
         )
     | natAndNodeAndNode => (
         let thisNode : nat = fst natAndNodeAndNode in
-        let leftNode : (u node. (unit | (nat * (node * node)))) = fst (snd natAndNodeAndNode) in
-        let rightNode : (u node. (unit | (nat * (node * node)))) = snd (snd natAndNodeAndNode) in
+        let leftNode : (u node. (unit || (nat * (node * node)))) = fst (snd natAndNodeAndNode) in
+        let rightNode : (u node. (unit || (nat * (node * node)))) = snd (snd natAndNodeAndNode) in
         ifz (lt n thisNode) of
             Z -> (
-                fold u node. (unit | (nat * (node * node)))
+                fold u node. (unit || (nat * (node * node)))
                 with right (thisNode,
                 (
                     (* recurse insert right *)
                     leftNode, insert n rightNode
                 )) : (unit
-                | (nat * ((u node. (unit | (nat * (node * node)))) *
-                            (u node. (unit | (nat * (node * node))))
+                || (nat * ((u node. (unit || (nat * (node * node)))) *
+                            (u node. (unit || (nat * (node * node))))
                         )
                     )
                 )
             )
         | S p -> (
-                fold u node. (unit | (nat * (node * node)))
+                fold u node. (unit || (nat * (node * node)))
                 with right (thisNode,
                 (
                     (* recurse insert left *)
                     insert n leftNode, rightNode
                 )) : (unit
-                | (nat * ((u node. (unit | (nat * (node * node)))) *
-                            (u node. (unit | (nat * (node * node))))
+                || (nat * ((u node. (unit || (nat * (node * node)))) *
+                            (u node. (unit || (nat * (node * node))))
                         )
                     )
                 )

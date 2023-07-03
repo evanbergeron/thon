@@ -1,19 +1,19 @@
-let isnonempty : (u nats. (unit |  (nat * nats))) -> nat =
-    \ natlist : (u nats. (unit |  (nat * nats))) ->
+let isnonempty : (u nats. (unit || (nat * nats))) -> nat =
+    \ natlist : (u nats. (unit || (nat * nats))) ->
         (case (unfold natlist) of
            empty => Z
          | hdAndTl => S Z end)
-in let nil : (u nats. (unit |  (nat * nats))) =
-    fold u nats . (unit | (nat * nats))
-    with left unit : (unit |  (nat * (u nats . (unit | (nat * nats)))))
+in let nil : (u nats. (unit ||  (nat * nats))) =
+    fold u nats . (unit || (nat * nats))
+    with left unit : (unit ||  (nat * (u nats . (unit || (nat * nats)))))
 in let cons :
-       (nat * (u nats. (unit |  (nat * nats)))) ->
-       (u nats. (unit |  (nat * nats))) =
-    \ natAndNatList : (nat * (u nats . (unit |  (nat * nats)))) ->
-    fold u nats .(unit |  (nat * nats))
-    with right natAndNatList : (unit | (nat * (u nats. (unit |  (nat * nats)))))
-in let len : (u nats. (unit |  (nat * nats))) -> nat =
-    \ natlist : (u nats. (unit |  (nat * nats))) ->
+       (nat * (u nats. (unit ||  (nat * nats)))) ->
+       (u nats. (unit ||  (nat * nats))) =
+    \ natAndNatList : (nat * (u nats . (unit ||  (nat * nats)))) ->
+    fold u nats .(unit ||  (nat * nats))
+    with right natAndNatList : (unit || (nat * (u nats. (unit ||  (nat * nats)))))
+in let len : (u nats. (unit ||  (nat * nats))) -> nat =
+    \ natlist : (u nats. (unit ||  (nat * nats))) ->
     rec (isnonempty natlist) of
         Z -> Z
       | p -> S p

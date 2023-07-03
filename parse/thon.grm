@@ -11,6 +11,7 @@ structure A = Ast
  | SUCC
  | LPAREN | RPAREN
  | PIPE
+ | DPIPE
  | LAM
  | SARROW
  | DARROW
@@ -55,7 +56,7 @@ structure A = Ast
    exp of A.exp
  | typ of A.typ
  | starTyps of A.typ list
- | pipeTyps of A.typ list
+ | dpipeTyps of A.typ list
  | dataSummands of (string list) * (A.typ list)
  | caseBranches of (string list) * (A.exp list)
  | program of A.exp
@@ -72,7 +73,7 @@ structure A = Ast
 
 (* The precedence grows down *)
 %nonassoc TYPEOR (* Deliberately first *)
-%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX FUN DATA DARROW END
+%nonassoc EOF ZERO SUCC LPAREN RPAREN LAM COLON NAT IDX ID REC PIPE DPIPE POLY COMMA STAR LEFT RIGHT FST SND ALL SOME TYPEREC DOT UNIT FOLD UNFOLD WITH AS USE IN CASE OF IMPL LET EQ IFZ FIX FUN DATA DARROW END
 %right SARROW
 %nonassoc APP GO (* Deliberately last *)
 
@@ -119,14 +120,14 @@ typ:
   | SOME ID DOT typ (A.Some (ID, typ))
   | TYPEREC ID DOT typ (A.TyRec (ID, typ))
   (* TODO should this take precedence below star and arrow? *)
-  | typ PIPE pipeTyps %prec TYPEOR (A.Plus (typ::pipeTyps))
+  | typ DPIPE dpipeTyps %prec TYPEOR (A.Plus (typ::dpipeTyps))
 
 starTyps:
     typ STAR starTyps (typ::starTyps)
   | typ ([typ])
 
-pipeTyps:
-    typ PIPE pipeTyps (typ::pipeTyps)
+dpipeTyps:
+    typ DPIPE dpipeTyps (typ::dpipeTyps)
   | typ ([typ])
 
 dataSummands:

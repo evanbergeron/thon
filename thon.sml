@@ -742,13 +742,13 @@ open A;
 (* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : typ = TyRec("natlist",Plus[Unit, Prod [Nat, TypVar ("natlist", 0)]]);
 val Fn ("natlist", TyRec ("l",Plus [Unit,Prod [Nat,TypVar ("l", 0)]]),Var ("natlist",0)) =
-    parse "\\ natlist : (u l. (unit |  (nat * l))) -> natlist";
+    parse "\\ natlist : (u l. (unit ||  (nat * l))) -> natlist";
 
 (* id function on natlists *)
 val TypApp
     (TyRec ("natlist",Plus [Unit,Prod ([Nat,TypVar ("natlist",0)])]),
      TypFn ("s",Fn ("x",TypVar ("s",0),Var ("x",0)))) : Ast.exp =
-    parse "((poly s -> \\ x : s -> x) (u natlist. (unit | (nat * natlist))))";
+    parse "((poly s -> \\ x : s -> x) (u natlist. (unit || (nat * natlist))))";
 val nilNatList =
     Fold(natlist, PlusLeft(Plus[Unit, Prod([Nat, natlist])], TmUnit));
 
@@ -848,7 +848,7 @@ val Impl
      Fn
        ("l",TyRec ("natlist",Plus [Unit,Prod ([Nat,TypVar ("natlist",0)])]),
         Zero),Some ("s",Arr (TypVar ("s",0),TypVar ("s",0)))) : exp =
-    parse "impl (some s. s -> s) with (u natlist. (unit |  (nat * natlist))) as \\ l : (u natlist. (unit |  (nat * natlist))) -> Z";
+    parse "impl (some s. s -> s) with (u natlist. (unit || (nat * natlist))) as \\ l : (u natlist. (unit || (nat * natlist))) -> Z";
 
 val Use (Impl (Nat,Fn ("x",Nat,Zero),Some ("t'",Arr (TypVar ("t'",0),TypVar ("t'",0)))),
          "pkg","s", Var ("pkg",0)) : exp =
@@ -1148,24 +1148,24 @@ val Fn ("pkg", Some ("t'",TypVar ("t'", 0)),Var ("pkg",0)) : Ast.exp =
     parse "\\ pkg : (some t'. t') -> pkg"
 
 val Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)],Var ("natOrFunc",0)) : Ast.exp =
-    parse "\\ natOrFunc : (nat | nat -> nat) -> natOrFunc"
+    parse "\\ natOrFunc : (nat || nat -> nat) -> natOrFunc"
 
 val Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)],Case (Var ("natOrFunc", 0),["l", "r"], [Zero, Succ Zero])) : exp =
-    run "\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end"
+    run "\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end"
 
 val App
     (Fn ("natOrFunc", Plus [Nat,Arr (Nat,Nat)], Case (Var ("natOrFunc",0),["l", "r"], [Zero, Succ Zero])),
      PlusLeft (Plus [Nat,Arr (Nat,Nat)],Zero)) : Ast.exp =
-    parse "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat | nat -> nat)))";
+    parse "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat || nat -> nat)))";
 
 val Zero : exp =
-    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat | nat -> nat)))";
+    run "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat || nat -> nat)))";
 
 val Succ Zero: exp =
-    run "((\\ natOrFunc : (nat | nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (right (\\ x : nat -> Z) : (nat | nat -> nat)))";
+    run "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (right (\\ x : nat -> Z) : (nat || nat -> nat)))";
 
 val Fn ("natOrFuncOrProd", Plus [Nat,Plus [Arr (Nat,Nat),Prod ([Nat,Nat])]], Var ("natOrFuncOrProd",0)) : Ast.exp =
-    parse "\\ natOrFuncOrProd : (nat | ((nat -> nat) | (nat * nat))) -> natOrFuncOrProd"
+    parse "\\ natOrFuncOrProd : (nat || ((nat -> nat) || (nat * nat))) -> natOrFuncOrProd"
 
 val Some ("t",Prod ([TypVar ("t", 0),Prod ([Arr (Prod [Nat,TypVar ("t", 0)],TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)])])) : typ =
     typeof (parseFile "/home/evan/thon/examples/natlist.thon");
@@ -1285,6 +1285,27 @@ val
        Fn ("x",Nat,Var ("x",0)),
        TypFn ("t",Fn ("x",TypVar ("t",0),Var ("x",0)))] : exp =
 step (A.Tuple [polymorphicIdFn, A.TypApp(Nat, polymorphicIdFn), polymorphicIdFn]);
+
+val
+  Data
+    ("tree",["nil","two","cons"],
+     [Unit,Prod [Nat,Prod [Nat,TypVar ("tree",0)]],
+      Prod [Nat,TypVar ("tree",0)]],
+     Let
+       ("isempty",Arr (TypVar ("tree",0),Nat),
+        Fix
+          ("isempty",Arr (TypVar ("tree",0),Nat),
+           Fn
+             ("t",TypVar ("tree",0),
+              Case
+                (App (Var ("exposetree",2),Var ("t",0)),
+                 ["empty","twocase","conscase"],[Succ Zero,Zero,Zero]))),
+        App
+          (Var ("isempty",0),
+           App (Var ("cons",2),Pair (Zero,App (Var ("nil",4),TmUnit))))))
+  : exp = parseFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
+
+val Zero = runFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
 
 in
 ()

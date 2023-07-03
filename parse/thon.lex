@@ -83,6 +83,7 @@ ws = [\ \t];
 <INITIAL> "="      => (Tokens.EQ(!pos,!pos));
 <INITIAL> "("      => (Tokens.LPAREN(!pos,!pos));
 <INITIAL> ")"      => (Tokens.RPAREN(!pos,!pos));
+<INITIAL> "||"     => (Tokens.DPIPE(!pos,!pos));
 <INITIAL> "|"      => (Tokens.PIPE(!pos,!pos));
 <INITIAL> {digit}+ => (Tokens.IDX (valOf (Int.fromString yytext), !pos, !pos));
 <INITIAL> {id}     => (Tokens.ID(yytext, !pos, !pos));

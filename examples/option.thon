@@ -1,4 +1,4 @@
-\ x : ((*some*) nat | (*none*) unit) -> (\ y : nat ->
+\ x : ((*some*) nat || (*none*) unit) -> (\ y : nat ->
 case x of
     somex => somex
   | none => y

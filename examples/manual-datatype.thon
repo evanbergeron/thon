@@ -30,18 +30,18 @@
  *)
 let ListImpl : (some t. ((unit -> t) * (((nat * t) -> t)))) =
     impl (some t. ((unit -> t) * (((nat * t) -> t))))
-    with (u List. (unit |  (nat * List))) as
+    with (u List. (unit ||  (nat * List))) as
     (
         (* Nil *)
         \ foo : unit ->
-            fold u List. (unit | (nat * List))
-            with left foo : (unit |  (nat * (u List . (unit | (nat * List)))))
+            fold u List. (unit || (nat * List))
+            with left foo : (unit ||  (nat * (u List . (unit || (nat * List)))))
         ,
         (* Cons *)
-        \ natAndNatList : (nat * (u List. (unit |  (nat * List)))) ->
-            fold u List.(unit |  (nat * List))
-            with right natAndNatList : (unit
-                                     | (nat * (u List. (unit |  (nat * List)))))
+        \ natAndNatList : (nat * (u List. (unit || (nat * List)))) ->
+            fold u List.(unit || (nat * List))
+            with right natAndNatList :  (unit
+                                     || (nat * (u List. (unit || (nat * List)))))
     )
 in use ListImpl as (li, List) in
 let Nil : unit -> List = fst li in
