@@ -53,6 +53,9 @@ sig
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
 
+    val expShift : int -> int -> exp -> exp
+    val subst : int -> exp -> exp -> exp
+
   structure Print :
   sig
     val expToString : exp -> string
@@ -160,6 +163,75 @@ struct
           | Some (name, t') => f (Some(name, typMap f t'))
           | TyRec (name, t') => f (TyRec(name, typMap f t'))
 
+    (* See page 86 of Types and Programming Languages *)
+    fun expShift cutoff shift dst =
+        let fun walk c exp =
+        case exp of
+            Zero => Zero
+          | TmUnit => TmUnit
+          | Var (name, n)  => if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n)
+          | Succ e2 => Succ (walk c e2)
+          | ProdLeft e => ProdLeft (walk c e)
+          | ProdRight e => ProdRight (walk c e)
+          | ProdNth (i, e) => ProdNth (i, walk c e)
+          | PlusLeft (t, e) => PlusLeft (t, walk c e)
+          | PlusRight (t, e) => PlusRight (t, walk c e)
+          | PlusNth (i, t, e) => PlusNth (i, t, walk c e)
+          | Case(cas, names, exps) =>
+            Case(walk c cas, names, List.map (fn e => walk (c+1) e) exps)
+          | Fn (argName, t, f) => Fn(argName, t, (walk (c+1) f))
+          | Let (varname, vartype, varval, varscope) =>
+            Let(varname, vartype, walk c varval, walk (c+1) varscope)
+          | App (f, n) => App((walk c f), (walk c n))
+          | Ifz (i, t, prev, e) => Ifz(walk c i, walk c t, prev, walk (c+1) e)
+          | Rec (i, baseCase, prevCaseName, recCase) =>
+            Rec(walk c i, walk c baseCase, prevCaseName, walk (c+1) recCase)
+          | Fix (name, t, e) => Fix(name, t, walk (c+1) e)
+          | TypFn (name, e) => TypFn (name, walk c e)
+          | TypApp (appType, e) => TypApp(appType, walk c e)
+          | Impl(reprType, pkgImpl, t) => Impl(reprType, walk c pkgImpl, t)
+          | Use (pkg, clientName, typeName, client) =>
+            Use(walk c pkg, clientName, typeName, walk (c+1) client)
+          | Pair (l, r) => Pair (walk c l, walk c r)
+          | Tuple exps => Tuple (List.map (fn e => walk c e) exps)
+          | Fold(t, e') => Fold(t, (walk c e'))
+          | Unfold(e') => Unfold(walk c e')
+          in walk 0 dst end
+
+    (* See page 86 of Types and Programming Languages *)
+    fun subst j s dst =
+        let fun walk c dst =
+        case dst of
+            Zero => Zero
+          | TmUnit => TmUnit
+          | Var (name, n)  => if n = j+c then expShift 0 c s else Var(name, n)
+          | Succ e2 => Succ (walk c e2)
+          | ProdLeft e => ProdLeft (walk c e)
+          | ProdRight e => ProdRight (walk c e)
+          | ProdNth (i, e) => ProdNth (i, walk c e)
+          | PlusLeft (t, e) => PlusLeft (t, walk c e)
+          | PlusRight (t, e) => PlusRight (t, walk c e)
+          | PlusNth (i, t, e) => PlusNth (i, t, walk c e)
+          | Case(cas, names, exps) =>
+            Case(walk c cas, names, List.map (fn e => walk (c+1) e) exps)
+          | Fn (argName, t, f) => Fn(argName, t, (walk (c+1) f))
+          | Let (varname, vartype, varval, varscope) =>
+            Let(varname, vartype, (walk c varval), (walk (c+1) varscope))
+          | App (f, n) => App((walk c f), (walk c n))
+          | Ifz (i, t, prev, e) => Ifz(walk c i, walk c t, prev, walk (c+1) e)
+          | Rec (i, baseCase, prevCaseName, recCase) =>
+            Rec(walk c i, walk c baseCase, prevCaseName, walk (c+1) recCase)
+          | Fix (name, t, e) => Fix(name, t, walk (c+1) e)
+          | TypFn (name, e) => TypFn (name, walk c e)
+          | TypApp (appType, e) => TypApp(appType, walk c e)
+          | Impl(reprType, pkgImpl, t) => Impl(reprType, walk c pkgImpl, t)
+          | Use (pkg, clientName, typeName, client) =>
+            Use(walk c pkg, clientName, typeName, walk (c+1) client)
+          | Pair (l, r) => Pair (walk c l, walk c r)
+          | Tuple exps => Tuple (List.map (fn e => walk c e) exps)
+          | Fold(t, e') => Fold(t, (walk c e'))
+          | Unfold(e') => Unfold(walk c e')
+          in walk 0 dst end
 
   structure Print =
   struct

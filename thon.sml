@@ -7,7 +7,6 @@ structure Thon : sig
                    val eval : A.exp -> A.exp
                    val isval : A.exp -> bool
                    val step : A.exp -> A.exp
-                   val subst : int -> A.exp -> A.exp -> A.exp
                    val substType : A.typ -> A.typ -> A.typ
                    val run : string -> A.exp
                    val eraseNamesInTyp : A.typ -> A.typ
@@ -15,7 +14,6 @@ structure Thon : sig
                    val findParseErrors : string -> unit
                    val elaborateDatatype : A.exp -> A.exp
                    val elaborateDatatypes : A.exp -> A.exp
-                   val expShift : int -> int -> A.exp -> A.exp
                  end =
 struct
 
@@ -107,53 +105,6 @@ fun decrDeBruijinIndices t =
       | A.All (name, t') => A.All(name, decrDeBruijinIndices t')
       | A.Some (name, t') => A.Some(name, decrDeBruijinIndices t')
       | A.TyRec (name, t') => A.TyRec(name, decrDeBruijinIndices t')
-
-
-(* See page 86 of Types and Programming Languages *)
-fun expShift cutoff shift dst =
-    let fun walk c exp =
-    case exp of
-         A.Zero => A.Zero
-       | A.TmUnit => A.TmUnit
-       | A.Var (name, n)  => if n >= (c+cutoff) then A.Var(name, n+shift) else A.Var(name, n)
-       | A.Succ e2 => A.Succ (walk c e2)
-       | A.ProdLeft e => A.ProdLeft (walk c e)
-       | A.ProdRight e => A.ProdRight (walk c e)
-       | A.ProdNth (i, e) => A.ProdNth (i, walk c e)
-       | A.PlusLeft (t, e) => A.PlusLeft (t, walk c e)
-       | A.PlusRight (t, e) => A.PlusRight (t, walk c e)
-       | A.PlusNth (i, t, e) => A.PlusNth (i, t, walk c e)
-       | A.Case(cas, names, exps) =>
-         A.Case(walk c cas,
-                names,
-                List.map (fn e => walk (c+1) e) exps)
-       | A.Fn (argName, t, f) => A.Fn(argName, t, (walk (c+1) f))
-       | A.Let (varname, vartype, varval, varscope) =>
-         A.Let(varname,
-               vartype,
-               walk c varval,
-               walk (c+1) varscope)
-       | A.App (f, n) => A.App((walk c f), (walk c n))
-       | A.Ifz (i, t, prev, e) => A.Ifz(walk c i,
-                                        walk c t,
-                                        prev,
-                                        walk (c+1) e) (* binds *)
-       | A.Rec (i, baseCase, prevCaseName, recCase) =>
-         A.Rec(walk c i,
-               walk c baseCase,
-               prevCaseName, walk (c+1) recCase)
-       | A.Fix (name, t, e) =>
-         A.Fix(name, t, walk (c+1) e) (* binds *)
-       | A.TypFn (name, e) => A.TypFn (name, walk c e) (* abstracts over types, not exps *)
-       | A.TypApp (appType, e) => A.TypApp(appType, walk c e)
-       | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, walk c pkgImpl, t)
-       | A.Use (pkg, clientName, typeName, client) =>
-         A.Use(walk c pkg, clientName, typeName, walk (c+1) client)
-       | A.Pair (l, r) => A.Pair (walk c l, walk c r)
-       | A.Tuple exps => A.Tuple (List.map (fn e => walk c e) exps)
-       | A.Fold(t, e') => A.Fold(t, (walk c e')) (* binds a typ var *)
-       | A.Unfold(e') => A.Unfold(walk c e')
-       in walk 0 dst end
 
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
@@ -384,7 +335,7 @@ fun elaborateDatatype e =
                                  A.Arr(A.TypVar(dataname, 0), A.Plus types),
                                  A.ProdNth(1, A.Var("li", (List.length types))),
                                  (* This is a bit tricky, worth thinking this over again *)
-                                 expShift shift shift exp);
+                                 A.expShift shift shift exp);
             fun makeDecls i =
                 if i = (List.length types) then innerExp
                 else
@@ -613,41 +564,6 @@ fun containsTargetVar' src dst bindingDepth =
        | A.Fold(t, e') => containsTargetVar' src e' (bindingDepth)
        | A.Unfold(e') => containsTargetVar' src e' (bindingDepth)
 
-(* See page 86 of Types and Programming Languages *)
-fun subst j s dst =
-    let fun walk c dst =
-    case dst of
-         A.Zero => A.Zero
-       | A.TmUnit => A.TmUnit
-       | A.Var (name, n)  => if n = j+c then expShift 0 c s else A.Var(name, n)
-       | A.Succ e2 => A.Succ (walk c e2)
-       | A.ProdLeft e => A.ProdLeft (walk c e)
-       | A.ProdRight e => A.ProdRight (walk c e)
-       | A.ProdNth (i, e) => A.ProdNth (i, walk c e)
-       | A.PlusLeft (t, e) => A.PlusLeft (t, walk c e)
-       | A.PlusRight (t, e) => A.PlusRight (t, walk c e)
-       | A.PlusNth (i, t, e) => A.PlusNth (i, t, walk c e)
-       | A.Case(cas, names, exps) =>
-         A.Case(walk c cas, names, List.map (fn e => walk (c+1) e) exps)
-       | A.Fn (argName, t, f) => A.Fn(argName, t, (walk (c+1) f))
-       | A.Let (varname, vartype, varval, varscope) =>
-         A.Let(varname, vartype, (walk c varval), (walk (c+1) varscope))
-       | A.App (f, n) => A.App((walk c f), (walk c n))
-       | A.Ifz (i, t, prev, e) => A.Ifz(walk c i, walk c t, prev, walk (c+1) e)
-       | A.Rec (i, baseCase, prevCaseName, recCase) =>
-            A.Rec(walk c i, walk c baseCase, prevCaseName, walk (c+1) recCase)
-       | A.Fix (name, t, e) =>
-         A.Fix(name, t, walk (c+1) e) (* binds *)
-       | A.TypFn (name, e) => A.TypFn (name, walk c e) (* abstracts over types, not exps *)
-       | A.TypApp (appType, e) => A.TypApp(appType, walk c e)
-       | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, walk c pkgImpl, t)
-       | A.Use (pkg, clientName, typeName, client) =>
-         A.Use(walk c pkg, clientName, typeName, walk (c+1) client)
-       | A.Pair (l, r) => A.Pair (walk c l, walk c r)
-       | A.Tuple exps => A.Tuple (List.map (fn e => walk c e) exps)
-       | A.Fold(t, e') => A.Fold(t, (walk c e')) (* binds a typ var *)
-       | A.Unfold(e') => A.Unfold(walk c e')
-     in walk 0 dst end
 
 fun step e =
     let val _ = typeof' [] [] e in
@@ -674,27 +590,27 @@ fun step e =
                            else let val A.Fn(argName, t, f') = f
                            in
                                (* plug `n` into `f'` *)
-                               subst 0 n f'
+                               A.subst 0 n f'
                            end
                           )
       | A.Ifz(i, t, prev, e) =>
             if not (isval i) then A.Ifz(step i, t, prev, e)
             else (case i of
                       A.Zero => t
-                    | A.Succ i' => subst 0 i' e
+                    | A.Succ i' => A.subst 0 i' e
                     | _ => raise IllTypedMsg "ifz conditional must be an integer")
       (* BUG? should this eval varval before subst? should it eval varscope before subst? *)
-      | A.Let (varname, vartype, varval, varscope) => subst 0 varval varscope
+      | A.Let (varname, vartype, varval, varscope) => A.subst 0 varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
       | A.Rec (A.Succ(i), baseCase, prevCaseName, recCase) =>
             (* Doesn't evaluate recursive call if not required. *)
-            subst 0 (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
+            A.subst 0 (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
       | A.Rec (i, baseCase, prevCaseName, recCase) =>
             if not (isval i) then
                 A.Rec(step i, baseCase, prevCaseName, recCase)
             else raise No
-      | A.Fix(name, t, body) => subst 0 e body
+      | A.Fix(name, t, body) => A.subst 0 e body
       | A.TypFn (name, e') => raise No (* Already isval *)
       | A.TypApp (t, e') =>
             if not (isval e') then (A.TypApp (t, step e'))
@@ -711,7 +627,7 @@ fun step e =
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 A.Impl(reprType', pkgImpl', _) =>
-                    subst 0 pkgImpl' (substTypeInExp reprType' client)
+                    A.subst 0 pkgImpl' (substTypeInExp reprType' client)
               | _ => raise No
            )
       | A.PlusLeft (t, e') =>
@@ -728,9 +644,9 @@ fun step e =
         if not (isval c) then A.Case(step c, names, exps)
         else (
             case c of
-                 A.PlusLeft(_, e) => subst 0 e (List.nth (exps, 0))
-               | A.PlusRight(_, e) => subst 0 e (List.nth (exps, 1))
-               | A.PlusNth(i, _, e) => subst 0 e (List.nth (exps, i))
+                 A.PlusLeft(_, e) => A.subst 0 e (List.nth (exps, 0))
+               | A.PlusRight(_, e) => A.subst 0 e (List.nth (exps, 1))
+               | A.PlusNth(i, _, e) => A.subst 0 e (List.nth (exps, i))
                | _ => raise IllTyped
         )
       | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')

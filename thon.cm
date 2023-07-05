@@ -12,5 +12,4 @@ Group is
   parse/thon.grm
   parse/thon.lex
   parse/parse.sml
-  elaborate.sml
   thon.sml
