@@ -7,7 +7,7 @@ structure Thon : sig
                    val eval : A.exp -> A.exp
                    val isval : A.exp -> bool
                    val step : A.exp -> A.exp
-                   val subst : A.exp -> A.exp -> A.exp
+                   val subst : int -> A.exp -> A.exp -> A.exp
                    val substType : A.typ -> A.typ -> A.typ
                    val run : string -> A.exp
                    val eraseNamesInTyp : A.typ -> A.typ
@@ -15,7 +15,7 @@ structure Thon : sig
                    val findParseErrors : string -> unit
                    val elaborateDatatype : A.exp -> A.exp
                    val elaborateDatatypes : A.exp -> A.exp
-                   val shiftDeBruijinIndicesInExp : int -> A.exp -> int -> A.exp
+                   val expShift : int -> int -> A.exp -> A.exp
                  end =
 struct
 
@@ -52,8 +52,8 @@ fun istype typeCtx A.Nat = true
 fun substType' src A.Nat bindingDepth = A.Nat
   | substType' src A.Unit bindingDepth = A.Unit
   | substType' src (A.TypVar (name, n)) bindingDepth =
-    if n = bindingDepth then src else
-    if n > bindingDepth then A.TypVar(name, n-1) else A.TypVar(name, n)
+    if n = bindingDepth then src else A.TypVar(name, n)
+    (* if n > bindingDepth then A.TypVar(name, n-1) else A.TypVar(name, n) *)
   | substType' src (A.Arr(t, t')) bindingDepth = A.Arr((substType' src t bindingDepth),
                                                        (substType' src t' bindingDepth))
   | substType' src (A.Prod types) bindingDepth = A.Prod(List.map (fn t => substType' src t bindingDepth) types)
@@ -109,54 +109,51 @@ fun decrDeBruijinIndices t =
       | A.TyRec (name, t') => A.TyRec(name, decrDeBruijinIndices t')
 
 
-fun shiftDeBruijinIndicesInExp shift dst bindingDepth =
-    case dst
-     of  A.Zero => A.Zero
+(* See page 86 of Types and Programming Languages *)
+fun expShift cutoff shift dst =
+    let fun walk c exp =
+    case exp of
+         A.Zero => A.Zero
        | A.TmUnit => A.TmUnit
-       | A.Var (name, n)  => if n >= bindingDepth then A.Var(name, n+shift) else
-                             A.Var(name, n)
-       | A.Succ e2 => A.Succ (shiftDeBruijinIndicesInExp shift e2 bindingDepth)
-       | A.ProdLeft e => A.ProdLeft (shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.ProdRight e => A.ProdRight (shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.ProdNth (i, e) => A.ProdNth (i, shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.PlusLeft (t, e) => A.PlusLeft (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.PlusRight (t, e) => A.PlusRight (t, shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.PlusNth (i, t, e) => A.PlusNth (i, t, shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.Case(c, names, exps) =>
-         A.Case(shiftDeBruijinIndicesInExp shift c bindingDepth,
+       | A.Var (name, n)  => if n >= (c+cutoff) then A.Var(name, n+shift) else A.Var(name, n)
+       | A.Succ e2 => A.Succ (walk c e2)
+       | A.ProdLeft e => A.ProdLeft (walk c e)
+       | A.ProdRight e => A.ProdRight (walk c e)
+       | A.ProdNth (i, e) => A.ProdNth (i, walk c e)
+       | A.PlusLeft (t, e) => A.PlusLeft (t, walk c e)
+       | A.PlusRight (t, e) => A.PlusRight (t, walk c e)
+       | A.PlusNth (i, t, e) => A.PlusNth (i, t, walk c e)
+       | A.Case(cas, names, exps) =>
+         A.Case(walk c cas,
                 names,
-                List.map (fn e => shiftDeBruijinIndicesInExp shift e (bindingDepth+1)) exps)
-       | A.Fn (argName, t, f) => A.Fn(argName, t, (shiftDeBruijinIndicesInExp shift f (bindingDepth+1)))
+                List.map (fn e => walk (c+1) e) exps)
+       | A.Fn (argName, t, f) => A.Fn(argName, t, (walk (c+1) f))
        | A.Let (varname, vartype, varval, varscope) =>
          A.Let(varname,
                vartype,
-               (shiftDeBruijinIndicesInExp shift varval (bindingDepth)),
-               (shiftDeBruijinIndicesInExp shift varscope (bindingDepth+1)))
-       | A.App (f, n) => A.App((shiftDeBruijinIndicesInExp shift f bindingDepth), (shiftDeBruijinIndicesInExp shift n bindingDepth))
-       | A.Ifz (i, t, prev, e) => A.Ifz(shiftDeBruijinIndicesInExp shift i bindingDepth,
-                                        shiftDeBruijinIndicesInExp shift t bindingDepth,
+               walk c varval,
+               walk (c+1) varscope)
+       | A.App (f, n) => A.App((walk c f), (walk c n))
+       | A.Ifz (i, t, prev, e) => A.Ifz(walk c i,
+                                        walk c t,
                                         prev,
-                                        shiftDeBruijinIndicesInExp shift e (bindingDepth+1)) (* binds *)
+                                        walk (c+1) e) (* binds *)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
-         A.Rec(shiftDeBruijinIndicesInExp shift i bindingDepth,
-               shiftDeBruijinIndicesInExp shift baseCase bindingDepth,
-               prevCaseName, shiftDeBruijinIndicesInExp shift recCase (bindingDepth+1))
+         A.Rec(walk c i,
+               walk c baseCase,
+               prevCaseName, walk (c+1) recCase)
        | A.Fix (name, t, e) =>
-         A.Fix(name, t, shiftDeBruijinIndicesInExp shift e (bindingDepth+1)) (* binds *)
-       | A.TypFn (name, e) => A.TypFn (name, shiftDeBruijinIndicesInExp shift e bindingDepth) (* abstracts over types, not exps *)
-       | A.TypApp (appType, e) => A.TypApp(appType, shiftDeBruijinIndicesInExp shift e bindingDepth)
-       | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, shiftDeBruijinIndicesInExp shift pkgImpl bindingDepth, t)
+         A.Fix(name, t, walk (c+1) e) (* binds *)
+       | A.TypFn (name, e) => A.TypFn (name, walk c e) (* abstracts over types, not exps *)
+       | A.TypApp (appType, e) => A.TypApp(appType, walk c e)
+       | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, walk c pkgImpl, t)
        | A.Use (pkg, clientName, typeName, client) =>
-         A.Use(shiftDeBruijinIndicesInExp shift pkg bindingDepth,
-               clientName,
-               typeName,
-               shiftDeBruijinIndicesInExp shift client (bindingDepth+1))
-       | A.Pair (l, r) => A.Pair (shiftDeBruijinIndicesInExp shift l bindingDepth,
-                                  shiftDeBruijinIndicesInExp shift r bindingDepth)
-       | A.Tuple exps => A.Tuple (List.map (fn e => shiftDeBruijinIndicesInExp shift e bindingDepth) exps)
-       | A.Fold(t, e') => A.Fold(t, (shiftDeBruijinIndicesInExp shift e' (bindingDepth))) (* binds a typ var *)
-       | A.Unfold(e') => A.Unfold(shiftDeBruijinIndicesInExp shift e' (bindingDepth))
-       | A.Data(dname, names, types, e') => A.Data(dname, names, types, shiftDeBruijinIndicesInExp shift e' (bindingDepth+1+(List.length names)))
+         A.Use(walk c pkg, clientName, typeName, walk (c+1) client)
+       | A.Pair (l, r) => A.Pair (walk c l, walk c r)
+       | A.Tuple exps => A.Tuple (List.map (fn e => walk c e) exps)
+       | A.Fold(t, e') => A.Fold(t, (walk c e')) (* binds a typ var *)
+       | A.Unfold(e') => A.Unfold(walk c e')
+       in walk 0 dst end
 
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
@@ -386,7 +383,8 @@ fun elaborateDatatype e =
             val innerExp = A.Let("expose" ^ dataname,
                                  A.Arr(A.TypVar(dataname, 0), A.Plus types),
                                  A.ProdNth(1, A.Var("li", (List.length types))),
-                                 shiftDeBruijinIndicesInExp shift exp shift);
+                                 (* This is a bit tricky, worth thinking this over again *)
+                                 expShift shift shift exp);
             fun makeDecls i =
                 if i = (List.length types) then innerExp
                 else
@@ -573,57 +571,83 @@ fun isval e =
       | A.Fold(t, e') => isval e'
       | _ => false
 
-
-fun subst' src dst bindingDepth =
+fun containsTargetVar' src dst bindingDepth =
     case dst
-     of  A.Zero => A.Zero
-       | A.TmUnit => A.TmUnit
-       | A.Var (name, n)  => if n = bindingDepth then src else
-                   if n > bindingDepth then A.Var(name, n-1) else
-                   A.Var(name, n)
-       | A.Succ e2 => A.Succ (subst' src e2 bindingDepth)
-       | A.ProdLeft e => A.ProdLeft (subst' src e bindingDepth)
-       | A.ProdRight e => A.ProdRight (subst' src e bindingDepth)
-       | A.ProdNth (i, e) => A.ProdNth (i, subst' src e bindingDepth)
-       | A.PlusLeft (t, e) => A.PlusLeft (t, subst' src e bindingDepth)
-       | A.PlusRight (t, e) => A.PlusRight (t, subst' src e bindingDepth)
-       | A.PlusNth (i, t, e) => A.PlusNth (i, t, subst' src e bindingDepth)
+     of  A.Zero => false
+       | A.TmUnit => false
+       | A.Var (name, n)  => n = bindingDepth
+       | A.Succ e2 => containsTargetVar' src e2 bindingDepth
+       | A.ProdLeft e => containsTargetVar' src e bindingDepth
+       | A.ProdRight e => containsTargetVar' src e bindingDepth
+       | A.ProdNth (i, e) => containsTargetVar' src e bindingDepth
+       | A.PlusLeft (t, e) => containsTargetVar' src e bindingDepth
+       | A.PlusRight (t, e) => containsTargetVar' src e bindingDepth
+       | A.PlusNth (i, t, e) => containsTargetVar' src e bindingDepth
        | A.Case(c, names, exps) =>
-            A.Case(subst' src c bindingDepth,
-                   names, List.map (fn e => subst' src e (bindingDepth+1)) exps)
-       | A.Fn (argName, t, f) => A.Fn(argName, t, (subst' src f (bindingDepth+1)))
+         containsTargetVar' src c bindingDepth orelse
+         List.foldl (fn (a,b) => a orelse b)
+                    false
+                    (List.map (fn e => containsTargetVar' src e (bindingDepth+1)) exps)
+       | A.Fn (argName, t, f) => containsTargetVar' src f (bindingDepth+1)
        | A.Let (varname, vartype, varval, varscope) =>
-            A.Let(varname,
-                  vartype,
-                  (subst' src varval (bindingDepth)),
-                  (subst' src varscope (bindingDepth+1)))
-       | A.App (f, n) => A.App((subst' src f bindingDepth), (subst' src n bindingDepth))
-       | A.Ifz (i, t, prev, e) => A.Ifz(subst' src i bindingDepth,
-                                  subst' src t bindingDepth,
-                                  prev,
-                                  subst' src e (bindingDepth+1)) (* binds *)
+                  (containsTargetVar' src varval (bindingDepth)) orelse
+                  (containsTargetVar' src varscope (bindingDepth+1))
+       | A.App (f, n) => (containsTargetVar' src f bindingDepth) orelse (containsTargetVar' src n bindingDepth)
+       | A.Ifz (i, t, prev, e) => containsTargetVar' src i bindingDepth orelse
+                                  containsTargetVar' src t bindingDepth orelse
+                                  containsTargetVar' src e (bindingDepth+1)
+       | A.Rec (i, baseCase, prevCaseName, recCase) => containsTargetVar' src i bindingDepth orelse
+                                                       containsTargetVar' src baseCase bindingDepth orelse
+                                                       containsTargetVar' src recCase (bindingDepth+1)
+       | A.Fix (name, t, e) => containsTargetVar' src e (bindingDepth+1)
+       | A.TypFn (name, e) => containsTargetVar' src e bindingDepth
+       | A.TypApp (appType, e) => containsTargetVar' src e bindingDepth
+       | A.Impl(reprType, pkgImpl, t) => containsTargetVar' src pkgImpl bindingDepth
+       | A.Use (pkg, clientName, typeName, client) => containsTargetVar' src pkg bindingDepth orelse
+                                                      containsTargetVar' src client (bindingDepth+1)
+       | A.Pair (l, r) => containsTargetVar' src l bindingDepth orelse
+                          containsTargetVar' src r bindingDepth
+       | A.Tuple exps => List.foldl (fn (a,b) => a orelse b)
+                                    false
+                                    (List.map (fn e => containsTargetVar' src e bindingDepth) exps)
+       | A.Fold(t, e') => containsTargetVar' src e' (bindingDepth)
+       | A.Unfold(e') => containsTargetVar' src e' (bindingDepth)
+
+(* See page 86 of Types and Programming Languages *)
+fun subst j s dst =
+    let fun walk c dst =
+    case dst of
+         A.Zero => A.Zero
+       | A.TmUnit => A.TmUnit
+       | A.Var (name, n)  => if n = j+c then expShift 0 c s else A.Var(name, n)
+       | A.Succ e2 => A.Succ (walk c e2)
+       | A.ProdLeft e => A.ProdLeft (walk c e)
+       | A.ProdRight e => A.ProdRight (walk c e)
+       | A.ProdNth (i, e) => A.ProdNth (i, walk c e)
+       | A.PlusLeft (t, e) => A.PlusLeft (t, walk c e)
+       | A.PlusRight (t, e) => A.PlusRight (t, walk c e)
+       | A.PlusNth (i, t, e) => A.PlusNth (i, t, walk c e)
+       | A.Case(cas, names, exps) =>
+         A.Case(walk c cas, names, List.map (fn e => walk (c+1) e) exps)
+       | A.Fn (argName, t, f) => A.Fn(argName, t, (walk (c+1) f))
+       | A.Let (varname, vartype, varval, varscope) =>
+         A.Let(varname, vartype, (walk c varval), (walk (c+1) varscope))
+       | A.App (f, n) => A.App((walk c f), (walk c n))
+       | A.Ifz (i, t, prev, e) => A.Ifz(walk c i, walk c t, prev, walk (c+1) e)
        | A.Rec (i, baseCase, prevCaseName, recCase) =>
-            A.Rec(subst' src i bindingDepth,
-                subst' src baseCase bindingDepth,
-                prevCaseName, subst' src recCase (bindingDepth+1))
+            A.Rec(walk c i, walk c baseCase, prevCaseName, walk (c+1) recCase)
        | A.Fix (name, t, e) =>
-         A.Fix(name, t, subst' src e (bindingDepth+1)) (* binds *)
-       | A.TypFn (name, e) => A.TypFn (name, subst' src e bindingDepth) (* abstracts over types, not exps *)
-       | A.TypApp (appType, e) => A.TypApp(appType, subst' src e bindingDepth)
-       | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, subst' src pkgImpl bindingDepth, t)
+         A.Fix(name, t, walk (c+1) e) (* binds *)
+       | A.TypFn (name, e) => A.TypFn (name, walk c e) (* abstracts over types, not exps *)
+       | A.TypApp (appType, e) => A.TypApp(appType, walk c e)
+       | A.Impl(reprType, pkgImpl, t) => A.Impl(reprType, walk c pkgImpl, t)
        | A.Use (pkg, clientName, typeName, client) =>
-         A.Use(subst' src pkg bindingDepth,
-               clientName,
-               typeName,
-               subst' src client (bindingDepth+1))
-       | A.Pair (l, r) => A.Pair (subst' src l bindingDepth, subst' src r bindingDepth)
-       | A.Tuple exps => A.Tuple (List.map (fn e => subst' src e bindingDepth) exps)
-       | A.Fold(t, e') => A.Fold(t, (subst' src e' (bindingDepth))) (* binds a typ var *)
-       | A.Unfold(e') => A.Unfold(subst' src e' (bindingDepth))
-
-
-fun subst src dst = subst' src dst 0
-
+         A.Use(walk c pkg, clientName, typeName, walk (c+1) client)
+       | A.Pair (l, r) => A.Pair (walk c l, walk c r)
+       | A.Tuple exps => A.Tuple (List.map (fn e => walk c e) exps)
+       | A.Fold(t, e') => A.Fold(t, (walk c e')) (* binds a typ var *)
+       | A.Unfold(e') => A.Unfold(walk c e')
+     in walk 0 dst end
 
 fun step e =
     let val _ = typeof' [] [] e in
@@ -650,27 +674,27 @@ fun step e =
                            else let val A.Fn(argName, t, f') = f
                            in
                                (* plug `n` into `f'` *)
-                               subst n f'
+                               subst 0 n f'
                            end
                           )
       | A.Ifz(i, t, prev, e) =>
             if not (isval i) then A.Ifz(step i, t, prev, e)
             else (case i of
                       A.Zero => t
-                    | A.Succ i' => subst i' e
+                    | A.Succ i' => subst 0 i' e
                     | _ => raise IllTypedMsg "ifz conditional must be an integer")
       (* BUG? should this eval varval before subst? should it eval varscope before subst? *)
-      | A.Let (varname, vartype, varval, varscope) => subst varval varscope
+      | A.Let (varname, vartype, varval, varscope) => subst 0 varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
       | A.Rec (A.Succ(i), baseCase, prevCaseName, recCase) =>
             (* Doesn't evaluate recursive call if not required. *)
-            subst (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
+            subst 0 (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
       | A.Rec (i, baseCase, prevCaseName, recCase) =>
             if not (isval i) then
                 A.Rec(step i, baseCase, prevCaseName, recCase)
             else raise No
-      | A.Fix(name, t, body) => subst e body
+      | A.Fix(name, t, body) => subst 0 e body
       | A.TypFn (name, e') => raise No (* Already isval *)
       | A.TypApp (t, e') =>
             if not (isval e') then (A.TypApp (t, step e'))
@@ -687,7 +711,7 @@ fun step e =
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 A.Impl(reprType', pkgImpl', _) =>
-                    subst pkgImpl' (substTypeInExp reprType' client)
+                    subst 0 pkgImpl' (substTypeInExp reprType' client)
               | _ => raise No
            )
       | A.PlusLeft (t, e') =>
@@ -704,9 +728,9 @@ fun step e =
         if not (isval c) then A.Case(step c, names, exps)
         else (
             case c of
-                 A.PlusLeft(_, e) => subst e (List.nth (exps, 0))
-               | A.PlusRight(_, e) => subst e (List.nth (exps, 1))
-               | A.PlusNth(i, _, e) => subst e (List.nth (exps, i))
+                 A.PlusLeft(_, e) => subst 0 e (List.nth (exps, 0))
+               | A.PlusRight(_, e) => subst 0 e (List.nth (exps, 1))
+               | A.PlusNth(i, _, e) => subst 0 e (List.nth (exps, i))
                | _ => raise IllTyped
         )
       | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')
@@ -997,28 +1021,29 @@ val true = isval (Fn("x", Nat, Zero));
 val true = isval (Fn("x", Nat, Succ(Var("x", 0))));
 val false = isval (App(Fn("x", Nat, Zero), Zero));
 
-val Zero = subst Zero Zero;
-val Succ Zero = subst Zero (Succ Zero);
-val (Fn("x", Nat, Var ("x", 0))) = subst (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
-val (Var ("y", 0)) = subst (Succ Zero) (Var ("y", 1));
-val Fn("x", Nat, Var ("x", 0)) = subst (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
-val Fn("x", Nat, (Succ Zero)) = subst (Succ Zero) (Fn("x", Nat, Var("y", 1)));
+val Zero = subst 0 Zero Zero;
+val Succ Zero = subst 0 Zero (Succ Zero);
+val (Fn("x", Nat, Var ("x", 0))) = subst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
+val (Var ("y", 1)) = subst 0 (Succ Zero) (Var ("y", 1));
+val Tuple [Var ("y",1),Succ Zero] = subst 0 (Succ Zero) (Tuple([Var ("y", 1), Var("x", 0)]));
+val Fn("x", Nat, Var ("x", 0)) = subst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
+val Fn("x", Nat, (Succ Zero)) = subst 0 (Succ Zero) (Fn("x", Nat, Var("y", 1)));
 val App(Fn("x", Nat, Succ Zero), (Succ Zero)) =
-    subst (Succ Zero) (App(Fn("x", Nat, Var ("y", 1)), (Var ("x", 0))));
+    subst 0 (Succ Zero) (App(Fn("x", Nat, Var ("y", 1)), (Var ("x", 0))));
 
-val Fn("y", Nat, Zero) = subst Zero (Fn("y", Nat, Var ("x", 1)));
-val Fn("x", Nat, Succ Zero) = subst (Succ Zero) (Fn("x", Nat, Var ("x", 1)));
-val Fn("x", Nat, Fn("x", Nat, Succ Zero)) = subst (Succ Zero) (Fn("x", Nat, Fn("x", Nat, Var ("z", 2))));
-val Fn("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = subst (Succ Zero) (Fn("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
-
+val Fn("y", Nat, Zero) = subst 0 Zero (Fn("y", Nat, Var ("x", 1)));
+val Fn("x", Nat, Succ Zero) = subst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 1)));
+val Fn("x", Nat, Fn("x", Nat, Succ Zero)) = subst 0 (Succ Zero) (Fn("x", Nat, Fn("x", Nat, Var ("z", 2))));
+val Fn("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = subst 0 (Succ Zero) (Fn("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
 
 val Fn("x", Nat, Rec (Zero,
                        Var ("x",0),
                        "prev", Zero)) : exp =
-    subst Zero (Fn("x", Nat, Rec(Var ("x", 1),
+    subst 0 Zero (Fn("x", Nat, Rec(Var ("x", 1),
                                   Var ("x", 0),
                                   "prev", Zero)));
-val Fn("x", Nat, Rec(Zero, Var ("x", 1), "prev", Zero)) = subst Zero (Fn("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
+
+val Fn("x", Nat, Rec(Zero, Var ("x", 2), "prev", Zero)) = subst 0 Zero (Fn("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
 val Rec(Zero, Zero, "prev", Zero) = step (App(Fn("x", Nat, Rec(Var ("x", 0), Var ("x", 0), "prev", Zero)), Zero));
 
 val Nat = get [Nat] 0;
@@ -1333,21 +1358,12 @@ val elaborated = elaborateDatatypes simpleNestedDatatypes;
 
 val Nat = substType Nat (TypVar ("typ",0));
 val Nat = substType' Nat (TypVar ("typ",1)) 1;
-val Zero = subst Zero (Var("x", 0));
+val Zero = subst 0 Zero (Var("x", 0));
 
-(* WRONG WE SHOULD NOT CHANGE THE DBI
- * Only decr dbi if we have actually subst'd something
- *)
-val TypVar("typ", 0) = substType Nat (TypVar ("typ",1));
-(* WRONG WE SHOULD NOT CHANGE THE DBI
- * We are substituting for depth 1.
- * There is not a depth 1 variable in the dst expression.
- *)
-val TypVar("typ", 1) = substType' Nat (TypVar ("typ",2)) 1;
-(* WRONG *)
-val Var("x", 0) = subst Zero (Var("x", 1));
-(* WRONG *)
-val Var("x", 1) = subst' Zero (Var("x", 2)) 1;
+val TypVar("typ", 1) = substType Nat (TypVar ("typ",1));
+val TypVar("typ", 2) = substType' Nat (TypVar ("typ",2)) 1;
+val Var("x", 1) = subst 0 Zero (Var("x", 1));
+val Var("x", 2) = subst 1 Zero (Var("x", 2));
 
 in
 ()
