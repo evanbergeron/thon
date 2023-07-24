@@ -7,7 +7,6 @@ structure Thon : sig
                    val eval : A.exp -> A.exp
                    val isval : A.exp -> bool
                    val step : A.exp -> A.exp
-                   val substType : A.typ -> A.typ -> A.typ
                    val run : string -> A.exp
                    val eraseNamesInTyp : A.typ -> A.typ
                    val runFile : string -> A.exp
@@ -46,33 +45,13 @@ fun istype typeCtx A.Nat = true
   | istype typeCtx (A.Some (name, t')) = istype (NONE::typeCtx) t'
   | istype typeCtx (A.TyRec (name, t')) = istype (NONE::typeCtx) t'
 
-
-fun substType' src A.Nat bindingDepth = A.Nat
-  | substType' src A.Unit bindingDepth = A.Unit
-  | substType' src (A.TypVar (name, n)) bindingDepth =
-    if n = bindingDepth then src else A.TypVar(name, n)
-    (* if n > bindingDepth then A.TypVar(name, n-1) else A.TypVar(name, n) *)
-  | substType' src (A.Arr(t, t')) bindingDepth = A.Arr((substType' src t bindingDepth),
-                                                       (substType' src t' bindingDepth))
-  | substType' src (A.Prod types) bindingDepth = A.Prod(List.map (fn t => substType' src t bindingDepth) types)
-  | substType' src (A.Plus types) bindingDepth = A.Plus (List.map (fn t => substType' src t bindingDepth) types)
-  | substType' src (A.All (name, t)) bindingDepth =
-    A.All(name, substType' src t (bindingDepth + 1))
-  | substType' src (A.Some (name, t)) bindingDepth =
-    A.Some(name, substType' src t (bindingDepth + 1))
-  | substType' src (A.TyRec (name, t)) bindingDepth =
-    A.TyRec(name, substType' src t (bindingDepth + 1))
-
-
-fun substType src dst = substType' src dst 0
-
 (* Turns search to A.Var bindingDepth
  *
  * DEVNOTE: assumes the caller will place the result underneath a type
  * variable binding site.
  *
- * Remarkably similar to substType - might be able to dedup. This needs
- * to track bindingDepth though and subst in A.TypVar of the appropriate
+ * Remarkably similar to typSubst - might be able to dedup. This needs
+ * to track bindingDepth though and expSubst in A.TypVar of the appropriate
  * depth.
  *)
 fun abstractOutType' name search t bindingDepth =
@@ -119,16 +98,16 @@ fun substTypeInExp' srcType dstExp bindingDepth =
        | A.ProdNth (i, e) => A.ProdNth (i, substTypeInExp' srcType e bindingDepth)
        | A.PlusLeft (t, e) => A.PlusLeft (t, substTypeInExp' srcType e bindingDepth)
        | A.PlusRight (t, e) => A.PlusRight (t, substTypeInExp' srcType e bindingDepth)
-       | A.PlusNth (i, t, e) => A.PlusNth (i, t, substTypeInExp' srcType e bindingDepth)
+       | A.PlusNth (i, t, e) => A.PlusNth (i, A.typSubst bindingDepth srcType t, substTypeInExp' srcType e bindingDepth)
        | A.Case(c, names, exps) =>
             A.Case(substTypeInExp' srcType c bindingDepth,
                    names,
                    List.map (fn e => substTypeInExp' srcType e bindingDepth) exps)
        | A.Fn (argName, argType, funcBody) =>
-            A.Fn(argName, (substType' srcType argType bindingDepth),
+            A.Fn(argName, (A.typSubst bindingDepth srcType argType),
                 substTypeInExp' srcType funcBody bindingDepth)
        | A.Let (varname, vartype, varval, varscope) =>
-            A.Let(varname, (substType' srcType vartype bindingDepth),
+            A.Let(varname, (A.typSubst bindingDepth srcType vartype),
                   substTypeInExp' srcType varval bindingDepth,
                   substTypeInExp' srcType varscope bindingDepth
                  )
@@ -150,22 +129,22 @@ fun substTypeInExp' srcType dstExp bindingDepth =
                 prevCaseName, substTypeInExp' srcType recCase bindingDepth)
        | A.Fix (name, t, e) =>
          A.Fix(name,
-               substType' srcType t bindingDepth,
+               A.typSubst bindingDepth srcType t,
                substTypeInExp' srcType e bindingDepth)
        | A.TypFn (name, e) => A.TypFn(name, substTypeInExp' srcType e (bindingDepth+1)) (* binds type var *)
        | A.TypApp (appType, e) =>
-            A.TypApp(substType' srcType appType bindingDepth,
+            A.TypApp(A.typSubst bindingDepth srcType appType,
                    substTypeInExp' srcType e bindingDepth)
        | A.Impl(reprType, pkgImpl, pkgType) =>
-            A.Impl(substType' srcType reprType bindingDepth,
+            A.Impl(A.typSubst bindingDepth srcType reprType,
                  substTypeInExp' srcType pkgImpl bindingDepth,
-                 substType' srcType pkgType bindingDepth)
+                 A.typSubst bindingDepth srcType pkgType)
        | A.Use (pkg, clientName, typeName, client) =>
             A.Use(substTypeInExp' srcType pkg bindingDepth,
                   clientName,
                   typeName,
                   substTypeInExp' srcType client (bindingDepth+1)) (*binds type var*)
-       | A.Fold(t, e') => A.Fold(substType' srcType t bindingDepth,
+       | A.Fold(t, e') => A.Fold(A.typSubst bindingDepth srcType t,
                              substTypeInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
        | A.Unfold(e') => A.Unfold(substTypeInExp' srcType e' bindingDepth)
 
@@ -290,7 +269,7 @@ fun elaborateDatatype e =
             val withType = A.TyRec(dataname, A.Plus types)
             (* dataname is not bound here - the recursive reference is bound to the abstract
              * type bound in the Some *)
-            val tInTypes = List.map (substType (A.TypVar("t", 0))) types
+            val tInTypes = List.map (A.typSubst 0 (A.TypVar("t", 0))) types
             val exposeFnType = A.Arr(A.TypVar("t", 0), A.Plus tInTypes)
             val exposeFn = A.Fn(dataname ^ "exp", withType, A.Unfold(A.Var(dataname ^ "exp", 0)))
             val pkgType = A.Some("t", (*arbitrary name ok here *)
@@ -298,12 +277,12 @@ fun elaborateDatatype e =
                                               List.map (fn t => A.Arr(t, A.TypVar("t", 0))) tInTypes),
                                          exposeFnType])
                                 )
-            val sumTypeForInjection = List.map (substType withType) types;
+            val sumTypeForInjection = List.map (A.typSubst 0 withType) types;
             fun makeInjectionExprFromSummandType (i, t) =
                 let val name = "summand" ^ Int.toString i
                 in
                 A.Fn(name,
-                     substType withType t, (* getting typ, 0 instead of typ,1 here *)
+                     A.typSubst 0 withType t, (* getting typ, 0 instead of typ,1 here *)
                      A.Fold(withType,
                             (* UNDONE is DeBruijin index 0 ok here?
                              * Do we need to be incrementing a bindingDepth somewhere else?
@@ -454,7 +433,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     if not (istype typCtx appType) then raise IllTyped else
     let val A.All(name, t) = typeof' ctx typCtx e
     in
-        substType appType t
+        A.typSubst 0 appType t
     end
   | typeof' ctx typCtx (A.Impl (reprType, pkgImpl, pkgType)) =
     if not (istype typCtx reprType) then (
@@ -498,7 +477,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     raise IllTypedMsg "Fold type argument must be a recursive type"
   | typeof' ctx typCtx (A.Unfold(e')) =
     let val A.TyRec(name, t) = typeof' ctx typCtx e' in
-        substType (A.TyRec(name, t)) t
+        A.typSubst 0 (A.TyRec(name, t)) t
     end
 
 
@@ -590,27 +569,27 @@ fun step e =
                            else let val A.Fn(argName, t, f') = f
                            in
                                (* plug `n` into `f'` *)
-                               A.subst 0 n f'
+                               A.expSubst 0 n f'
                            end
                           )
       | A.Ifz(i, t, prev, e) =>
             if not (isval i) then A.Ifz(step i, t, prev, e)
             else (case i of
                       A.Zero => t
-                    | A.Succ i' => A.subst 0 i' e
+                    | A.Succ i' => A.expSubst 0 i' e
                     | _ => raise IllTypedMsg "ifz conditional must be an integer")
-      (* BUG? should this eval varval before subst? should it eval varscope before subst? *)
-      | A.Let (varname, vartype, varval, varscope) => A.subst 0 varval varscope
+      (* BUG? should this eval varval before expSubst? should it eval varscope before expSubst? *)
+      | A.Let (varname, vartype, varval, varscope) => A.expSubst 0 varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
       | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
       | A.Rec (A.Succ(i), baseCase, prevCaseName, recCase) =>
             (* Doesn't evaluate recursive call if not required. *)
-            A.subst 0 (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
+            A.expSubst 0 (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
       | A.Rec (i, baseCase, prevCaseName, recCase) =>
             if not (isval i) then
                 A.Rec(step i, baseCase, prevCaseName, recCase)
             else raise No
-      | A.Fix(name, t, body) => A.subst 0 e body
+      | A.Fix(name, t, body) => A.expSubst 0 e body
       | A.TypFn (name, e') => raise No (* Already isval *)
       | A.TypApp (t, e') =>
             if not (isval e') then (A.TypApp (t, step e'))
@@ -627,7 +606,7 @@ fun step e =
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 A.Impl(reprType', pkgImpl', _) =>
-                    A.subst 0 pkgImpl' (substTypeInExp reprType' client)
+                    A.expSubst 0 pkgImpl' (substTypeInExp reprType' client)
               | _ => raise No
            )
       | A.PlusLeft (t, e') =>
@@ -644,9 +623,9 @@ fun step e =
         if not (isval c) then A.Case(step c, names, exps)
         else (
             case c of
-                 A.PlusLeft(_, e) => A.subst 0 e (List.nth (exps, 0))
-               | A.PlusRight(_, e) => A.subst 0 e (List.nth (exps, 1))
-               | A.PlusNth(i, _, e) => A.subst 0 e (List.nth (exps, i))
+                 A.PlusLeft(_, e) => A.expSubst 0 e (List.nth (exps, 0))
+               | A.PlusRight(_, e) => A.expSubst 0 e (List.nth (exps, 1))
+               | A.PlusNth(i, _, e) => A.expSubst 0 e (List.nth (exps, i))
                | _ => raise IllTyped
         )
       | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')
@@ -888,16 +867,16 @@ val TypFn("t", Zero) = step (TypFn("t", Zero));
 val true = isval (Fn("x", Nat, TypFn("t", Zero)));
 val (TypFn ("t", Zero)) = step (App(Fn("x", Nat, TypFn("t", Zero)), Zero));
 
-val Nat = substType Nat (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
-val Arr(Nat, Nat) = substType (Arr(Nat, Nat)) (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
+val Nat = typSubst 0 Nat (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
+val Arr(Nat, Nat) = typSubst 0 (Arr(Nat, Nat)) (TypVar ("t", 0)); (* Tho this isn't actually a well-formed type *)
 val false = istype [] (TypVar ("t", 0));
-val All("t", Nat) = substType Nat (All("t", TypVar ("t", 1)));
-val Some("t",Nat) = substType Nat (Some("t",TypVar ("t", 1)));
-val Some("t",Some("t",TypVar ("t", 1))) = substType Nat (Some("t",Some("t",TypVar ("t", 1))));
+val All("t", Nat) = typSubst 0 Nat (All("t", TypVar ("t", 1)));
+val Some("t",Nat) = typSubst 0 Nat (Some("t",TypVar ("t", 1)));
+val Some("t",Some("t",TypVar ("t", 1))) = typSubst 0 Nat (Some("t",Some("t",TypVar ("t", 1))));
 val true = istype [] (All("t", TypVar ("t", 0)));
 val true = istype [] (Some("t",TypVar ("t", 0)));
-val All("t", Arr(Nat, (All("t", Nat)))) = substType (All("t", Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
-val All("t", Arr(Nat, (Some("t",Nat)))) = substType (Some("t",Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
+val All("t", Arr(Nat, (All("t", Nat)))) = typSubst 0 (All("t", Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
+val All("t", Arr(Nat, (Some("t",Nat)))) = typSubst 0 (Some("t",Nat)) (All("t", Arr(Nat, TypVar ("t", 1))));
 
 val Nat = typeof' [] [] (TypApp(TypVar ("t", 0), Zero)) handle IllTyped => Nat;
 val All("t", Arr(TypVar ("t", 0), Nat)) = typeof' [] [] (TypFn("t", Fn("x", TypVar ("t", 0), Zero)));
@@ -937,29 +916,29 @@ val true = isval (Fn("x", Nat, Zero));
 val true = isval (Fn("x", Nat, Succ(Var("x", 0))));
 val false = isval (App(Fn("x", Nat, Zero), Zero));
 
-val Zero = subst 0 Zero Zero;
-val Succ Zero = subst 0 Zero (Succ Zero);
-val (Fn("x", Nat, Var ("x", 0))) = subst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
-val (Var ("y", 1)) = subst 0 (Succ Zero) (Var ("y", 1));
-val Tuple [Var ("y",1),Succ Zero] = subst 0 (Succ Zero) (Tuple([Var ("y", 1), Var("x", 0)]));
-val Fn("x", Nat, Var ("x", 0)) = subst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
-val Fn("x", Nat, (Succ Zero)) = subst 0 (Succ Zero) (Fn("x", Nat, Var("y", 1)));
+val Zero = expSubst 0 Zero Zero;
+val Succ Zero = expSubst 0 Zero (Succ Zero);
+val (Fn("x", Nat, Var ("x", 0))) = expSubst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
+val (Var ("y", 1)) = expSubst 0 (Succ Zero) (Var ("y", 1));
+val Tuple [Var ("y",1),Succ Zero] = expSubst 0 (Succ Zero) (Tuple([Var ("y", 1), Var("x", 0)]));
+val Fn("x", Nat, Var ("x", 0)) = expSubst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 0)));
+val Fn("x", Nat, (Succ Zero)) = expSubst 0 (Succ Zero) (Fn("x", Nat, Var("y", 1)));
 val App(Fn("x", Nat, Succ Zero), (Succ Zero)) =
-    subst 0 (Succ Zero) (App(Fn("x", Nat, Var ("y", 1)), (Var ("x", 0))));
+    expSubst 0 (Succ Zero) (App(Fn("x", Nat, Var ("y", 1)), (Var ("x", 0))));
 
-val Fn("y", Nat, Zero) = subst 0 Zero (Fn("y", Nat, Var ("x", 1)));
-val Fn("x", Nat, Succ Zero) = subst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 1)));
-val Fn("x", Nat, Fn("x", Nat, Succ Zero)) = subst 0 (Succ Zero) (Fn("x", Nat, Fn("x", Nat, Var ("z", 2))));
-val Fn("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = subst 0 (Succ Zero) (Fn("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
+val Fn("y", Nat, Zero) = expSubst 0 Zero (Fn("y", Nat, Var ("x", 1)));
+val Fn("x", Nat, Succ Zero) = expSubst 0 (Succ Zero) (Fn("x", Nat, Var ("x", 1)));
+val Fn("x", Nat, Fn("x", Nat, Succ Zero)) = expSubst 0 (Succ Zero) (Fn("x", Nat, Fn("x", Nat, Var ("z", 2))));
+val Fn("x", Nat, Rec(Zero, Zero, "prev", Succ Zero)) = expSubst 0 (Succ Zero) (Fn("x", Nat, Rec(Zero, Zero, "prev", Var ("z", 2))));
 
 val Fn("x", Nat, Rec (Zero,
                        Var ("x",0),
                        "prev", Zero)) : exp =
-    subst 0 Zero (Fn("x", Nat, Rec(Var ("x", 1),
+    expSubst 0 Zero (Fn("x", Nat, Rec(Var ("x", 1),
                                   Var ("x", 0),
                                   "prev", Zero)));
 
-val Fn("x", Nat, Rec(Zero, Var ("x", 2), "prev", Zero)) = subst 0 Zero (Fn("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
+val Fn("x", Nat, Rec(Zero, Var ("x", 2), "prev", Zero)) = expSubst 0 Zero (Fn("x", Nat, Rec(Var ("x", 1), Var ("x", 2), "prev", Zero)));
 val Rec(Zero, Zero, "prev", Zero) = step (App(Fn("x", Nat, Rec(Var ("x", 0), Var ("x", 0), "prev", Zero)), Zero));
 
 val Nat = get [Nat] 0;
@@ -1272,14 +1251,14 @@ val simpleNestedDatatypes =
 
 val elaborated = elaborateDatatypes simpleNestedDatatypes;
 
-val Nat = substType Nat (TypVar ("typ",0));
-val Nat = substType' Nat (TypVar ("typ",1)) 1;
-val Zero = subst 0 Zero (Var("x", 0));
+val Nat = typSubst 0 Nat (TypVar ("typ",0));
+val Nat = typSubst 1 Nat (TypVar ("typ",1));
+val Zero = expSubst 0 Zero (Var("x", 0));
 
-val TypVar("typ", 1) = substType Nat (TypVar ("typ",1));
-val TypVar("typ", 2) = substType' Nat (TypVar ("typ",2)) 1;
-val Var("x", 1) = subst 0 Zero (Var("x", 1));
-val Var("x", 2) = subst 1 Zero (Var("x", 2));
+val TypVar("typ", 1) = typSubst 0 Nat (TypVar ("typ",1));
+val TypVar("typ", 2) = typSubst 1 Nat (TypVar ("typ",2));
+val Var("x", 1) = expSubst 0 Zero (Var("x", 1));
+val Var("x", 2) = expSubst 1 Zero (Var("x", 2));
 
 in
 ()

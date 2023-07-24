@@ -53,8 +53,11 @@ sig
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
 
+    val typShift : int -> typ -> typ
+    val typSubst : int -> typ -> typ -> typ
+
     val expShift : int -> int -> exp -> exp
-    val subst : int -> exp -> exp -> exp
+    val expSubst : int -> exp -> exp -> exp
 
   structure Print :
   sig
@@ -164,6 +167,21 @@ struct
           | TyRec (name, t') => f (TyRec(name, typMap f t'))
 
     (* See page 86 of Types and Programming Languages *)
+    fun typShift shift dst =
+        let fun walk c t =
+        case t of
+             Nat => Nat
+           | Unit => Unit
+           | TypVar (name, n)  => if n >= c then TypVar(name, n+shift) else TypVar(name, n)
+           | Arr(d, co) => Arr(walk c d, walk c co)
+           | Prod types => Prod(List.map (walk c) types)
+           | Plus types => Plus(List.map (walk c) types)
+           | All (name, t') => All(name, walk (c+1) t')
+           | Some (name, t') => Some(name, walk (c+1) t')
+           | TyRec (name, t') => TyRec(name, walk (c+1) t')
+        in walk 0 dst end
+
+    (* See page 86 of Types and Programming Languages *)
     fun expShift cutoff shift dst =
         let fun walk c exp =
         case exp of
@@ -199,7 +217,22 @@ struct
           in walk 0 dst end
 
     (* See page 86 of Types and Programming Languages *)
-    fun subst j s dst =
+    fun typSubst j s dst =
+        let fun walk c dst =
+        case dst of
+             Nat => Nat
+           | Unit => Unit
+           | TypVar (name, n)  => if n = j+c then typShift c s else TypVar (name, n)
+           | Arr(d, co) => Arr(walk c d, walk c co)
+           | Prod types => Prod(List.map (walk c) types)
+           | Plus types => Plus (List.map (walk c) types)
+           | All (name, t') => All(name, walk (c+1) t')
+           | Some (name, t') => Some(name, walk (c+1) t')
+           | TyRec (name, t') => TyRec(name, walk (c+1) t')
+        in walk 0 dst end
+
+    (* See page 86 of Types and Programming Languages *)
+    fun expSubst j s dst =
         let fun walk c dst =
         case dst of
             Zero => Zero
