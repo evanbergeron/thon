@@ -295,6 +295,8 @@ fun elaborateDatatype e =
                                A.Tuple[A.Tuple fns, exposeFn],
                                pkgType)
 
+            val openedPackageTermName = "li"
+
             (* We've already bound term vars lname and rname, and type var dname.
              *
              * We have package impl to bind still, the use impl pkg exp to bind,
@@ -306,24 +308,21 @@ fun elaborateDatatype e =
              *
              * Need to bind impl and use vars. (Which are bound immediately before
              * the two sides of the datatype declaration).
-             *
-             * UNDONE need to bump by something parametrized on the length of the list
              *)
-            val shift = (List.length types) + 1;
+            val cutoff = (List.length types) + 1;
             val innerExp = A.Let("expose" ^ dataname,
                                  A.Arr(A.TypVar(dataname, 0), A.Plus types),
-                                 A.ProdNth(1, A.Var("li", (List.length types))),
-                                 (* This is a bit tricky, worth thinking this over again *)
-                                 A.expShift shift shift exp);
+                                 A.ProdNth(1, A.Var(openedPackageTermName, (List.length types))),
+                                 A.expShift cutoff 2 (* reach over expose and openedPackageTermName *) exp);
             fun makeDecls i =
                 if i = (List.length types) then innerExp
                 else
                     A.Let(List.nth (names, i),
                           A.Arr(List.nth (types, i), A.TypVar(dataname, 0)),
-                          A.ProdNth(i, A.ProdNth(0, A.Var("li", i))),
+                          A.ProdNth(i, A.ProdNth(0, A.Var(openedPackageTermName, i))),
                           makeDecls (i+1))
         in
-            A.Let(datanameimpl, pkgType, dtval, A.Use(A.Var(datanameimpl, 0), "li", dataname, makeDecls 0))
+            A.Let(datanameimpl, pkgType, dtval, A.Use(A.Var(datanameimpl, 0), openedPackageTermName, dataname, makeDecls 0))
         end
       | _ => e
 
@@ -1243,6 +1242,7 @@ val
   : exp = parseFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
 
 val Zero = runFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
+val Zero = runFile "/home/evan/thon/examples/dbi-management-datatype-elaboration.thon";
 
 val simpleNestedDatatypes =
   Data

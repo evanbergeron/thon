@@ -1,0 +1,4 @@
+let x : nat = S Z in
+let y : nat = Z in
+data list = nil unit | cons nat * list in
+y
