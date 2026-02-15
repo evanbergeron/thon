@@ -151,7 +151,7 @@ struct
            | Fold(t, e') => f (Fold(t, (expMap f e')))
            | Unfold(e') => f (Unfold(expMap f e'))
            | Data(dataname, names, types, exp) =>
-             f (Data(dataname, names, types, f exp))
+             f (Data(dataname, names, types, expMap f exp))
 
     (* DEVNOTE this applies f at every node *)
     fun typMap f t =
