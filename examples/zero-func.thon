@@ -1,1 +1,1 @@
-\ (nat -> (nat -> nat)) -> S S Z
+\ f : (nat -> (nat -> nat)) -> S S Z

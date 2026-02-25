@@ -37,7 +37,7 @@ fun println s = (print s; print "\n")
 
 fun istype typeCtx A.Nat = true
   | istype typeCtx A.Unit = true
-  | istype typeCtx (A.TypVar (name, i)) = i < (length typeCtx)
+  | istype typeCtx (A.TypVar (name, i)) = i >= 0 andalso i < (length typeCtx)
   | istype typeCtx (A.Arr(d, c)) = (istype typeCtx d) andalso (istype typeCtx c)
   | istype typeCtx (A.Prod types) = List.all (istype typeCtx) types
   | istype typeCtx (A.Plus types) = List.all (istype typeCtx) types
@@ -70,20 +70,6 @@ fun abstractOutType' name search t bindingDepth =
 
 
 fun abstractOutType name search t = abstractOutType' name search t 0
-
-
-fun decrDeBruijinIndices t =
-    case t of
-        A.Nat => A.Nat
-      | A.Unit => A.Unit
-      | A.TypVar (name, i) => if (i-1) < 0 then raise ClientTypeCannotEscapeClientScope
-                    else A.TypVar (name, i -1)
-      | A.Arr(d, c) => A.Arr(decrDeBruijinIndices d, decrDeBruijinIndices c)
-      | A.Prod types => A.Prod(List.map decrDeBruijinIndices types)
-      | A.Plus types => A.Plus(List.map decrDeBruijinIndices types)
-      | A.All (name, t') => A.All(name, decrDeBruijinIndices t')
-      | A.Some (name, t') => A.Some(name, decrDeBruijinIndices t')
-      | A.TyRec (name, t') => A.TyRec(name, decrDeBruijinIndices t')
 
 
 (* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
@@ -453,7 +439,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     let val A.Some(name, r) = typeof' ctx typCtx pkg
         (* binds BOTH a A.TypVar and a exp A.Var *)
         val clientType = typeof' (r::ctx) (NONE::typCtx) client
-        val resType = decrDeBruijinIndices clientType
+        val resType = A.typShift ~1 clientType
     in
         if not (istype typCtx resType) then raise IllTyped else
         resType
@@ -676,7 +662,7 @@ fun test() = let
 open A;
 val exDir = OS.FileSys.getDir() ^ "/examples/";
 fun parseEx f = parseFile (exDir ^ f);
-fun runEx f = runFile (exDir ^ f);
+fun runEx f = (println f; runFile (exDir ^ f));
 (* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : typ = TyRec("natlist",Plus[Unit, Prod [Nat, TypVar ("natlist", 0)]]);
 val Fn ("natlist", TyRec ("l",Plus [Unit,Prod [Nat,TypVar ("l", 0)]]),Var ("natlist",0)) =
@@ -792,7 +778,7 @@ val Use (Impl (Nat,Fn ("x",Nat,Zero),Some ("t'",Arr (TypVar ("t'",0),TypVar ("t'
     parse "use (impl (some t'. t' -> t') with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)";
 
 val Zero = run "use (impl (some t. t -> t) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)"
-           handle ClientTypeCannotEscapeClientScope => Zero;
+           handle IllTyped => Zero;
 
 
 val e1 = Impl(Nat, Fn("x", Nat, Var ("x", 0)), Some("t", Arr(TypVar ("t", 0), TypVar ("t", 0))));
@@ -1190,6 +1176,8 @@ val true = (zerobst = appbst);
 
 val Succ (Succ Zero) = runEx "setget.thon";
 
+val TypFn ("a", Fn ("x", TypVar ("a", 0), Var ("x", 0))) = runEx "use-poly.thon";
+
 val TypFn ("t", Zero) = runEx "typnames.thon";
 
 val
@@ -1246,6 +1234,22 @@ val
 val Zero = runEx "unary-or-binary-tree.thon";
 val Zero = runEx "dbi-management-datatype-elaboration.thon";
 val Zero = runEx "expmap-data.thon";
+
+val Zero = runEx "zero.thon";
+val Succ Zero = runEx "one.thon";
+val Succ Zero = runEx "foo.thon";
+val Succ Zero = runEx "idid.thon";
+val Succ Zero = runEx "abcd.thon";
+val TypFn ("t", Zero) = runEx "aeqv.thon";
+val Succ Zero = runEx "collatz.thon";
+(* val Zero = runEx "two-datatypes.thon"; *)
+(* val Zero = runEx "appapp.thon"; *)
+(* val Zero = runEx "thon.thon"; *)
+
+val Arr(Arr(Nat, Arr(Nat, Nat)), Nat) = typeof (parseEx "zero-func.thon");
+val All("t", All("s", _)) = typeof (parseEx "all.thon");
+val bstType2 = typeof (parseEx "emptybinarytree.thon");
+val true = (bstType = bstType2);
 
 val simpleNestedDatatypes =
   Data
