@@ -53,6 +53,7 @@ sig
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
 
+    val typWalk : (int -> typ -> typ) -> int -> typ -> typ
     val typShift : int -> typ -> typ
     val typSubst : int -> typ -> typ -> typ
 
@@ -166,22 +167,23 @@ struct
           | Some (name, t') => f (Some(name, typMap f t'))
           | TyRec (name, t') => f (TyRec(name, typMap f t'))
 
-    (* See page 86 of Types and Programming Languages *)
-    fun typShift shift dst =
-        let fun walk c t =
+    fun typWalk onTypVar c t =
         case t of
              Nat => Nat
            | Unit => Unit
-           | TypVar (name, n)  => if n >= c then TypVar(name, n+shift) else TypVar(name, n)
-           | Arr(d, co) => Arr(walk c d, walk c co)
-           | Prod types => Prod(List.map (walk c) types)
-           | Plus types => Plus(List.map (walk c) types)
-           | All (name, t') => All(name, walk (c+1) t')
-           | Some (name, t') => Some(name, walk (c+1) t')
-           | TyRec (name, t') => TyRec(name, walk (c+1) t')
-        in walk 0 dst end
+           | TypVar _ => onTypVar c t
+           | Arr(d, co) => Arr(typWalk onTypVar c d, typWalk onTypVar c co)
+           | Prod types => Prod(List.map (typWalk onTypVar c) types)
+           | Plus types => Plus(List.map (typWalk onTypVar c) types)
+           | All (name, t') => All(name, typWalk onTypVar (c+1) t')
+           | Some (name, t') => Some(name, typWalk onTypVar (c+1) t')
+           | TyRec (name, t') => TyRec(name, typWalk onTypVar (c+1) t')
 
     (* See page 86 of Types and Programming Languages *)
+    fun typShift shift =
+        typWalk (fn c => fn TypVar(name, n) =>
+            if n >= c then TypVar(name, n+shift) else TypVar(name, n)) 0
+
     fun expShift cutoff shift dst =
         let fun walk c exp =
         case exp of
@@ -217,19 +219,9 @@ struct
           in walk 0 dst end
 
     (* See page 86 of Types and Programming Languages *)
-    fun typSubst j s dst =
-        let fun walk c dst =
-        case dst of
-             Nat => Nat
-           | Unit => Unit
-           | TypVar (name, n)  => if n = j+c then typShift c s else TypVar (name, n)
-           | Arr(d, co) => Arr(walk c d, walk c co)
-           | Prod types => Prod(List.map (walk c) types)
-           | Plus types => Plus (List.map (walk c) types)
-           | All (name, t') => All(name, walk (c+1) t')
-           | Some (name, t') => Some(name, walk (c+1) t')
-           | TyRec (name, t') => TyRec(name, walk (c+1) t')
-        in walk 0 dst end
+    fun typSubst j s =
+        typWalk (fn c => fn TypVar(name, n) =>
+            if n = j+c then typShift c s else TypVar(name, n)) 0
 
     (* See page 86 of Types and Programming Languages *)
     fun expSubst j s dst =
