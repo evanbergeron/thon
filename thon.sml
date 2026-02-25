@@ -674,6 +674,9 @@ fun runFile s =
 
 fun test() = let
 open A;
+val exDir = OS.FileSys.getDir() ^ "/examples/";
+fun parseEx f = parseFile (exDir ^ f);
+fun runEx f = runFile (exDir ^ f);
 (* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : typ = TyRec("natlist",Plus[Unit, Prod [Nat, TypVar ("natlist", 0)]]);
 val Fn ("natlist", TyRec ("l",Plus [Unit,Prod [Nat,TypVar ("l", 0)]]),Var ("natlist",0)) =
@@ -687,8 +690,7 @@ val TypApp
 val nilNatList =
     Fold(natlist, PlusLeft(Plus[Unit, Prod([Nat, natlist])], TmUnit));
 
-(* TODO don't hardcode dir *)
-val parsedConsNatList = parseFile "/home/evan/thon/examples/emptynatlist.thon";
+val parsedConsNatList = parseEx "emptynatlist.thon";
 
 val true = (nilNatList = parsedConsNatList);
 
@@ -715,10 +717,10 @@ val Fn("natAndNatlist", Prod [Nat,TyRec ("natlist",Plus [Unit, Prod [Nat,TypVar 
         PlusRight
           (Plus ([Unit, Prod [Nat,TyRec ("natlist",Plus [Unit, Prod [Nat,TypVar ("natlist", 0)]])]]),
            Var ("natAndNatlist", 0)))) : Ast.exp =
-    parseFile "/home/evan/thon/examples/natlistcons.thon";
+    parseEx "natlistcons.thon";
 
 val parsedNatlistCons =
-    parseFile "/home/evan/thon/examples/natlistcons.thon";
+    parseEx "natlistcons.thon";
 val true = (parsedNatlistCons = natlistCons);
 
 val Arr (Prod ([Nat,TyRec ("natlist",Plus [Unit,Prod [Nat,TypVar ("natlist", 0)]])]),
@@ -1104,19 +1106,19 @@ val Fn ("natOrFuncOrProd", Plus [Nat,Plus [Arr (Nat,Nat),Prod ([Nat,Nat])]], Var
     parse "\\ natOrFuncOrProd : (nat || ((nat -> nat) || (nat * nat))) -> natOrFuncOrProd"
 
 val Some ("t",Prod ([TypVar ("t", 0),Prod ([Arr (Prod [Nat,TypVar ("t", 0)],TypVar ("t", 0)),Arr (TypVar ("t", 0),Nat)])])) : typ =
-    typeof (parseFile "/home/evan/thon/examples/natlist.thon");
+    typeof (parseEx "natlist.thon");
 
-val natList = (parseFile "/home/evan/thon/examples/natlist.thon");
+val natList = parseEx "natlist.thon";
 
 val Arr (Plus [Nat,Unit],Arr (Nat,Nat)) : Ast.typ =
-    typeof (parseFile "/home/evan/thon/examples/option.thon");
+    typeof (parseEx "option.thon");
 
 val Fn
     ("x",Plus [Nat,Unit],
      Fn
        ("y",Nat,Case (Var ("x",1),["somex", "none"],[Var ("somex",0),Var ("y",1)])))
   : exp =
-    parseFile "/home/evan/thon/examples/option.thon";
+    parseEx "option.thon";
 
 val Let ("x",Nat,Zero,Var ("x",0)) : Ast.exp = parse "let x : nat = Z in x";
 val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.exp =
@@ -1126,18 +1128,18 @@ val Let ("x",Nat,Zero,Let ("y",Nat,Succ Zero,Var ("x",1))) : Ast.exp =
 
 val Zero : Ast.exp = run "let x : nat = Z in x";
 
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/nilisempty.thon";
+val Succ Zero : Ast.exp = runEx "nilisempty.thon";
 
 val Succ Zero : Ast.exp = run "ifz Z of Z -> S Z | S prev -> Z";
 val Zero : Ast.exp = run "ifz S Z of Z -> S Z | S prev -> prev";
 
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/decr.thon";
+val Succ Zero : Ast.exp = runEx "decr.thon";
 
-val Succ (Succ Zero) : Ast.exp = runFile "/home/evan/thon/examples/add.thon";
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/sub.thon";
-val Zero : Ast.exp = runFile "/home/evan/thon/examples/eq.thon";
+val Succ (Succ Zero) : Ast.exp = runEx "add.thon";
+val Succ Zero : Ast.exp = runEx "sub.thon";
+val Zero : Ast.exp = runEx "eq.thon";
 
-val Succ Zero : Ast.exp = runFile "/home/evan/thon/examples/len.thon";
+val Succ Zero : Ast.exp = runEx "len.thon";
 
 val Fold
     (TyRec
@@ -1159,15 +1161,15 @@ val Fold
                     Plus
                       [Unit,
                        Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])]]],
-        TmUnit)) : Ast.exp = runFile "/home/evan/thon/examples/emptybst.thon";
+        TmUnit)) : Ast.exp = runEx "emptybst.thon";
 
-val bstType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/singletonbst.thon");
+val bstType : Ast.typ = typeof (parseEx "singletonbst.thon");
 
 val TyRec
     ("node",Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])
     : Ast.typ = bstType;
 
-val bstInsertType : Ast.typ = typeof (parseFile "/home/evan/thon/examples/bst.thon");
+val bstInsertType : Ast.typ = typeof (parseEx "bst.thon");
 val Arr(Nat, (Arr(bstType1, bstType2))) = bstInsertType;
 val true = (bstType = bstType1);
 
@@ -1177,18 +1179,18 @@ val loop = parse "fix loop : nat in loop";
 val true = (loop) = (step loop);
 val Nat = typeof loop;
 (* 2 is even *)
-val Succ Zero = runFile "/home/evan/thon/examples/iseven.thon";;
+val Succ Zero = runEx "iseven.thon";;
 
-val bstinsert = parseFile "/home/evan/thon/examples/bst.thon";
-val emptybst = parseFile "/home/evan/thon/examples/emptybst.thon";
-val zerobst = parseFile "/home/evan/thon/examples/singletonbst.thon";
+val bstinsert = parseEx "bst.thon";
+val emptybst = parseEx "emptybst.thon";
+val zerobst = parseEx "singletonbst.thon";
 
 val appbst = eval (A.App(A.App(bstinsert, A.Zero), emptybst));
 val true = (zerobst = appbst);
 
-val Succ (Succ Zero) = runFile "/home/evan/thon/examples/setget.thon";
+val Succ (Succ Zero) = runEx "setget.thon";
 
-val TypFn ("t", Zero) = runFile "/home/evan/thon/examples/typnames.thon";
+val TypFn ("t", Zero) = runEx "typnames.thon";
 
 val
   Data
@@ -1197,23 +1199,23 @@ val
   : Ast.exp =
     parse "data List = Nil unit | Cons nat * (some t. t -> List) in Z";
 
-val manualDatatype = parseFile "/home/evan/thon/examples/manual-datatype.thon";
+val manualDatatype = parseEx "manual-datatype.thon";
 val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * List in Z");
 
-val Zero = runFile "/home/evan/thon/examples/auto-natlist.thon";
-val Succ (Succ Zero) = runFile "/home/evan/thon/examples/bst-depth.thon";
+val Zero = runEx "auto-natlist.thon";
+val Succ (Succ Zero) = runEx "bst-depth.thon";
 
-val Zero = runFile "/home/evan/thon/examples/ternary-tree.thon";
-val Zero = runFile "/home/evan/thon/examples/three-summands-to-data.thon";
-val Zero = runFile "/home/evan/thon/examples/one-summand-to-data.thon";
+val Zero = runEx "ternary-tree.thon";
+val Zero = runEx "three-summands-to-data.thon";
+val Zero = runEx "one-summand-to-data.thon";
 
 val Fn
     ("natOrFuncOrProd",Prod [Nat,Prod [Arr (Nat,Nat),Prod [Nat,Nat]]],
-     Var ("natOrFuncOrProd",0)) = runFile "/home/evan/thon/examples/ternary-prod-type.thon";
+     Var ("natOrFuncOrProd",0)) = runEx "ternary-prod-type.thon";
 
 val Fn
     ("natOrFuncOrProd",Plus [Nat,Plus [Arr (Nat,Nat),Prod [Nat,Nat]]],
-     Var ("natOrFuncOrProd",0)) = runFile "/home/evan/thon/examples/ternary-sum-type.thon";
+     Var ("natOrFuncOrProd",0)) = runEx "ternary-sum-type.thon";
 
 val
   Tuple
@@ -1239,10 +1241,11 @@ val
         App
           (Var ("isempty",0),
            App (Var ("cons",2),Pair (Zero,App (Var ("nil",4),TmUnit))))))
-  : exp = parseFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
+  : exp = parseEx "unary-or-binary-tree.thon";
 
-val Zero = runFile "/home/evan/thon/examples/unary-or-binary-tree.thon";
-val Zero = runFile "/home/evan/thon/examples/dbi-management-datatype-elaboration.thon";
+val Zero = runEx "unary-or-binary-tree.thon";
+val Zero = runEx "dbi-management-datatype-elaboration.thon";
+val Zero = runEx "expmap-data.thon";
 
 val simpleNestedDatatypes =
   Data
