@@ -58,7 +58,7 @@ structure A = Ast
  | starTyps of A.typ list
  | dpipeTyps of A.typ list
  | dataSummands of (string list) * (A.typ list)
- | caseBranches of (string list) * (A.exp list)
+ | caseBranches of A.exp A.scope list
  | program of A.exp
 
 %verbose
@@ -90,13 +90,13 @@ exp:
   | ZERO (A.Zero)
   | SUCC exp (A.Succ exp)
   | UNIT (A.TmUnit)
-  | LAM ID COLON typ SARROW exp (A.Fn (ID, typ, exp))
-  | LET ID COLON typ EQ exp IN exp (A.Let (ID, typ, exp1, exp2))
-  | IFZ exp OF ZERO SARROW exp PIPE SUCC ID SARROW exp (A.Ifz (exp1, exp2, ID, exp3))
-  | REC exp OF ZERO SARROW exp PIPE ID SARROW exp (A.Rec (exp1, exp2, ID, exp3))
-  | FUN ID COLON typ EQ exp IN exp (A.Let(ID1, typ1, A.Fix(ID1, typ1, exp1), exp2))
-  | FIX ID COLON typ IN exp (A.Fix (ID, typ, exp))
-  | POLY ID SARROW exp (A.TypFn (ID, exp))
+  | LAM ID COLON typ SARROW exp (A.Fn (typ, A.Scope(ID, exp)))
+  | LET ID COLON typ EQ exp IN exp (A.Let (typ, exp1, A.Scope(ID, exp2)))
+  | IFZ exp OF ZERO SARROW exp PIPE SUCC ID SARROW exp (A.Ifz (exp1, exp2, A.Scope(ID, exp3)))
+  | REC exp OF ZERO SARROW exp PIPE ID SARROW exp (A.Rec (exp1, exp2, A.Scope(ID, exp3)))
+  | FUN ID COLON typ EQ exp IN exp (A.Let(typ1, A.Fix(typ1, A.Scope(ID1, exp1)), A.Scope(ID1, exp2)))
+  | FIX ID COLON typ IN exp (A.Fix (typ, A.Scope(ID, exp)))
+  | POLY ID SARROW exp (A.TypFn (A.Scope(ID, exp)))
   | LPAREN exp COMMA exp RPAREN (A.Pair(exp1, exp2))
   | FST exp (A.ProdLeft exp)
   | SND exp (A.ProdRight exp)
@@ -105,8 +105,8 @@ exp:
   | FOLD typ WITH exp (A.Fold(typ, exp))
   | UNFOLD exp (A.Unfold(exp))
   | IMPL typ WITH typ AS exp (A.Impl(typ2, exp, typ1))
-  | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, ID1, ID2, exp2))
-  | CASE exp OF caseBranches END (let val (ids, exps) = caseBranches in A.Case(exp, ids, exps) end)
+  | USE exp AS LPAREN ID COMMA ID RPAREN IN exp (A.Use(exp1, A.Scope(ID2, A.Scope(ID1, exp2))))
+  | CASE exp OF caseBranches END (A.Case(exp, caseBranches))
   | DATA ID EQ dataSummands IN exp (let val (ids, types) = dataSummands in A.Data(ID, ids, types, exp) end)
 
 typ:
@@ -116,9 +116,9 @@ typ:
   | typ STAR starTyps (A.Prod (typ::starTyps))
   | LPAREN typ RPAREN (typ)
   | ID (A.TypVar (ID, ~1))
-  | ALL ID DOT typ (A.All (ID, typ))
-  | SOME ID DOT typ (A.Some (ID, typ))
-  | TYPEREC ID DOT typ (A.TyRec (ID, typ))
+  | ALL ID DOT typ (A.All (A.Scope(ID, typ)))
+  | SOME ID DOT typ (A.Some (A.Scope(ID, typ)))
+  | TYPEREC ID DOT typ (A.TyRec (A.Scope(ID, typ)))
   (* TODO should this take precedence below star and arrow? *)
   | typ DPIPE dpipeTyps %prec TYPEOR (A.Plus (typ::dpipeTyps))
 
@@ -135,5 +135,5 @@ dataSummands:
   | ID typ ([ID], [typ])
 
 caseBranches:
-    ID DARROW exp PIPE caseBranches (let val (ids, exps) = caseBranches in (ID::ids, exp::exps) end)
-  | ID DARROW exp ([ID], [exp])
+    ID DARROW exp PIPE caseBranches (A.Scope(ID, exp)::caseBranches)
+  | ID DARROW exp ([A.Scope(ID, exp)])

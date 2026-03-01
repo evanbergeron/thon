@@ -48,9 +48,9 @@ fun istype typeCtx A.Nat = true
   | istype typeCtx (A.Arr(d, c)) = (istype typeCtx d) andalso (istype typeCtx c)
   | istype typeCtx (A.Prod types) = List.all (istype typeCtx) types
   | istype typeCtx (A.Plus types) = List.all (istype typeCtx) types
-  | istype typeCtx (A.All (name, t')) = istype (NONE::typeCtx) t'
-  | istype typeCtx (A.Some (name, t')) = istype (NONE::typeCtx) t'
-  | istype typeCtx (A.TyRec (name, t')) = istype (NONE::typeCtx) t'
+  | istype typeCtx (A.All (A.Scope(name, t'))) = istype (NONE::typeCtx) t'
+  | istype typeCtx (A.Some (A.Scope(name, t'))) = istype (NONE::typeCtx) t'
+  | istype typeCtx (A.TyRec (A.Scope(name, t'))) = istype (NONE::typeCtx) t'
 
 fun abstractOutType name search =
     A.typWalk (fn c => fn t => if t = search then A.TypVar(name, c) else t)
@@ -85,28 +85,28 @@ fun elaborateDatatype e =
     case e of
         A.Data(dataname, names, types, exp) =>
         let
-            val withType = A.TyRec(dataname, A.Plus types)
+            val withType = A.TyRec(A.Scope(dataname, A.Plus types))
             (* dataname is not bound here - the recursive reference is bound to the abstract
              * type bound in the Some *)
             val tInTypes = List.map (A.typSubst 0 (A.TypVar("t", 0))) types
             val exposeFnType = A.Arr(A.TypVar("t", 0), A.Plus tInTypes)
-            val exposeFn = A.Fn(dataname ^ "exp", withType, A.Unfold(A.Var(dataname ^ "exp", 0)))
-            val pkgType = A.Some("t", (*arbitrary name ok here *)
+            val exposeFn = A.Fn(withType, A.Scope(dataname ^ "exp", A.Unfold(A.Var(dataname ^ "exp", 0))))
+            val pkgType = A.Some(A.Scope("t", (*arbitrary name ok here *)
                                  A.Prod([A.Prod(
                                               List.map (fn t => A.Arr(t, A.TypVar("t", 0))) tInTypes),
                                          exposeFnType])
-                                )
+                                ))
             val sumTypeForInjection = List.map (A.typSubst 0 withType) types;
             fun makeInjectionExprFromSummandType (i, t) =
                 let val name = "summand" ^ Int.toString i
                 in
-                A.Fn(name,
-                     A.typSubst 0 withType t, (* getting typ, 0 instead of typ,1 here *)
+                A.Fn(A.typSubst 0 withType t, (* getting typ, 0 instead of typ,1 here *)
+                     A.Scope(name,
                      A.Fold(withType,
                             (* UNDONE is DeBruijin index 0 ok here?
                              * Do we need to be incrementing a bindingDepth somewhere else?
                              *)
-                            A.PlusNth(i, A.Plus sumTypeForInjection, A.Var(name, 0))))
+                            A.PlusNth(i, A.Plus sumTypeForInjection, A.Var(name, 0)))))
                 end
 
             val fns = List.mapi makeInjectionExprFromSummandType types;
@@ -116,19 +116,19 @@ fun elaborateDatatype e =
 
             val openedPackageTermName = "li"
             val cutoff = (List.length types) + 1;
-            val innerExp = A.Let("expose" ^ dataname,
-                                 A.Arr(A.TypVar(dataname, 0), A.Plus types),
+            val innerExp = A.Let(A.Arr(A.TypVar(dataname, 0), A.Plus types),
                                  A.ProdNth(1, A.Var(openedPackageTermName, (List.length types))),
-                                 A.expShift cutoff 1 (* reach over expose *) exp);
+                                 A.Scope("expose" ^ dataname,
+                                 A.expShift cutoff 1 (* reach over expose *) exp));
             fun makeDecls i =
                 if i = (List.length types) then innerExp
                 else
-                    A.Let(List.nth (names, i),
-                          A.Arr(List.nth (types, i), A.TypVar(dataname, 0)),
+                    A.Let(A.Arr(List.nth (types, i), A.TypVar(dataname, 0)),
                           A.ProdNth(i, A.ProdNth(0, A.Var(openedPackageTermName, i))),
-                          makeDecls (i+1))
+                          A.Scope(List.nth (names, i),
+                          makeDecls (i+1)))
         in
-            A.Use(dtval, openedPackageTermName, dataname, makeDecls 0)
+            A.Use(dtval, A.Scope(dataname, A.Scope(openedPackageTermName, makeDecls 0)))
         end
       | _ => e
 
@@ -138,9 +138,9 @@ fun eraseNamesInTyp t =
     let fun erase t =
             (case t of
                  A.TypVar(_, i) => A.TypVar("", i)
-               | A.All(_, t') => A.All("", t')
-               | A.Some(_, t') => A.Some("", t')
-               | A.TyRec(_, t') => A.TyRec("", t')
+               | A.All(A.Scope(_, t')) => A.All(A.Scope("", t'))
+               | A.Some(A.Scope(_, t')) => A.Some(A.Scope("", t'))
+               | A.TyRec(A.Scope(_, t')) => A.TyRec(A.Scope("", t'))
                | _ => t
             )
     in A.typMap erase t end
@@ -180,21 +180,22 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         ) else
             A.Plus types
     end
-  | typeof' ctx typCtx (A.Case (c, names, exps)) =
+  | typeof' ctx typCtx (A.Case (c, scs)) =
     let
         val A.Plus types = typeof' ctx typCtx c
-        val typeofFirstBranch = typeof' ((* binds exp var *) List.nth(types, 0)::ctx) typCtx (List.nth (exps, 0))
-        val typesExps = List.mapi (fn (i, _) => (List.nth (types, i), List.nth(exps, i))) types;
+        val A.Scope(_, firstBody) = List.hd scs
+        val firstType = List.hd types
+        val typeofFirstBranch = typeof' (firstType::ctx) typCtx firstBody
     in
-        if not (List.all (fn (t, e) => (typeEq typeofFirstBranch (typeof' (t::ctx) typCtx e))) typesExps) then
+        if not (ListPair.all (fn (t, A.Scope(_, e)) => (typeEq typeofFirstBranch (typeof' (t::ctx) typCtx e))) (types, scs)) then
             raiseIllTypedMsg "Case statement branches types do not agree"
         else
             typeofFirstBranch
     end
-  | typeof' ctx typCtx (A.Fn (argName, argType, funcBody)) =
+  | typeof' ctx typCtx (A.Fn (argType, A.Scope(argName, funcBody))) =
     if not (istype typCtx argType) then raiseIllTypedMsg "Function arg type is not a type."
     else A.Arr (argType, typeof' (argType::ctx) typCtx funcBody)
-  | typeof' ctx typCtx (A.Let (varname, vartype, varval, varscope)) =
+  | typeof' ctx typCtx (A.Let (vartype, varval, A.Scope(varname, varscope))) =
     if not (istype typCtx vartype) then
         raiseIllTypedMsg "Let var type is not a type"
     else if not (typeEq (typeof' ctx typCtx varval) vartype) then
@@ -208,7 +209,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         if not (typeEq d argType) then raise IllTyped
         else c
     end
-  | typeof' ctx typCtx (A.Ifz (i, t, prev, e)) =
+  | typeof' ctx typCtx (A.Ifz (i, t, A.Scope(prev, e))) =
     let val Nat = typeof' ctx typCtx i
         val thenType = typeof' ctx typCtx t
         val elseType = typeof' (Nat::ctx) typCtx e
@@ -218,18 +219,18 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     end
   | typeof' ctx typCtx (A.Pair (l, r)) = A.Prod [typeof' ctx typCtx l, typeof' ctx typCtx r]
   | typeof' ctx typCtx (A.Tuple exps) = A.Prod (List.map (typeof' ctx typCtx) exps)
-  | typeof' ctx typCtx (A.Rec (i, baseCase, prevCaseName, recCase)) =
+  | typeof' ctx typCtx (A.Rec (i, baseCase, A.Scope(prevCaseName, recCase))) =
     let val A.Nat = typeof' ctx typCtx i
         val t = typeof' ctx typCtx baseCase
         val t2 = typeof' (t::ctx) typCtx recCase
     in
         if not (typeEq t t2) then raise IllTyped else t
     end
-  | typeof' ctx typCtx (A.Fix (name, typ, e)) = typeof' (typ::ctx) typCtx e
-  | typeof' ctx typCtx (A.TypFn (name, e)) = A.All(name, typeof' ctx (NONE::typCtx) e)
+  | typeof' ctx typCtx (A.Fix (typ, A.Scope(name, e))) = typeof' (typ::ctx) typCtx e
+  | typeof' ctx typCtx (A.TypFn (A.Scope(name, e))) = A.All(A.Scope(name, typeof' ctx (NONE::typCtx) e))
   | typeof' ctx typCtx (A.TypApp (appType, e)) =
     if not (istype typCtx appType) then raise IllTyped else
-    let val A.All(name, t) = typeof' ctx typCtx e
+    let val A.All(A.Scope(name, t)) = typeof' ctx typCtx e
     in
         A.typSubst 0 appType t
     end
@@ -240,7 +241,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     ) else
     (* pkgType : [reprType/A.TypVar 0](t') *)
     let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
-        val A.Some(name, pkgType') = pkgType
+        val A.Some(A.Scope(name, pkgType')) = pkgType
     in
         if not (typeEq (abstractOutType name reprType deducedPkgType)
                        (abstractOutType name reprType pkgType')) then
@@ -248,8 +249,8 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         else
             pkgType
     end
-  | typeof' ctx typCtx (A.Use (pkg, clientName, typeName, client)) =
-    let val A.Some(name, r) = typeof' ctx typCtx pkg
+  | typeof' ctx typCtx (A.Use (pkg, A.Scope(typeName, A.Scope(clientName, client)))) =
+    let val A.Some(A.Scope(name, r)) = typeof' ctx typCtx pkg
         (* binds BOTH a A.TypVar and a exp A.Var *)
         val clientType = typeof' (r::ctx) (NONE::typCtx) client
         val resType = A.typShift ~1 clientType
@@ -257,16 +258,16 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         if not (istype typCtx resType) then raise IllTyped else
         resType
     end
-  | typeof' ctx typCtx (A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *))) =
+  | typeof' ctx typCtx (A.Fold(A.TyRec(A.Scope(name, t)) (*declared type*), e'(* binds a typ var *))) =
     let val deduced = typeof' ctx (NONE::typCtx) e'
-        val finalType = A.TyRec(name, t)
-        val absDeduced = A.TyRec(name, abstractOutType name finalType deduced)
+        val finalType = A.TyRec(A.Scope(name, t))
+        val absDeduced = A.TyRec(A.Scope(name, abstractOutType name finalType deduced))
     in
         if not (typeEq absDeduced finalType) then (
             print "Recursive type deduced type:\n";
             print (A.Print.typToString absDeduced);
             print "\nis not type-equal to declared type:\n";
-            printlnType (A.TyRec(name, t));
+            printlnType (A.TyRec(A.Scope(name, t)));
             raise IllTyped
          ) else
             finalType
@@ -274,8 +275,8 @@ fun typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx (A.Fold(_ , e'(* binds a typ var *))) =
     raiseIllTypedMsg "Fold type argument must be a recursive type"
   | typeof' ctx typCtx (A.Unfold(e')) =
-    let val A.TyRec(name, t) = typeof' ctx typCtx e' in
-        A.typSubst 0 (A.TyRec(name, t)) t
+    let val A.TyRec(A.Scope(name, t)) = typeof' ctx typCtx e' in
+        A.typSubst 0 (A.TyRec(A.Scope(name, t))) t
     end
 
 fun typeof e = typeof' [] [] e
@@ -285,11 +286,11 @@ fun isval e =
         A.Zero => true
       | A.TmUnit => true
       | A.Succ(n) => isval n
-      | A.Fn(_, _, _) => true
-      | A.Let(_, _, _, _) => false
+      | A.Fn(_, _) => true
+      | A.Let(_, _, _) => false
       | A.Pair(l, r) => (isval l) andalso (isval r)
       | A.Tuple exps => List.all isval exps
-      | A.TypFn (_, _)  => true
+      | A.TypFn _  => true
       | A.Impl(_, pkgImpl, _) => isval pkgImpl
       | A.PlusLeft(_, e') => isval e'
       | A.PlusRight(_, e') => isval e'
@@ -319,43 +320,43 @@ fun step e =
         end
       | A.App(f, n) => if not (isval f) then A.App(step f, n)
                      else (if not (isval n) then A.App(f, step n)
-                           else let val A.Fn(argName, t, f') = f
+                           else let val A.Fn(t, A.Scope(argName, f')) = f
                            in
                                (* plug `n` into `f'` *)
                                A.expSubst 0 n f'
                            end
                           )
-      | A.Ifz(i, t, prev, e) =>
-            if not (isval i) then A.Ifz(step i, t, prev, e)
+      | A.Ifz(i, t, A.Scope(prev, e')) =>
+            if not (isval i) then A.Ifz(step i, t, A.Scope(prev, e'))
             else (case i of
                       A.Zero => t
-                    | A.Succ i' => A.expSubst 0 i' e
+                    | A.Succ i' => A.expSubst 0 i' e'
                     | _ => raiseIllTypedMsg "ifz conditional must be an integer")
       (* BUG? should this eval varval before expSubst? should it eval varscope before expSubst? *)
-      | A.Let (varname, vartype, varval, varscope) => A.expSubst 0 varval varscope
+      | A.Let (vartype, varval, A.Scope(varname, varscope)) => A.expSubst 0 varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
-      | A.Rec (A.Zero, baseCase, prevCaseName, recCase) => baseCase
-      | A.Rec (A.Succ(i), baseCase, prevCaseName, recCase) =>
+      | A.Rec (A.Zero, baseCase, _) => baseCase
+      | A.Rec (A.Succ(i), baseCase, sc as A.Scope(_, recCase)) =>
             (* Doesn't evaluate recursive call if not required. *)
-            A.expSubst 0 (A.Rec(i, baseCase, prevCaseName, recCase)) recCase
-      | A.Rec (i, baseCase, prevCaseName, recCase) =>
+            A.expSubst 0 (A.Rec(i, baseCase, sc)) recCase
+      | A.Rec (i, baseCase, sc) =>
             if not (isval i) then
-                A.Rec(step i, baseCase, prevCaseName, recCase)
+                A.Rec(step i, baseCase, sc)
             else raise No
-      | A.Fix(name, t, body) => A.expSubst 0 e body
-      | A.TypFn (name, e') => raise No (* Already isval *)
+      | A.Fix(t, A.Scope(name, body)) => A.expSubst 0 e body
+      | A.TypFn _ => raise No (* Already isval *)
       | A.TypApp (t, e') =>
             if not (isval e') then (A.TypApp (t, step e'))
             else
-                let val A.TypFn(name, e'') = e' in
+                let val A.TypFn(A.Scope(name, e'')) = e' in
                     A.substTypeInExp t e''
                 end
       | A.Impl(reprType, pkgImpl, pkgType) =>
             if not (isval pkgImpl) then A.Impl(reprType, step pkgImpl, pkgType) else
             if not (isval e) then raise No else
             e
-      | A.Use (pkg, clientName, typeName, client) =>
-            if not (isval pkg) then A.Use (step pkg, clientName, typeName, client) else
+      | A.Use (pkg, sc as A.Scope(typeName, A.Scope(clientName, client))) =>
+            if not (isval pkg) then A.Use (step pkg, sc) else
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 A.Impl(reprType', pkgImpl', _) =>
@@ -372,13 +373,13 @@ fun step e =
         (print "plusnth";
             if not (isval e') then A.PlusNth(i, t, step e')
             else e)
-      | A.Case (c, names, exps) =>
-        if not (isval c) then A.Case(step c, names, exps)
+      | A.Case (c, scs) =>
+        if not (isval c) then A.Case(step c, scs)
         else (
             case c of
-                 A.PlusLeft(_, e) => A.expSubst 0 e (List.nth (exps, 0))
-               | A.PlusRight(_, e) => A.expSubst 0 e (List.nth (exps, 1))
-               | A.PlusNth(i, _, e) => A.expSubst 0 e (List.nth (exps, i))
+                 A.PlusLeft(_, e') => let val A.Scope(_, body) = List.nth (scs, 0) in A.expSubst 0 e' body end
+               | A.PlusRight(_, e') => let val A.Scope(_, body) = List.nth (scs, 1) in A.expSubst 0 e' body end
+               | A.PlusNth(i, _, e') => let val A.Scope(_, body) = List.nth (scs, i) in A.expSubst 0 e' body end
                | _ => raise IllTyped
         )
       | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')

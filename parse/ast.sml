@@ -2,15 +2,16 @@ signature AST =
 sig
 
     (* TODO is there a way to dedupe this with the structure defn below? *)
+    datatype 'a scope = Scope of string * 'a
     datatype typ =
         Nat
       | TypVar of string * int
       | Arr of typ * typ
-      | All of string * typ (* binds *)
-      | Some of string * typ (* binds *)
+      | All of typ scope (* binds *)
+      | Some of typ scope (* binds *)
       | Prod of typ list
       | Plus of typ list (* sum type *)
-      | TyRec of string * typ (* binds *)
+      | TyRec of typ scope (* binds *)
       | Unit (* nullary sum *)
 
     datatype Idx = int
@@ -19,16 +20,16 @@ sig
         Zero
       | Var of string * int (* idx into ctx *)
       | Succ of exp
-      | Fn of string * typ (*argType*) * exp (*funcBody*)
-      | Let of string * typ (*vartype*) * exp (*varval*) * exp (*varscope*)
+      | Fn of typ (*argType*) * exp scope (*funcBody*)
+      | Let of typ (*vartype*) * exp (*varval*) * exp scope (*varscope*)
       | App of exp * exp
-      | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * string * exp (*recCase - binds*)
-      | Fix of string (*x*) * typ (*: t*) * exp (*x's scope*)
-      | TypFn of string * exp (* binds type variable *)
-      | Ifz of exp * exp * string * exp
+      | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * exp scope (*recCase - binds*)
+      | Fix of typ (*: t*) * exp scope (*x's scope*)
+      | TypFn of exp scope (* binds type variable *)
+      | Ifz of exp * exp * exp scope
       | TypApp of typ * exp
       | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
-      | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
+      | Use of exp (*package*) * (exp scope) scope (* client that binds BOTH a TypVar and a exp Var *)
       | Data of string *
                 string list *
                 typ list *
@@ -44,8 +45,7 @@ sig
       | PlusRight of typ * exp
       | PlusNth of int * typ * exp (* Internal *)
       | Case of exp (* thing being cased on*) *
-                string list *
-                exp list (* each exp binds *)
+                exp scope list (* each exp binds *)
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
@@ -77,15 +77,16 @@ end
 
 structure Ast :> AST =
 struct
+    datatype 'a scope = Scope of string * 'a
     datatype typ =
         Nat
       | TypVar of string * int
       | Arr of typ * typ
-      | All of string * typ (* binds *)
-      | Some of string * typ (* binds *)
+      | All of typ scope (* binds *)
+      | Some of typ scope (* binds *)
       | Prod of typ list
       | Plus of typ list (* sum type *)
-      | TyRec of string * typ (* binds *)
+      | TyRec of typ scope (* binds *)
       | Unit (* nullary sum *)
 
     datatype Idx = int
@@ -94,16 +95,16 @@ struct
         Zero
       | Var of string * int (* idx into ctx *)
       | Succ of exp
-      | Fn of string * typ (*argType*) * exp (*funcBody*)
-      | Let of string * typ (*vartype*) * exp (*varval*) * exp (*varscope*)
+      | Fn of typ (*argType*) * exp scope (*funcBody*)
+      | Let of typ (*vartype*) * exp (*varval*) * exp scope (*varscope*)
       | App of exp * exp
-      | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * string * exp (*recCase - binds*)
-      | Fix of string (*x*) * typ (*: t*) * exp (*x's scope*)
-      | TypFn of string * exp (* binds type variable *)
-      | Ifz of exp * exp * string * exp
+      | Rec of exp (*i : Nat*) * exp (*baseCase: t*) * exp scope (*recCase - binds*)
+      | Fix of typ (*: t*) * exp scope (*x's scope*)
+      | TypFn of exp scope (* binds type variable *)
+      | Ifz of exp * exp * exp scope
       | TypApp of typ * exp
       | Impl of typ (*reprType*)* exp (*pkgImpl*)* typ (*pkgType - first example of explicit type binding - there's not one cannonical type*)
-      | Use of exp (*package*) * string (*exp name*) * string (*type name*) * exp (* client that binds BOTH a TypVar and a exp Var *)
+      | Use of exp (*package*) * (exp scope) scope (* client that binds BOTH a TypVar and a exp Var *)
       | Data of string * (* binds type variable *)
                 string list *
                 typ list *
@@ -119,8 +120,7 @@ struct
       | PlusRight of typ * exp
       | PlusNth of int * typ * exp (* Internal *)
       | Case of exp (* thing being cased on*) *
-                string list *
-                exp list (* each exp binds *)
+                exp scope list (* each exp binds *)
       | Fold of typ (*binds*) * exp
       | Unfold of exp
       | TmUnit
@@ -138,21 +138,21 @@ struct
            | PlusLeft(t, e') => f (PlusLeft(t, expMap f e'))
            | PlusRight(t, e') => f (PlusRight(t, expMap f e'))
            | PlusNth(i, t, e') => f (PlusNth(i, t, expMap f e'))
-           | Case(c, names, exps) =>
-             f (Case(expMap f c, names, List.map (expMap f) exps))
-           | Fn(argName, t, f') => f (Fn(argName, t, (expMap f f')))
-           | Let(varname, vartype, varval, varscope) =>
-             f (Let(varname, vartype, (expMap f varval), (expMap f varscope)))
+           | Case(c, scs) =>
+             f (Case(expMap f c, List.map (fn Scope(n, e') => Scope(n, expMap f e')) scs))
+           | Fn(t, Scope(argName, f')) => f (Fn(t, Scope(argName, expMap f f')))
+           | Let(vartype, varval, Scope(varname, varscope)) =>
+             f (Let(vartype, (expMap f varval), Scope(varname, expMap f varscope)))
            | App(f', n) => f (App((expMap f f'), expMap f n))
-           | Ifz(i, t, prev, e) => f (Ifz(expMap f i, expMap f t, prev, expMap f e))
-           | Rec(i, baseCase, prevCaseName, recCase) =>
-             f (Rec(expMap f i, expMap f baseCase, prevCaseName, expMap f recCase))
-           | Fix(name, t, e') => f (Fix(name, t, expMap f e'))
-           | TypFn (name, e') => f (TypFn (name, expMap f e'))
+           | Ifz(i, t, Scope(prev, e')) => f (Ifz(expMap f i, expMap f t, Scope(prev, expMap f e')))
+           | Rec(i, baseCase, Scope(prevCaseName, recCase)) =>
+             f (Rec(expMap f i, expMap f baseCase, Scope(prevCaseName, expMap f recCase)))
+           | Fix(t, Scope(name, e')) => f (Fix(t, Scope(name, expMap f e')))
+           | TypFn (Scope(name, e')) => f (TypFn (Scope(name, expMap f e')))
            | TypApp (appType, e') => f (TypApp(appType, expMap f e'))
            | Impl(reprType, pkgImpl, t) => f (Impl(reprType, expMap f pkgImpl, t))
-           | Use(pkg, clientName, typeName, client) =>
-             f (Use(expMap f pkg, clientName, typeName, expMap f client))
+           | Use(pkg, Scope(typeName, Scope(clientName, client))) =>
+             f (Use(expMap f pkg, Scope(typeName, Scope(clientName, expMap f client))))
            | Pair(l, r) => f (Pair(expMap f l, expMap f r))
            | Tuple exps => f (Tuple (List.map (expMap f) exps))
            | Fold(t, e') => f (Fold(t, (expMap f e')))
@@ -169,11 +169,13 @@ struct
           | Arr(d, c) => f (Arr(typMap f d, typMap f c))
           | Prod types  => f (Prod(map (typMap f) types))
           | Plus types  => f (Plus(map (typMap f) types))
-          | All (name, t') => f (All(name, typMap f t'))
-          | Some (name, t') => f (Some(name, typMap f t'))
-          | TyRec (name, t') => f (TyRec(name, typMap f t'))
+          | All (Scope(name, t')) => f (All(Scope(name, typMap f t')))
+          | Some (Scope(name, t')) => f (Some(Scope(name, typMap f t')))
+          | TyRec (Scope(name, t')) => f (TyRec(Scope(name, typMap f t')))
 
     fun typWalk onTyp inc c t =
+        let fun walkScope (Scope(name, t')) = Scope(name, typWalk onTyp inc (inc name c) t')
+        in
         onTyp c (case t of
              Nat => Nat
            | Unit => Unit
@@ -181,9 +183,10 @@ struct
            | Arr(d, co) => Arr(typWalk onTyp inc c d, typWalk onTyp inc c co)
            | Prod types => Prod(List.map (typWalk onTyp inc c) types)
            | Plus types => Plus(List.map (typWalk onTyp inc c) types)
-           | All (name, t') => All(name, typWalk onTyp inc (inc name c) t')
-           | Some (name, t') => Some(name, typWalk onTyp inc (inc name c) t')
-           | TyRec (name, t') => TyRec(name, typWalk onTyp inc (inc name c) t'))
+           | All sc => All(walkScope sc)
+           | Some sc => Some(walkScope sc)
+           | TyRec sc => TyRec(walkScope sc))
+        end
 
     val incrDepth : string -> int -> int = fn _ => fn c => c+1
 
@@ -195,7 +198,10 @@ struct
             incrDepth 0
 
     fun expWalk (args as {onExp, onTyp, onBindExp, onBindTyp}) ce ct e =
-        let val walk = expWalk args in
+        let val walk = expWalk args
+            fun walkExpScope (Scope(name, e')) = Scope(name, walk (onBindExp name ce) ct e')
+            fun walkTypScope (Scope(name, e')) = Scope(name, walk ce (onBindTyp name ct) e')
+        in
         onExp ce (case e of
             Zero => e
           | TmUnit => e
@@ -207,26 +213,25 @@ struct
           | PlusLeft (t, e') => PlusLeft (onTyp ct t, walk ce ct e')
           | PlusRight (t, e') => PlusRight (onTyp ct t, walk ce ct e')
           | PlusNth (i, t, e') => PlusNth (i, onTyp ct t, walk ce ct e')
-          | Case(cas, names, exps) =>
-            Case(walk ce ct cas, names,
-                 ListPair.map (fn (name, e') => walk (onBindExp name ce) ct e') (names, exps))
-          | Fn (argName, t, f) => Fn(argName, onTyp ct t, walk (onBindExp argName ce) ct f)
-          | Let (varname, vartype, varval, varscope) =>
-            Let(varname, onTyp ct vartype, walk ce ct varval, walk (onBindExp varname ce) ct varscope)
+          | Case(cas, scs) =>
+            Case(walk ce ct cas, List.map walkExpScope scs)
+          | Fn (t, sc) => Fn(onTyp ct t, walkExpScope sc)
+          | Let (vartype, varval, sc) =>
+            Let(onTyp ct vartype, walk ce ct varval, walkExpScope sc)
           | App (f, n) => App(walk ce ct f, walk ce ct n)
-          | Ifz (i, t, prev, e') => Ifz(walk ce ct i, walk ce ct t, prev, walk (onBindExp prev ce) ct e')
-          | Rec (i, baseCase, prevCaseName, recCase) =>
-            Rec(walk ce ct i, walk ce ct baseCase, prevCaseName, walk (onBindExp prevCaseName ce) ct recCase)
-          | Fix (name, t, e') => Fix(name, onTyp ct t, walk (onBindExp name ce) ct e')
+          | Ifz (i, t, sc) => Ifz(walk ce ct i, walk ce ct t, walkExpScope sc)
+          | Rec (i, baseCase, sc) =>
+            Rec(walk ce ct i, walk ce ct baseCase, walkExpScope sc)
+          | Fix (t, sc) => Fix(onTyp ct t, walkExpScope sc)
           | Pair (l, r) => Pair (walk ce ct l, walk ce ct r)
           | Tuple exps => Tuple (List.map (fn e' => walk ce ct e') exps)
-          | TypFn (name, e') => TypFn (name, walk ce (onBindTyp name ct) e')
+          | TypFn sc => TypFn (walkTypScope sc)
           | TypApp (appType, e') => TypApp(onTyp ct appType, walk ce ct e')
           | Impl(reprType, pkgImpl, t) => Impl(onTyp ct reprType, walk ce ct pkgImpl, onTyp ct t)
-          | Use (pkg, clientName, typeName, client) =>
-            Use(walk ce ct pkg, clientName, typeName, walk (onBindExp clientName ce) (onBindTyp typeName ct) client)
+          | Use (pkg, Scope(tn, Scope(en, body))) =>
+            Use(walk ce ct pkg, Scope(tn, Scope(en, walk (onBindExp en ce) (onBindTyp tn ct) body)))
           | Fold(t, e') =>
-            let val ct' = case t of TyRec(name, _) => onBindTyp name ct | _ => ct
+            let val ct' = case t of TyRec(Scope(name, _)) => onBindTyp name ct | _ => ct
             in Fold(onTyp ct t, walk ce ct' e') end
           | Unfold(e') => Unfold(walk ce ct e')
           | Data(dataname, names, types, e') =>
@@ -269,11 +274,11 @@ struct
       | typToString (TypVar(s, i)) = "TypVar(" ^ s ^ "," ^ Int.toString(i) ^ ")"
 
       | typToString (Arr(t, t')) = "Arr(" ^ typToString(t) ^ "," ^ typToString(t') ^ ")"
-      | typToString (All(s, t)) = "All(" ^ s ^ "," ^ typToString(t) ^ ")"
-      | typToString (Some(s, t)) = "Some(" ^ s ^ "," ^ typToString(t) ^ ")"
+      | typToString (All(Scope(s, t))) = "All(" ^ s ^ "," ^ typToString(t) ^ ")"
+      | typToString (Some(Scope(s, t))) = "Some(" ^ s ^ "," ^ typToString(t) ^ ")"
       | typToString (Prod types) = "Prod[" ^ (String.concatWith "," (List.map typToString types)) ^ "]"
       | typToString (Plus types) = "Plus[" ^ (String.concatWith "," (List.map typToString types)) ^ "]"
-      | typToString (TyRec(s, t)) = "TyRec(" ^ s ^ "," ^ typToString(t) ^ ")"
+      | typToString (TyRec(Scope(s, t))) = "TyRec(" ^ s ^ "," ^ typToString(t) ^ ")"
       | typToString Unit = "Unit"
 
 
@@ -287,17 +292,17 @@ struct
       | expToString (PlusLeft(t, e')) = "PlusLeft(" ^ (typToString t) ^ (expToString e') ^ ")"
       | expToString (PlusRight(t, e')) = "PlusRight(" ^ (typToString t) ^ (expToString e') ^ ")"
       | expToString (PlusNth(i, t, e')) = "PlusNth(" ^ (Int.toString i) ^ "," ^ (typToString t) ^ (expToString e') ^ ")"
-      | expToString (Case(c, names, exps)) = "TODO"
-      | expToString (Fn(argName, t, f')) = "TODO"
-      | expToString (Let(varname, vartype, varval, varscope)) = "TODO"
+      | expToString (Case(c, scs)) = "TODO"
+      | expToString (Fn(t, Scope(argName, f'))) = "TODO"
+      | expToString (Let(vartype, varval, Scope(varname, varscope))) = "TODO"
       | expToString (App(f', n)) =  "TODO"
-      | expToString (Ifz(i, t, prev, e)) =  "TODO"
-      | expToString (Rec(i, baseCase, prevCaseName, recCase)) = "TODO"
-      | expToString (Fix(name, t, e')) =  "TODO"
-      | expToString (TypFn (name, e')) = "TODO"
+      | expToString (Ifz(i, t, Scope(prev, e))) =  "TODO"
+      | expToString (Rec(i, baseCase, Scope(prevCaseName, recCase))) = "TODO"
+      | expToString (Fix(t, Scope(name, e'))) =  "TODO"
+      | expToString (TypFn (Scope(name, e'))) = "TODO"
       | expToString (TypApp (appType, e')) = "TODO"
       | expToString (Impl(reprType, pkgImpl, t)) = "TODO"
-      | expToString (Use(pkg, clientName, typeName, client)) = "TODO"
+      | expToString (Use(pkg, Scope(typeName, Scope(clientName, client)))) = "TODO"
       | expToString (Pair(l, r)) = "TODO"
       | expToString (Tuple exps) = "TODO"
       | expToString (Fold(t, e')) = "TODO"
