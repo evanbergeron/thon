@@ -71,10 +71,11 @@ fun setDeBruijnIndexInType t typnames =
 
 fun setDeBruijnIndex e varnames typnames =
     A.expWalk
-        {onExpVar = fn varnames => fn A.Var(name, _) =>
+        {onExp = fn varnames => fn A.Var(name, _) =>
             (case find name varnames of
                 NONE => (print ("unknown var: "^ name); raise VarNotInContext)
-              | SOME i => A.Var(name, i)),
+              | SOME i => A.Var(name, i))
+            | e => e,
          onTyp = fn typnames => fn t => setDeBruijnIndexInType t typnames,
          onBindExp = fn name => fn names => name::names,
          onBindTyp = fn name => fn names => name::names}

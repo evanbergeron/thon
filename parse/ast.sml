@@ -58,7 +58,7 @@ sig
     val typShift : int -> typ -> typ
     val typSubst : int -> typ -> typ -> typ
 
-    val expWalk : {onExpVar: 'a -> exp -> exp,
+    val expWalk : {onExp: 'a -> exp -> exp,
                    onTyp: 'b -> typ -> typ,
                    onBindExp: string -> 'a -> 'a,
                    onBindTyp: string -> 'b -> 'b} -> 'a -> 'b -> exp -> exp
@@ -194,13 +194,12 @@ struct
             | t => t)
             incrDepth 0
 
-    fun expWalk (args as {onExpVar, onTyp, onBindExp, onBindTyp}) ce ct e =
-        let val walk = expWalk args
-        in
-        case e of
-            Zero => Zero
-          | TmUnit => TmUnit
-          | Var _ => onExpVar ce e
+    fun expWalk (args as {onExp, onTyp, onBindExp, onBindTyp}) ce ct e =
+        let val walk = expWalk args in
+        onExp ce (case e of
+            Zero => e
+          | TmUnit => e
+          | Var _ => e
           | Succ e' => Succ (walk ce ct e')
           | ProdLeft e' => ProdLeft (walk ce ct e')
           | ProdRight e' => ProdRight (walk ce ct e')
@@ -233,12 +232,13 @@ struct
           | Data(dataname, names, types, e') =>
             let val ct' = onBindTyp dataname ct
                 val ce' = foldl (fn (n, c) => onBindExp n c) ce (names @ ["expose" ^ dataname])
-            in Data(dataname, names, List.map (onTyp ct') types, walk ce' ct' e') end
+            in Data(dataname, names, List.map (onTyp ct') types, walk ce' ct' e') end)
         end
 
     fun expShift cutoff shift =
-        expWalk {onExpVar = fn c => fn Var(name, n) =>
-                    if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n),
+        expWalk {onExp = fn c => fn Var(name, n) =>
+                    if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n)
+                    | e => e,
                  onTyp = fn _ => fn t => t,
                  onBindExp = incrDepth, onBindTyp = incrDepth} 0 0
 
@@ -251,13 +251,14 @@ struct
 
     (* See page 86 of Types and Programming Languages *)
     fun expSubst j s =
-        expWalk {onExpVar = fn c => fn Var(name, n) =>
-                    if n = j+c then expShift 0 c s else Var(name, n),
+        expWalk {onExp = fn c => fn Var(name, n) =>
+                    if n = j+c then expShift 0 c s else Var(name, n)
+                    | e => e,
                  onTyp = fn _ => fn t => t,
                  onBindExp = incrDepth, onBindTyp = incrDepth} 0 0
 
     fun substTypeInExp srcType =
-        expWalk {onExpVar = fn _ => fn e => e,
+        expWalk {onExp = fn _ => fn e => e,
                  onTyp = fn ct => fn t => typSubst ct srcType t,
                  onBindExp = incrDepth, onBindTyp = incrDepth} 0 0
 
