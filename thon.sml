@@ -152,23 +152,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx (A.Var (name, i)) =
     if i < 0 then raise VarWithNegativeDeBruijinIndex(name, i) else get ctx i
   | typeof' ctx typCtx (A.Succ e2) = (typeof' ctx typCtx e2)
-  | typeof' ctx typCtx (A.ProdLeft e) = let val A.Prod [l, r] = (typeof' ctx typCtx e) in l end
-  | typeof' ctx typCtx (A.ProdRight e) = let val A.Prod [l, r] = (typeof' ctx typCtx e) in r end
   | typeof' ctx typCtx (A.ProdNth (i,e)) = let val A.Prod types = (typeof' ctx typCtx e) in List.nth (types, i) end
-  | typeof' ctx typCtx (A.PlusLeft (t, e)) =
-    let val A.Plus[l, r] = t in
-        if not (typeEq l (typeof' ctx typCtx e)) then
-            raiseIllTypedMsg "Sum type annotation does not match deduced type"
-        else
-            A.Plus[l, r]
-    end
-  | typeof' ctx typCtx (A.PlusRight (t, e)) =
-    let val A.Plus[l, r] = t in
-        if not (typeEq r (typeof' ctx typCtx e)) then
-            raiseIllTypedMsg "Sum type annotation does not match deduced type"
-        else
-            A.Plus[l, r]
-    end
   | typeof' ctx typCtx (A.PlusNth (i, t, e)) =
     let val A.Plus types = t in
         if not (typeEq (List.nth (types, i)) (typeof' ctx typCtx e)) then (
@@ -217,7 +201,6 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         if not (typeEq thenType elseType) then raise IllTyped
         else thenType
     end
-  | typeof' ctx typCtx (A.Pair (l, r)) = A.Prod [typeof' ctx typCtx l, typeof' ctx typCtx r]
   | typeof' ctx typCtx (A.Tuple exps) = A.Prod (List.map (typeof' ctx typCtx) exps)
   | typeof' ctx typCtx (A.Rec (i, baseCase, A.Scope(prevCaseName, recCase))) =
     let val A.Nat = typeof' ctx typCtx i
@@ -288,12 +271,9 @@ fun isval e =
       | A.Succ(n) => isval n
       | A.Fn(_, _) => true
       | A.Let(_, _, _) => false
-      | A.Pair(l, r) => (isval l) andalso (isval r)
       | A.Tuple exps => List.all isval exps
       | A.TypFn _  => true
       | A.Impl(_, pkgImpl, _) => isval pkgImpl
-      | A.PlusLeft(_, e') => isval e'
-      | A.PlusRight(_, e') => isval e'
       | A.PlusNth(_, _, e') => isval e'
       | A.Fold(t, e') => isval e'
       | _ => false
@@ -303,15 +283,8 @@ fun step e =
     if isval e then e else
     case e of
         A.Succ(n) => if not (isval n) then A.Succ(step n) else e
-      | A.ProdLeft n  => if not (isval n) then A.ProdLeft(step n) else
-                   let val A.Pair(l, r) = n in l end
-      | A.ProdRight n  => if not (isval n) then A.ProdRight(step n) else
-                    let val A.Pair(l, r) = n in r end
       | A.ProdNth (i, n)  => if not (isval n) then A.ProdNth(i, step n) else
                     let val A.Tuple exps = n in List.nth (exps, i) end
-      | A.Pair(l, r) => if not (isval l) then A.Pair(step l, r) else
-                       if not (isval r) then A.Pair(l, step r) else
-                       e
       | A.Tuple exps =>
         let fun recr [] = []
               | recr (e::es) = if isval e then e::(recr es) else (step e)::es
@@ -363,23 +336,14 @@ fun step e =
                     A.expSubst 0 pkgImpl' (A.substTypeInExp reprType' client)
               | _ => raise No
            )
-      | A.PlusLeft (t, e') =>
-            if not (isval e') then A.PlusLeft(t, step e')
-            else e
-      | A.PlusRight (t, e') =>
-            if not (isval e') then A.PlusRight(t, step e')
-            else e
       | A.PlusNth (i, t, e') =>
-        (print "plusnth";
             if not (isval e') then A.PlusNth(i, t, step e')
-            else e)
+            else e
       | A.Case (c, scs) =>
         if not (isval c) then A.Case(step c, scs)
         else (
             case c of
-                 A.PlusLeft(_, e') => let val A.Scope(_, body) = List.nth (scs, 0) in A.expSubst 0 e' body end
-               | A.PlusRight(_, e') => let val A.Scope(_, body) = List.nth (scs, 1) in A.expSubst 0 e' body end
-               | A.PlusNth(i, _, e') => let val A.Scope(_, body) = List.nth (scs, i) in A.expSubst 0 e' body end
+                 A.PlusNth(i, _, e') => let val A.Scope(_, body) = List.nth (scs, i) in A.expSubst 0 e' body end
                | _ => raise IllTyped
         )
       | A.Fold (t, e') => if not (isval e') then A.Fold(t, step e')

@@ -34,16 +34,9 @@ sig
                 string list *
                 typ list *
                 exp (*TODO non-binary datatypes*)
-      | Pair of exp * exp
       | Tuple of exp list
-      (* Elimination forms for terms of Prod type *)
-      | ProdLeft of exp
-      | ProdRight of exp
       | ProdNth of int * exp
-      (* Elimination forms for terms of Plus type *)
-      | PlusLeft of typ * exp
-      | PlusRight of typ * exp
-      | PlusNth of int * typ * exp (* Internal *)
+      | PlusNth of int * typ * exp
       | Case of exp (* thing being cased on*) *
                 exp scope list (* each exp binds *)
       | Fold of typ (*binds*) * exp
@@ -109,16 +102,9 @@ struct
                 string list *
                 typ list *
                 exp (*TODO non-binary datatypes*)
-      | Pair of exp * exp
       | Tuple of exp list
-      (* Elimination forms for terms of Prod type *)
-      | ProdLeft of exp
-      | ProdRight of exp
       | ProdNth of int * exp
-      (* Elimination forms for terms of Plus type *)
-      | PlusLeft of typ * exp
-      | PlusRight of typ * exp
-      | PlusNth of int * typ * exp (* Internal *)
+      | PlusNth of int * typ * exp
       | Case of exp (* thing being cased on*) *
                 exp scope list (* each exp binds *)
       | Fold of typ (*binds*) * exp
@@ -132,11 +118,7 @@ struct
            | TmUnit => f TmUnit
            | Var (name, n)  => f (Var(name, n))
            | Succ e' => f (Succ (expMap f e'))
-           | ProdLeft e' => f (ProdLeft(expMap f e'))
-           | ProdRight e' => f (ProdRight(expMap f e'))
            | ProdNth(i, e') => f (ProdNth(i, expMap f e'))
-           | PlusLeft(t, e') => f (PlusLeft(t, expMap f e'))
-           | PlusRight(t, e') => f (PlusRight(t, expMap f e'))
            | PlusNth(i, t, e') => f (PlusNth(i, t, expMap f e'))
            | Case(c, scs) =>
              f (Case(expMap f c, List.map (fn Scope(n, e') => Scope(n, expMap f e')) scs))
@@ -153,7 +135,6 @@ struct
            | Impl(reprType, pkgImpl, t) => f (Impl(reprType, expMap f pkgImpl, t))
            | Use(pkg, Scope(typeName, Scope(clientName, client))) =>
              f (Use(expMap f pkg, Scope(typeName, Scope(clientName, expMap f client))))
-           | Pair(l, r) => f (Pair(expMap f l, expMap f r))
            | Tuple exps => f (Tuple (List.map (expMap f) exps))
            | Fold(t, e') => f (Fold(t, (expMap f e')))
            | Unfold(e') => f (Unfold(expMap f e'))
@@ -207,11 +188,7 @@ struct
           | TmUnit => e
           | Var _ => e
           | Succ e' => Succ (walk ce ct e')
-          | ProdLeft e' => ProdLeft (walk ce ct e')
-          | ProdRight e' => ProdRight (walk ce ct e')
           | ProdNth (i, e') => ProdNth (i, walk ce ct e')
-          | PlusLeft (t, e') => PlusLeft (onTyp ct t, walk ce ct e')
-          | PlusRight (t, e') => PlusRight (onTyp ct t, walk ce ct e')
           | PlusNth (i, t, e') => PlusNth (i, onTyp ct t, walk ce ct e')
           | Case(cas, scs) =>
             Case(walk ce ct cas, List.map walkExpScope scs)
@@ -223,7 +200,6 @@ struct
           | Rec (i, baseCase, sc) =>
             Rec(walk ce ct i, walk ce ct baseCase, walkExpScope sc)
           | Fix (t, sc) => Fix(onTyp ct t, walkExpScope sc)
-          | Pair (l, r) => Pair (walk ce ct l, walk ce ct r)
           | Tuple exps => Tuple (List.map (fn e' => walk ce ct e') exps)
           | TypFn sc => TypFn (walkTypScope sc)
           | TypApp (appType, e') => TypApp(onTyp ct appType, walk ce ct e')
@@ -272,7 +248,6 @@ struct
 
     fun typToString Nat = "Nat"
       | typToString (TypVar(s, i)) = "TypVar(" ^ s ^ "," ^ Int.toString(i) ^ ")"
-
       | typToString (Arr(t, t')) = "Arr(" ^ typToString(t) ^ "," ^ typToString(t') ^ ")"
       | typToString (All(Scope(s, t))) = "All(" ^ s ^ "," ^ typToString(t) ^ ")"
       | typToString (Some(Scope(s, t))) = "Some(" ^ s ^ "," ^ typToString(t) ^ ")"
@@ -286,12 +261,8 @@ struct
       | expToString TmUnit = "unit"
       | expToString (Var (name, n))  = "Var(" ^ name ^ "," ^ (Int.toString n) ^ ")"
       | expToString (Succ e') = "Succ(" ^ (expToString e') ^ ")"
-      | expToString (ProdLeft e') = "ProdLeft(" ^ (expToString e') ^ ")"
-      | expToString (ProdRight e') = "ProdRight(" ^ (expToString e') ^ ")"
       | expToString (ProdNth(i, e')) = "ProdNth(" ^ (Int.toString i) ^ "," ^ (expToString e') ^ ")"
-      | expToString (PlusLeft(t, e')) = "PlusLeft(" ^ (typToString t) ^ (expToString e') ^ ")"
-      | expToString (PlusRight(t, e')) = "PlusRight(" ^ (typToString t) ^ (expToString e') ^ ")"
-      | expToString (PlusNth(i, t, e')) = "PlusNth(" ^ (Int.toString i) ^ "," ^ (typToString t) ^ (expToString e') ^ ")"
+      | expToString (PlusNth(i, t, e')) = "PlusNth(" ^ (Int.toString i) ^ "," ^ (typToString t) ^ "," ^ (expToString e') ^ ")"
       | expToString (Case(c, scs)) = "TODO"
       | expToString (Fn(t, Scope(argName, f'))) = "TODO"
       | expToString (Let(vartype, varval, Scope(varname, varscope))) = "TODO"
@@ -303,7 +274,6 @@ struct
       | expToString (TypApp (appType, e')) = "TODO"
       | expToString (Impl(reprType, pkgImpl, t)) = "TODO"
       | expToString (Use(pkg, Scope(typeName, Scope(clientName, client)))) = "TODO"
-      | expToString (Pair(l, r)) = "TODO"
       | expToString (Tuple exps) = "TODO"
       | expToString (Fold(t, e')) = "TODO"
       | expToString (Unfold(e')) = "TODO"
