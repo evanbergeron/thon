@@ -57,7 +57,10 @@ sig
     val typShift : int -> typ -> typ
     val typSubst : int -> typ -> typ -> typ
 
-    val expWalk : ('a -> exp -> exp) -> ('b -> typ -> typ) -> (string -> 'a -> 'a) -> (string -> 'b -> 'b) -> 'a -> 'b -> exp -> exp
+    val expWalk : {onExpVar: 'a -> exp -> exp,
+                   onTyp: 'b -> typ -> typ,
+                   onBindExp: string -> 'a -> 'a,
+                   onBindTyp: string -> 'b -> 'b} -> 'a -> 'b -> exp -> exp
     val expShift : int -> int -> exp -> exp
     val expSubst : int -> exp -> exp -> exp
     val substTypeInExp : typ -> exp -> exp
@@ -189,8 +192,8 @@ struct
             if n >= c then TypVar(name, n+shift) else TypVar(name, n))
             incrDepth 0
 
-    fun expWalk onExpVar onTyp incCe incCt ce ct e =
-        let val walk = expWalk onExpVar onTyp incCe incCt
+    fun expWalk (args as {onExpVar, onTyp, onBindExp, onBindTyp}) ce ct e =
+        let val walk = expWalk args
         in
         case e of
             Zero => Zero
@@ -205,37 +208,37 @@ struct
           | PlusNth (i, t, e') => PlusNth (i, onTyp ct t, walk ce ct e')
           | Case(cas, names, exps) =>
             Case(walk ce ct cas, names,
-                 ListPair.map (fn (name, e') => walk (incCe name ce) ct e') (names, exps))
-          | Fn (argName, t, f) => Fn(argName, onTyp ct t, walk (incCe argName ce) ct f)
+                 ListPair.map (fn (name, e') => walk (onBindExp name ce) ct e') (names, exps))
+          | Fn (argName, t, f) => Fn(argName, onTyp ct t, walk (onBindExp argName ce) ct f)
           | Let (varname, vartype, varval, varscope) =>
-            Let(varname, onTyp ct vartype, walk ce ct varval, walk (incCe varname ce) ct varscope)
+            Let(varname, onTyp ct vartype, walk ce ct varval, walk (onBindExp varname ce) ct varscope)
           | App (f, n) => App(walk ce ct f, walk ce ct n)
-          | Ifz (i, t, prev, e') => Ifz(walk ce ct i, walk ce ct t, prev, walk (incCe prev ce) ct e')
+          | Ifz (i, t, prev, e') => Ifz(walk ce ct i, walk ce ct t, prev, walk (onBindExp prev ce) ct e')
           | Rec (i, baseCase, prevCaseName, recCase) =>
-            Rec(walk ce ct i, walk ce ct baseCase, prevCaseName, walk (incCe prevCaseName ce) ct recCase)
-          | Fix (name, t, e') => Fix(name, onTyp ct t, walk (incCe name ce) ct e')
+            Rec(walk ce ct i, walk ce ct baseCase, prevCaseName, walk (onBindExp prevCaseName ce) ct recCase)
+          | Fix (name, t, e') => Fix(name, onTyp ct t, walk (onBindExp name ce) ct e')
           | Pair (l, r) => Pair (walk ce ct l, walk ce ct r)
           | Tuple exps => Tuple (List.map (fn e' => walk ce ct e') exps)
-          | TypFn (name, e') => TypFn (name, walk ce (incCt name ct) e')
+          | TypFn (name, e') => TypFn (name, walk ce (onBindTyp name ct) e')
           | TypApp (appType, e') => TypApp(onTyp ct appType, walk ce ct e')
           | Impl(reprType, pkgImpl, t) => Impl(onTyp ct reprType, walk ce ct pkgImpl, onTyp ct t)
           | Use (pkg, clientName, typeName, client) =>
-            Use(walk ce ct pkg, clientName, typeName, walk (incCe clientName ce) (incCt typeName ct) client)
+            Use(walk ce ct pkg, clientName, typeName, walk (onBindExp clientName ce) (onBindTyp typeName ct) client)
           | Fold(t, e') =>
-            let val ct' = case t of TyRec(name, _) => incCt name ct | _ => ct
+            let val ct' = case t of TyRec(name, _) => onBindTyp name ct | _ => ct
             in Fold(onTyp ct t, walk ce ct' e') end
           | Unfold(e') => Unfold(walk ce ct e')
           | Data(dataname, names, types, e') =>
-            let val ct' = incCt dataname ct
-                val ce' = foldl (fn (n, c) => incCe n c) ce (names @ ["expose" ^ dataname])
+            let val ct' = onBindTyp dataname ct
+                val ce' = foldl (fn (n, c) => onBindExp n c) ce (names @ ["expose" ^ dataname])
             in Data(dataname, names, List.map (onTyp ct') types, walk ce' ct' e') end
         end
 
     fun expShift cutoff shift =
-        expWalk (fn c => fn Var(name, n) =>
-            if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n))
-            (fn _ => fn t => t)
-            incrDepth incrDepth 0 0
+        expWalk {onExpVar = fn c => fn Var(name, n) =>
+                    if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n),
+                 onTyp = fn _ => fn t => t,
+                 onBindExp = incrDepth, onBindTyp = incrDepth} 0 0
 
     (* See page 86 of Types and Programming Languages *)
     fun typSubst j s =
@@ -245,15 +248,15 @@ struct
 
     (* See page 86 of Types and Programming Languages *)
     fun expSubst j s =
-        expWalk (fn c => fn Var(name, n) =>
-            if n = j+c then expShift 0 c s else Var(name, n))
-            (fn _ => fn t => t)
-            incrDepth incrDepth 0 0
+        expWalk {onExpVar = fn c => fn Var(name, n) =>
+                    if n = j+c then expShift 0 c s else Var(name, n),
+                 onTyp = fn _ => fn t => t,
+                 onBindExp = incrDepth, onBindTyp = incrDepth} 0 0
 
     fun substTypeInExp srcType =
-        expWalk (fn _ => fn e => e)
-                (fn ct => fn t => typSubst ct srcType t)
-                incrDepth incrDepth 0 0
+        expWalk {onExpVar = fn _ => fn e => e,
+                 onTyp = fn ct => fn t => typSubst ct srcType t,
+                 onBindExp = incrDepth, onBindTyp = incrDepth} 0 0
 
   structure Print =
   struct

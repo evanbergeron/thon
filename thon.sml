@@ -69,11 +69,7 @@ fun abstractOutType' name search t bindingDepth =
       | A.Some (name, t') => A.Some(name, abstractOutType' name search t' (bindingDepth+1))
       | A.TyRec (name, t') => A.TyRec(name, abstractOutType' name search t' (bindingDepth+1))
 
-
 fun abstractOutType name search t = abstractOutType' name search t 0
-
-
-
 
 fun find name names =
     (case List.findi (fn (_, n : string) => n = name) names
@@ -89,13 +85,13 @@ fun setDeBruijnIndexInType t typnames =
 
 fun setDeBruijnIndex e varnames typnames =
     A.expWalk
-        (fn varnames => fn A.Var(name, _) =>
+        {onExpVar = fn varnames => fn A.Var(name, _) =>
             (case find name varnames of
                 NONE => (print ("unknown var: "^ name); raise VarNotInContext)
-              | SOME i => A.Var(name, i)))
-        (fn typnames => fn t => setDeBruijnIndexInType t typnames)
-        (fn name => fn names => name::names)
-        (fn name => fn names => name::names)
+              | SOME i => A.Var(name, i)),
+         onTyp = fn typnames => fn t => setDeBruijnIndexInType t typnames,
+         onBindExp = fn name => fn names => name::names,
+         onBindTyp = fn name => fn names => name::names}
         varnames typnames e
 
 fun elaborateDatatype e =
@@ -149,11 +145,7 @@ fun elaborateDatatype e =
         end
       | _ => e
 
-
 fun elaborateDatatypes e = A.expMap elaborateDatatype e
-
-
-
 
 fun eraseNamesInTyp t =
     let fun erase t =
@@ -166,9 +158,7 @@ fun eraseNamesInTyp t =
             )
     in A.typMap erase t end
 
-
 fun typeEq (t : A.typ) (t' : A.typ) = ((eraseNamesInTyp t) = (eraseNamesInTyp t'))
-
 
 fun typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx A.TmUnit = A.Unit
@@ -301,9 +291,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         A.typSubst 0 (A.TyRec(name, t)) t
     end
 
-
 fun typeof e = typeof' [] [] e
-
 
 fun isval e =
     case e of
@@ -321,7 +309,6 @@ fun isval e =
       | A.PlusNth(_, _, e') => isval e'
       | A.Fold(t, e') => isval e'
       | _ => false
-
 
 fun step e =
     let val _ = typeof' [] [] e in
@@ -413,7 +400,6 @@ fun step e =
                      else (let val A.Fold(t, e'') = e' in e'' end)
       | _ => if (isval e) then e else raise No
     end
-
 
 fun parse s =
     let val ast : A.exp = Parse.parse s
