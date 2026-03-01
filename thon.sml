@@ -52,30 +52,9 @@ fun istype typeCtx A.Nat = true
   | istype typeCtx (A.Some (name, t')) = istype (NONE::typeCtx) t'
   | istype typeCtx (A.TyRec (name, t')) = istype (NONE::typeCtx) t'
 
-(* Turns search to A.Var bindingDepth
- *
- * DEVNOTE: assumes the caller will place the result underneath a type
- * variable binding site.
- *
- * Remarkably similar to typSubst - might be able to dedup. This needs
- * to track bindingDepth though and expSubst in A.TypVar of the appropriate
- * depth.
- *)
-fun abstractOutType' name search t bindingDepth =
-    if t = search then (A.TypVar (name, bindingDepth)) else
-    case t
-     of A.Nat => A.Nat
-      | A.Unit => A.Unit
-      | A.TypVar (name, n)  => A.TypVar (name, n)
-      | A.Arr(d, c) => A.Arr((abstractOutType' name search d bindingDepth),
-                          (abstractOutType' name search c bindingDepth))
-      | A.Prod types => A.Prod(List.map (fn t => abstractOutType' name search t bindingDepth) types)
-      | A.Plus types => A.Plus (List.map (fn t => abstractOutType' name search t bindingDepth) types)
-      | A.All (name, t') => A.All(name, abstractOutType' name search t' (bindingDepth+1))
-      | A.Some (name, t') => A.Some(name, abstractOutType' name search t' (bindingDepth+1))
-      | A.TyRec (name, t') => A.TyRec(name, abstractOutType' name search t' (bindingDepth+1))
-
-fun abstractOutType name search t = abstractOutType' name search t 0
+fun abstractOutType name search =
+    A.typWalk (fn c => fn t => if t = search then A.TypVar(name, c) else t)
+        A.incrDepth 0
 
 fun find name names =
     (case List.findi (fn (_, n : string) => n = name) names
@@ -86,7 +65,8 @@ fun setDeBruijnIndexInType t typnames =
     A.typWalk (fn typnames => fn A.TypVar(name, _) =>
         (case find name typnames of
             NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
-          | SOME i => A.TypVar(name, i)))
+          | SOME i => A.TypVar(name, i))
+        | t => t)
     (fn name => fn names => name::names) typnames t
 
 fun setDeBruijnIndex e varnames typnames =

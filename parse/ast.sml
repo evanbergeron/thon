@@ -54,6 +54,7 @@ sig
     val typMap : (typ -> typ) -> typ -> typ
 
     val typWalk : ('a -> typ -> typ) -> (string -> 'a -> 'a) -> 'a -> typ -> typ
+    val incrDepth : string -> int -> int
     val typShift : int -> typ -> typ
     val typSubst : int -> typ -> typ -> typ
 
@@ -172,24 +173,25 @@ struct
           | Some (name, t') => f (Some(name, typMap f t'))
           | TyRec (name, t') => f (TyRec(name, typMap f t'))
 
-    fun typWalk onTypVar inc c t =
-        case t of
+    fun typWalk onTyp inc c t =
+        onTyp c (case t of
              Nat => Nat
            | Unit => Unit
-           | TypVar _ => onTypVar c t
-           | Arr(d, co) => Arr(typWalk onTypVar inc c d, typWalk onTypVar inc c co)
-           | Prod types => Prod(List.map (typWalk onTypVar inc c) types)
-           | Plus types => Plus(List.map (typWalk onTypVar inc c) types)
-           | All (name, t') => All(name, typWalk onTypVar inc (inc name c) t')
-           | Some (name, t') => Some(name, typWalk onTypVar inc (inc name c) t')
-           | TyRec (name, t') => TyRec(name, typWalk onTypVar inc (inc name c) t')
+           | TypVar _ => t
+           | Arr(d, co) => Arr(typWalk onTyp inc c d, typWalk onTyp inc c co)
+           | Prod types => Prod(List.map (typWalk onTyp inc c) types)
+           | Plus types => Plus(List.map (typWalk onTyp inc c) types)
+           | All (name, t') => All(name, typWalk onTyp inc (inc name c) t')
+           | Some (name, t') => Some(name, typWalk onTyp inc (inc name c) t')
+           | TyRec (name, t') => TyRec(name, typWalk onTyp inc (inc name c) t'))
 
     val incrDepth : string -> int -> int = fn _ => fn c => c+1
 
     (* See page 86 of Types and Programming Languages *)
     fun typShift shift =
         typWalk (fn c => fn TypVar(name, n) =>
-            if n >= c then TypVar(name, n+shift) else TypVar(name, n))
+            if n >= c then TypVar(name, n+shift) else TypVar(name, n)
+            | t => t)
             incrDepth 0
 
     fun expWalk (args as {onExpVar, onTyp, onBindExp, onBindTyp}) ce ct e =
@@ -243,7 +245,8 @@ struct
     (* See page 86 of Types and Programming Languages *)
     fun typSubst j s =
         typWalk (fn c => fn TypVar(name, n) =>
-            if n = j+c then typShift c s else TypVar(name, n))
+            if n = j+c then typShift c s else TypVar(name, n)
+            | t => t)
             incrDepth 0
 
     (* See page 86 of Types and Programming Languages *)
