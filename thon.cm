@@ -13,3 +13,4 @@ Group is
   parse/thon.lex
   parse/parse.sml
   thon.sml
+  tests.sml

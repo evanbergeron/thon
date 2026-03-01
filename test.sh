@@ -1,2 +1,2 @@
 #!/bin/sh
-echo 'CM.make "thon.cm"; Thon.test();' | sml
+echo 'CM.make "thon.cm"; Tests.test();' | sml
