@@ -1229,6 +1229,7 @@ val Succ Zero = runEx "idid.thon";
 val Succ Zero = runEx "abcd.thon";
 val TypFn ("t", Zero) = runEx "aeqv.thon";
 val Succ Zero = runEx "collatz.thon";
+val All ("t",Arr (TypVar ("t",0),All ("s",TypVar ("t",0 (*Should be 1 here*))))) = typeof (parseEx "nested-poly.thon");
 (* val Zero = runEx "two-datatypes.thon"; *)
 (* val Zero = runEx "appapp.thon"; *)
 (* val Zero = runEx "thon.thon"; *)
