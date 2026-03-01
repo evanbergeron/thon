@@ -27,6 +27,8 @@
  *
  * data List = Nil | Cons of int * List
  *
+ * The 'let ListImpl' isn't strictly needed, it can be directly opened.
+ *
  *)
 let ListImpl : (some t. ((unit -> t) * (((nat * t) -> t)))) =
     impl (some t. ((unit -> t) * (((nat * t) -> t))))

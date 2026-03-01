@@ -299,7 +299,7 @@ fun elaborateDatatype e =
             val innerExp = A.Let("expose" ^ dataname,
                                  A.Arr(A.TypVar(dataname, 0), A.Plus types),
                                  A.ProdNth(1, A.Var(openedPackageTermName, (List.length types))),
-                                 A.expShift cutoff 2 (* reach over expose and openedPackageTermName *) exp);
+                                 A.expShift cutoff 1 (* reach over expose *) exp);
             fun makeDecls i =
                 if i = (List.length types) then innerExp
                 else
@@ -308,7 +308,7 @@ fun elaborateDatatype e =
                           A.ProdNth(i, A.ProdNth(0, A.Var(openedPackageTermName, i))),
                           makeDecls (i+1))
         in
-            A.Let(datanameimpl, pkgType, dtval, A.Use(A.Var(datanameimpl, 0), openedPackageTermName, dataname, makeDecls 0))
+            A.Use(dtval, openedPackageTermName, dataname, makeDecls 0)
         end
       | _ => e
 
