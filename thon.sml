@@ -18,6 +18,7 @@ struct
 
 exception IllTyped
 exception IllTypedMsg of string
+fun raiseIllTypedMsg msg = (print ("Type error: " ^ msg ^ "\n"); raise IllTypedMsg msg)
 exception No
 exception VarNotInContext
 exception VarWithNegativeDeBruijinIndex of string * int
@@ -251,7 +252,6 @@ fun elaborateDatatype e =
     case e of
         A.Data(dataname, names, types, exp) =>
         let
-            val datanameimpl = dataname ^ "Impl"
             val withType = A.TyRec(dataname, A.Plus types)
             (* dataname is not bound here - the recursive reference is bound to the abstract
              * type bound in the Some *)
@@ -282,19 +282,6 @@ fun elaborateDatatype e =
                                pkgType)
 
             val openedPackageTermName = "li"
-
-            (* We've already bound term vars lname and rname, and type var dname.
-             *
-             * We have package impl to bind still, the use impl pkg exp to bind,
-             * the use impl pkg typ var is already bound as dname, and lname and
-             * rname are already bound.
-             *
-             * Just bump by two. Just a term rewrite, no new type variables are
-             * created in this rewrite.
-             *
-             * Need to bind impl and use vars. (Which are bound immediately before
-             * the two sides of the datatype declaration).
-             *)
             val cutoff = (List.length types) + 1;
             val innerExp = A.Let("expose" ^ dataname,
                                  A.Arr(A.TypVar(dataname, 0), A.Plus types),
@@ -345,14 +332,14 @@ fun typeof' ctx typCtx A.Zero = A.Nat
   | typeof' ctx typCtx (A.PlusLeft (t, e)) =
     let val A.Plus[l, r] = t in
         if not (typeEq l (typeof' ctx typCtx e)) then
-            raise IllTypedMsg "Sum type annotation does not match deduced type"
+            raiseIllTypedMsg "Sum type annotation does not match deduced type"
         else
             A.Plus[l, r]
     end
   | typeof' ctx typCtx (A.PlusRight (t, e)) =
     let val A.Plus[l, r] = t in
         if not (typeEq r (typeof' ctx typCtx e)) then
-            raise IllTypedMsg "Sum type annotation does not match deduced type"
+            raiseIllTypedMsg "Sum type annotation does not match deduced type"
         else
             A.Plus[l, r]
     end
@@ -374,18 +361,18 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         val typesExps = List.mapi (fn (i, _) => (List.nth (types, i), List.nth(exps, i))) types;
     in
         if not (List.all (fn (t, e) => (typeEq typeofFirstBranch (typeof' (t::ctx) typCtx e))) typesExps) then
-            raise IllTypedMsg "Case statement branches types do not agree"
+            raiseIllTypedMsg "Case statement branches types do not agree"
         else
             typeofFirstBranch
     end
   | typeof' ctx typCtx (A.Fn (argName, argType, funcBody)) =
-    if not (istype typCtx argType) then raise IllTypedMsg "Function arg type is not a type."
+    if not (istype typCtx argType) then raiseIllTypedMsg "Function arg type is not a type."
     else A.Arr (argType, typeof' (argType::ctx) typCtx funcBody)
   | typeof' ctx typCtx (A.Let (varname, vartype, varval, varscope)) =
     if not (istype typCtx vartype) then
-        raise IllTypedMsg "Let var type is not a type"
+        raiseIllTypedMsg "Let var type is not a type"
     else if not (typeEq (typeof' ctx typCtx varval) vartype) then
-        raise IllTypedMsg "Let var type is not equal to deduced var value type."
+        raiseIllTypedMsg "Let var type is not equal to deduced var value type."
     else
         typeof' (vartype::ctx) typCtx varscope
   | typeof' ctx typCtx (A.App (f, n)) =
@@ -459,7 +446,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
             finalType
     end
   | typeof' ctx typCtx (A.Fold(_ , e'(* binds a typ var *))) =
-    raise IllTypedMsg "Fold type argument must be a recursive type"
+    raiseIllTypedMsg "Fold type argument must be a recursive type"
   | typeof' ctx typCtx (A.Unfold(e')) =
     let val A.TyRec(name, t) = typeof' ctx typCtx e' in
         A.typSubst 0 (A.TyRec(name, t)) t
@@ -562,7 +549,7 @@ fun step e =
             else (case i of
                       A.Zero => t
                     | A.Succ i' => A.expSubst 0 i' e
-                    | _ => raise IllTypedMsg "ifz conditional must be an integer")
+                    | _ => raiseIllTypedMsg "ifz conditional must be an integer")
       (* BUG? should this eval varval before expSubst? should it eval varscope before expSubst? *)
       | A.Let (varname, vartype, varval, varscope) => A.expSubst 0 varval varscope
       | A.Var (name, x) => (if x < 0 then raise VarNotInContext else A.Var (name, x))
