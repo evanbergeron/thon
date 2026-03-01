@@ -75,117 +75,28 @@ fun abstractOutType name search t = abstractOutType' name search t 0
 
 
 
-fun setDeBruijnIndexInType t varnames typnames =
-    let fun find name names =
-        (case List.findi (fn (_, n : string) => n = name) names
-         of NONE => NONE
-          | SOME (i, _) => SOME i)
-    in
-    case t
-     of  A.Nat => A.Nat
-       | A.Unit => A.Unit
-       | A.TypVar (name, i) =>
-         (case find name typnames of
-             NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
-           | SOME i => A.TypVar (name, i))
-       | A.Arr(d, c) =>
-            A.Arr(setDeBruijnIndexInType d varnames typnames,
-                  setDeBruijnIndexInType c varnames typnames)
-       | A.Prod types  => A.Prod(List.map (fn t => setDeBruijnIndexInType t varnames typnames) types)
-       | A.Plus types  => A.Plus(List.map (fn t => setDeBruijnIndexInType t varnames typnames) types)
-       | A.All (name, t') =>
-            A.All(name, setDeBruijnIndexInType t' varnames (name::typnames))
-       | A.Some (name, t') =>
-            A.Some(name, setDeBruijnIndexInType t' varnames (name::typnames))
-       | A.TyRec (name, t') =>
-            A.TyRec(name, setDeBruijnIndexInType t' varnames (name::typnames))
-       end
+fun find name names =
+    (case List.findi (fn (_, n : string) => n = name) names
+     of NONE => NONE
+      | SOME (i, _) => SOME i)
 
+fun setDeBruijnIndexInType t typnames =
+    A.typWalk (fn typnames => fn A.TypVar(name, _) =>
+        (case find name typnames of
+            NONE => (print ("unknown type var: "^ name); raise VarNotInContext)
+          | SOME i => A.TypVar(name, i)))
+    (fn name => fn names => name::names) typnames t
 
 fun setDeBruijnIndex e varnames typnames =
-    let fun find name names =
-        (case List.findi (fn (_, n : string) => n = name) names
-         of NONE => NONE
-          | SOME (i, _) => SOME i)
-    in
-    case e
-     of  A.Zero => e
-       | A.TmUnit => e
-       | A.Var (n, i) =>
-         (case find n varnames of
-             NONE => (print ("unknown var: "^ n); raise VarNotInContext)
-           | SOME i => A.Var (n, i))
-       | A.Fn(name, argType, funcBody) =>
-         A.Fn(name,
-               setDeBruijnIndexInType argType varnames typnames,
-               setDeBruijnIndex funcBody (name::varnames) typnames)
-       | A.Let (varname, vartype, varval, varscope) =>
-         A.Let(varname,
-               setDeBruijnIndexInType vartype varnames typnames,
-               (setDeBruijnIndex varval (varnames) typnames),
-               setDeBruijnIndex varscope (varname::varnames) typnames)
-       | A.Succ e2 => A.Succ (setDeBruijnIndex e2 varnames typnames)
-       | A.ProdLeft e => A.ProdLeft (setDeBruijnIndex e varnames typnames)
-       | A.ProdRight e => A.ProdRight (setDeBruijnIndex e varnames typnames)
-       | A.ProdNth (i, e) => A.ProdNth (i, setDeBruijnIndex e varnames typnames)
-       | A.PlusLeft (t, e) =>
-            A.PlusLeft(setDeBruijnIndexInType t varnames typnames,
-                       setDeBruijnIndex e varnames typnames)
-       | A.PlusRight (t, e) =>
-            A.PlusRight(setDeBruijnIndexInType t varnames typnames,
-                        setDeBruijnIndex e varnames typnames)
-       | A.PlusNth (i, t, e) =>
-            A.PlusNth(i, setDeBruijnIndexInType t varnames typnames,
-                        setDeBruijnIndex e varnames typnames)
-       | A.App (f, n) => A.App (setDeBruijnIndex f varnames typnames,
-                                setDeBruijnIndex n varnames typnames)
-       | A.Ifz (i, t, prev, e) => A.Ifz (setDeBruijnIndex i varnames typnames,
-                                   setDeBruijnIndex t varnames typnames,
-                                   prev,
-                                   setDeBruijnIndex e (prev::varnames) typnames)
-       | A.Pair (l, r) => A.Pair (setDeBruijnIndex l varnames typnames,
-                                  setDeBruijnIndex r varnames typnames)
-       | A.Tuple exps => A.Tuple (List.map (fn e => setDeBruijnIndex e varnames typnames) exps)
-       | A.Rec (i, baseCase, prevCaseName, recCase) =>
-            A.Rec (setDeBruijnIndex i varnames typnames,
-                   setDeBruijnIndex baseCase varnames typnames,
-                   prevCaseName, (setDeBruijnIndex recCase (prevCaseName::varnames) typnames))
-       | A.Fix(name, t, e) =>
-         A.Fix(name,
-               setDeBruijnIndexInType t varnames typnames,
-               setDeBruijnIndex e (name::varnames) typnames)
-       | A.Case (c, names, exps) => A.Case(
-            setDeBruijnIndex c varnames typnames,
-            names,
-            List.mapi (fn (i, e) => setDeBruijnIndex e ((List.nth (names, i))::varnames) typnames) exps)
-       | A.Use (pkg, clientName, typeName, client) => A.Use (
-            setDeBruijnIndex pkg varnames typnames,
-            clientName,
-            typeName,
-            setDeBruijnIndex client (clientName::varnames) (typeName::typnames))
-       | A.TypApp (appType, e) =>
-            A.TypApp (setDeBruijnIndexInType appType varnames typnames,
-                      setDeBruijnIndex e varnames typnames)
-       | A.TypFn (name, e) => A.TypFn (name, setDeBruijnIndex e varnames (name::typnames))
-       | A.Fold(A.TyRec(name, t) (*declared type*), e'(* binds a typ var *)) =>
-         A.Fold (A.TyRec(name, setDeBruijnIndexInType t varnames (name::typnames)),
-                 setDeBruijnIndex e' varnames typnames)
-       | A.Unfold(e') =>
-            A.Unfold (setDeBruijnIndex e' varnames typnames)
-       | A.Impl (reprType, pkgImpl, pkgType) =>
-            A.Impl(setDeBruijnIndexInType reprType varnames typnames,
-                   setDeBruijnIndex pkgImpl varnames typnames,
-                   setDeBruijnIndexInType pkgType varnames typnames)
-       | A.Data(dname, names, types, exp) =>
-         A.Data(dname,
-                names,
-                (* binds a typ var for each name in names *)
-                List.map (fn t => setDeBruijnIndexInType t varnames (dname::typnames)) types,
-                (* binds *)
-                setDeBruijnIndex exp (("expose" ^ dname)::((List.rev names)@varnames)) (dname::typnames)
-               )
-       | _ => raise Unimplemented (* TODO *)
-end
+    A.expWalk
+        (fn varnames => fn A.Var(name, _) =>
+            (case find name varnames of
+                NONE => (print ("unknown var: "^ name); raise VarNotInContext)
+              | SOME i => A.Var(name, i)))
+        (fn typnames => fn t => setDeBruijnIndexInType t typnames)
+        (fn name => fn names => name::names)
+        (fn name => fn names => name::names)
+        varnames typnames e
 
 fun elaborateDatatype e =
     case e of

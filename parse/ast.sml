@@ -53,11 +53,11 @@ sig
     val expMap : (exp -> exp) -> exp -> exp
     val typMap : (typ -> typ) -> typ -> typ
 
-    val typWalk : (int -> typ -> typ) -> int -> typ -> typ
+    val typWalk : ('a -> typ -> typ) -> (string -> 'a -> 'a) -> 'a -> typ -> typ
     val typShift : int -> typ -> typ
     val typSubst : int -> typ -> typ -> typ
 
-    val expWalk : (int -> exp -> exp) -> (int -> typ -> typ) -> int -> int -> exp -> exp
+    val expWalk : ('a -> exp -> exp) -> ('b -> typ -> typ) -> (string -> 'a -> 'a) -> (string -> 'b -> 'b) -> 'a -> 'b -> exp -> exp
     val expShift : int -> int -> exp -> exp
     val expSubst : int -> exp -> exp -> exp
     val substTypeInExp : typ -> exp -> exp
@@ -169,76 +169,91 @@ struct
           | Some (name, t') => f (Some(name, typMap f t'))
           | TyRec (name, t') => f (TyRec(name, typMap f t'))
 
-    fun typWalk onTypVar c t =
+    fun typWalk onTypVar inc c t =
         case t of
              Nat => Nat
            | Unit => Unit
            | TypVar _ => onTypVar c t
-           | Arr(d, co) => Arr(typWalk onTypVar c d, typWalk onTypVar c co)
-           | Prod types => Prod(List.map (typWalk onTypVar c) types)
-           | Plus types => Plus(List.map (typWalk onTypVar c) types)
-           | All (name, t') => All(name, typWalk onTypVar (c+1) t')
-           | Some (name, t') => Some(name, typWalk onTypVar (c+1) t')
-           | TyRec (name, t') => TyRec(name, typWalk onTypVar (c+1) t')
+           | Arr(d, co) => Arr(typWalk onTypVar inc c d, typWalk onTypVar inc c co)
+           | Prod types => Prod(List.map (typWalk onTypVar inc c) types)
+           | Plus types => Plus(List.map (typWalk onTypVar inc c) types)
+           | All (name, t') => All(name, typWalk onTypVar inc (inc name c) t')
+           | Some (name, t') => Some(name, typWalk onTypVar inc (inc name c) t')
+           | TyRec (name, t') => TyRec(name, typWalk onTypVar inc (inc name c) t')
+
+    val incrDepth : string -> int -> int = fn _ => fn c => c+1
 
     (* See page 86 of Types and Programming Languages *)
     fun typShift shift =
         typWalk (fn c => fn TypVar(name, n) =>
-            if n >= c then TypVar(name, n+shift) else TypVar(name, n)) 0
+            if n >= c then TypVar(name, n+shift) else TypVar(name, n))
+            incrDepth 0
 
-    fun expWalk onExpVar onTyp ce ct e =
+    fun expWalk onExpVar onTyp incCe incCt ce ct e =
+        let val walk = expWalk onExpVar onTyp incCe incCt
+        in
         case e of
             Zero => Zero
           | TmUnit => TmUnit
           | Var _ => onExpVar ce e
-          | Succ e' => Succ (expWalk onExpVar onTyp ce ct e')
-          | ProdLeft e' => ProdLeft (expWalk onExpVar onTyp ce ct e')
-          | ProdRight e' => ProdRight (expWalk onExpVar onTyp ce ct e')
-          | ProdNth (i, e') => ProdNth (i, expWalk onExpVar onTyp ce ct e')
-          | PlusLeft (t, e') => PlusLeft (onTyp ct t, expWalk onExpVar onTyp ce ct e')
-          | PlusRight (t, e') => PlusRight (onTyp ct t, expWalk onExpVar onTyp ce ct e')
-          | PlusNth (i, t, e') => PlusNth (i, onTyp ct t, expWalk onExpVar onTyp ce ct e')
+          | Succ e' => Succ (walk ce ct e')
+          | ProdLeft e' => ProdLeft (walk ce ct e')
+          | ProdRight e' => ProdRight (walk ce ct e')
+          | ProdNth (i, e') => ProdNth (i, walk ce ct e')
+          | PlusLeft (t, e') => PlusLeft (onTyp ct t, walk ce ct e')
+          | PlusRight (t, e') => PlusRight (onTyp ct t, walk ce ct e')
+          | PlusNth (i, t, e') => PlusNth (i, onTyp ct t, walk ce ct e')
           | Case(cas, names, exps) =>
-            Case(expWalk onExpVar onTyp ce ct cas, names, List.map (fn e' => expWalk onExpVar onTyp (ce+1) ct e') exps)
-          | Fn (argName, t, f) => Fn(argName, onTyp ct t, expWalk onExpVar onTyp (ce+1) ct f)
+            Case(walk ce ct cas, names,
+                 ListPair.map (fn (name, e') => walk (incCe name ce) ct e') (names, exps))
+          | Fn (argName, t, f) => Fn(argName, onTyp ct t, walk (incCe argName ce) ct f)
           | Let (varname, vartype, varval, varscope) =>
-            Let(varname, onTyp ct vartype, expWalk onExpVar onTyp ce ct varval, expWalk onExpVar onTyp (ce+1) ct varscope)
-          | App (f, n) => App(expWalk onExpVar onTyp ce ct f, expWalk onExpVar onTyp ce ct n)
-          | Ifz (i, t, prev, e') => Ifz(expWalk onExpVar onTyp ce ct i, expWalk onExpVar onTyp ce ct t, prev, expWalk onExpVar onTyp (ce+1) ct e')
+            Let(varname, onTyp ct vartype, walk ce ct varval, walk (incCe varname ce) ct varscope)
+          | App (f, n) => App(walk ce ct f, walk ce ct n)
+          | Ifz (i, t, prev, e') => Ifz(walk ce ct i, walk ce ct t, prev, walk (incCe prev ce) ct e')
           | Rec (i, baseCase, prevCaseName, recCase) =>
-            Rec(expWalk onExpVar onTyp ce ct i, expWalk onExpVar onTyp ce ct baseCase, prevCaseName, expWalk onExpVar onTyp (ce+1) ct recCase)
-          | Fix (name, t, e') => Fix(name, onTyp ct t, expWalk onExpVar onTyp (ce+1) ct e')
-          | Pair (l, r) => Pair (expWalk onExpVar onTyp ce ct l, expWalk onExpVar onTyp ce ct r)
-          | Tuple exps => Tuple (List.map (fn e' => expWalk onExpVar onTyp ce ct e') exps)
-          | TypFn (name, e') => TypFn (name, expWalk onExpVar onTyp ce (ct+1) e')
-          | TypApp (appType, e') => TypApp(onTyp ct appType, expWalk onExpVar onTyp ce ct e')
-          | Impl(reprType, pkgImpl, t) => Impl(onTyp ct reprType, expWalk onExpVar onTyp ce ct pkgImpl, onTyp ct t)
+            Rec(walk ce ct i, walk ce ct baseCase, prevCaseName, walk (incCe prevCaseName ce) ct recCase)
+          | Fix (name, t, e') => Fix(name, onTyp ct t, walk (incCe name ce) ct e')
+          | Pair (l, r) => Pair (walk ce ct l, walk ce ct r)
+          | Tuple exps => Tuple (List.map (fn e' => walk ce ct e') exps)
+          | TypFn (name, e') => TypFn (name, walk ce (incCt name ct) e')
+          | TypApp (appType, e') => TypApp(onTyp ct appType, walk ce ct e')
+          | Impl(reprType, pkgImpl, t) => Impl(onTyp ct reprType, walk ce ct pkgImpl, onTyp ct t)
           | Use (pkg, clientName, typeName, client) =>
-            Use(expWalk onExpVar onTyp ce ct pkg, clientName, typeName, expWalk onExpVar onTyp (ce+1) (ct+1) client)
-          | Fold(t, e') => Fold(onTyp ct t, expWalk onExpVar onTyp ce (ct+1) e')
-          | Unfold(e') => Unfold(expWalk onExpVar onTyp ce ct e')
+            Use(walk ce ct pkg, clientName, typeName, walk (incCe clientName ce) (incCt typeName ct) client)
+          | Fold(t, e') =>
+            let val ct' = case t of TyRec(name, _) => incCt name ct | _ => ct
+            in Fold(onTyp ct t, walk ce ct' e') end
+          | Unfold(e') => Unfold(walk ce ct e')
           | Data(dataname, names, types, e') =>
-            Data(dataname, names, List.map (onTyp ct) types, expWalk onExpVar onTyp ce ct e')
+            let val ct' = incCt dataname ct
+                val ce' = foldl (fn (n, c) => incCe n c) ce (names @ ["expose" ^ dataname])
+            in Data(dataname, names, List.map (onTyp ct') types, walk ce' ct' e') end
+        end
 
     fun expShift cutoff shift =
         expWalk (fn c => fn Var(name, n) =>
             if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n))
-            (fn _ => fn t => t) 0 0
+            (fn _ => fn t => t)
+            incrDepth incrDepth 0 0
 
     (* See page 86 of Types and Programming Languages *)
     fun typSubst j s =
         typWalk (fn c => fn TypVar(name, n) =>
-            if n = j+c then typShift c s else TypVar(name, n)) 0
+            if n = j+c then typShift c s else TypVar(name, n))
+            incrDepth 0
 
     (* See page 86 of Types and Programming Languages *)
     fun expSubst j s =
         expWalk (fn c => fn Var(name, n) =>
             if n = j+c then expShift 0 c s else Var(name, n))
-            (fn _ => fn t => t) 0 0
+            (fn _ => fn t => t)
+            incrDepth incrDepth 0 0
 
     fun substTypeInExp srcType =
         expWalk (fn _ => fn e => e)
-                (fn ct => fn t => typSubst ct srcType t) 0 0
+                (fn ct => fn t => typSubst ct srcType t)
+                incrDepth incrDepth 0 0
 
   structure Print =
   struct
