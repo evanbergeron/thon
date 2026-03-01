@@ -73,67 +73,6 @@ fun abstractOutType' name search t bindingDepth =
 fun abstractOutType name search t = abstractOutType' name search t 0
 
 
-(* Just substitute the srcType in everywhere you see a A.TypVar bindingDepth *)
-fun substTypeInExp' srcType dstExp bindingDepth =
-    case dstExp
-     of  A.Zero => A.Zero
-       | A.Var (name, i) => A.Var (name, i)
-       | A.TmUnit => A.TmUnit
-       | A.Succ e2 => A.Succ (substTypeInExp' srcType e2 bindingDepth)
-       | A.ProdLeft e => A.ProdLeft (substTypeInExp' srcType e bindingDepth)
-       | A.ProdRight e => A.ProdRight (substTypeInExp' srcType e bindingDepth)
-       | A.ProdNth (i, e) => A.ProdNth (i, substTypeInExp' srcType e bindingDepth)
-       | A.PlusLeft (t, e) => A.PlusLeft (t, substTypeInExp' srcType e bindingDepth)
-       | A.PlusRight (t, e) => A.PlusRight (t, substTypeInExp' srcType e bindingDepth)
-       | A.PlusNth (i, t, e) => A.PlusNth (i, A.typSubst bindingDepth srcType t, substTypeInExp' srcType e bindingDepth)
-       | A.Case(c, names, exps) =>
-            A.Case(substTypeInExp' srcType c bindingDepth,
-                   names,
-                   List.map (fn e => substTypeInExp' srcType e bindingDepth) exps)
-       | A.Fn (argName, argType, funcBody) =>
-            A.Fn(argName, (A.typSubst bindingDepth srcType argType),
-                substTypeInExp' srcType funcBody bindingDepth)
-       | A.Let (varname, vartype, varval, varscope) =>
-            A.Let(varname, (A.typSubst bindingDepth srcType vartype),
-                  substTypeInExp' srcType varval bindingDepth,
-                  substTypeInExp' srcType varscope bindingDepth
-                 )
-       | A.App (f, n) =>
-            A.App (substTypeInExp' srcType f bindingDepth,
-                 substTypeInExp' srcType n bindingDepth)
-       | A.Ifz (i, t, prev, e) =>
-            A.Ifz(substTypeInExp' srcType i bindingDepth,
-                  substTypeInExp' srcType t bindingDepth,
-                  prev,
-                  substTypeInExp' srcType e bindingDepth)
-       | A.Pair (l, r) =>
-            A.Pair (substTypeInExp' srcType l bindingDepth,
-                   substTypeInExp' srcType r bindingDepth)
-       | A.Tuple exps => A.Tuple (List.map (fn e => substTypeInExp' srcType e bindingDepth) exps)
-       | A.Rec (i, baseCase, prevCaseName, recCase) =>
-            A.Rec(substTypeInExp' srcType i bindingDepth,
-                substTypeInExp' srcType baseCase bindingDepth,
-                prevCaseName, substTypeInExp' srcType recCase bindingDepth)
-       | A.Fix (name, t, e) =>
-         A.Fix(name,
-               A.typSubst bindingDepth srcType t,
-               substTypeInExp' srcType e bindingDepth)
-       | A.TypFn (name, e) => A.TypFn(name, substTypeInExp' srcType e (bindingDepth+1)) (* binds type var *)
-       | A.TypApp (appType, e) =>
-            A.TypApp(A.typSubst bindingDepth srcType appType,
-                   substTypeInExp' srcType e bindingDepth)
-       | A.Impl(reprType, pkgImpl, pkgType) =>
-            A.Impl(A.typSubst bindingDepth srcType reprType,
-                 substTypeInExp' srcType pkgImpl bindingDepth,
-                 A.typSubst bindingDepth srcType pkgType)
-       | A.Use (pkg, clientName, typeName, client) =>
-            A.Use(substTypeInExp' srcType pkg bindingDepth,
-                  clientName,
-                  typeName,
-                  substTypeInExp' srcType client (bindingDepth+1)) (*binds type var*)
-       | A.Fold(t, e') => A.Fold(A.typSubst bindingDepth srcType t,
-                             substTypeInExp' srcType e' (bindingDepth+1)) (* binds typ var *)
-       | A.Unfold(e') => A.Unfold(substTypeInExp' srcType e' bindingDepth)
 
 
 fun setDeBruijnIndexInType t varnames typnames =
@@ -303,7 +242,6 @@ fun elaborateDatatype e =
 fun elaborateDatatypes e = A.expMap elaborateDatatype e
 
 
-fun substTypeInExp srcType dstExp = substTypeInExp' srcType dstExp 0
 
 
 fun eraseNamesInTyp t =
@@ -567,7 +505,7 @@ fun step e =
             if not (isval e') then (A.TypApp (t, step e'))
             else
                 let val A.TypFn(name, e'') = e' in
-                    substTypeInExp t e''
+                    A.substTypeInExp t e''
                 end
       | A.Impl(reprType, pkgImpl, pkgType) =>
             if not (isval pkgImpl) then A.Impl(reprType, step pkgImpl, pkgType) else
@@ -578,7 +516,7 @@ fun step e =
             (* Note that there's no abstract type at runtime. *)
            (case pkg of
                 A.Impl(reprType', pkgImpl', _) =>
-                    A.expSubst 0 pkgImpl' (substTypeInExp reprType' client)
+                    A.expSubst 0 pkgImpl' (A.substTypeInExp reprType' client)
               | _ => raise No
            )
       | A.PlusLeft (t, e') =>
@@ -1229,6 +1167,7 @@ val Succ Zero = runEx "idid.thon";
 val Succ Zero = runEx "abcd.thon";
 val TypFn ("t", Zero) = runEx "aeqv.thon";
 val Succ Zero = runEx "collatz.thon";
+(* TODO This is wrong. *)
 val All ("t",Arr (TypVar ("t",0),All ("s",TypVar ("t",0 (*Should be 1 here*))))) = typeof (parseEx "nested-poly.thon");
 (* val Zero = runEx "two-datatypes.thon"; *)
 (* val Zero = runEx "appapp.thon"; *)
