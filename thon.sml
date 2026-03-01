@@ -411,48 +411,6 @@ fun isval e =
       | A.Fold(t, e') => isval e'
       | _ => false
 
-fun containsTargetVar' src dst bindingDepth =
-    case dst
-     of  A.Zero => false
-       | A.TmUnit => false
-       | A.Var (name, n)  => n = bindingDepth
-       | A.Succ e2 => containsTargetVar' src e2 bindingDepth
-       | A.ProdLeft e => containsTargetVar' src e bindingDepth
-       | A.ProdRight e => containsTargetVar' src e bindingDepth
-       | A.ProdNth (i, e) => containsTargetVar' src e bindingDepth
-       | A.PlusLeft (t, e) => containsTargetVar' src e bindingDepth
-       | A.PlusRight (t, e) => containsTargetVar' src e bindingDepth
-       | A.PlusNth (i, t, e) => containsTargetVar' src e bindingDepth
-       | A.Case(c, names, exps) =>
-         containsTargetVar' src c bindingDepth orelse
-         List.foldl (fn (a,b) => a orelse b)
-                    false
-                    (List.map (fn e => containsTargetVar' src e (bindingDepth+1)) exps)
-       | A.Fn (argName, t, f) => containsTargetVar' src f (bindingDepth+1)
-       | A.Let (varname, vartype, varval, varscope) =>
-                  (containsTargetVar' src varval (bindingDepth)) orelse
-                  (containsTargetVar' src varscope (bindingDepth+1))
-       | A.App (f, n) => (containsTargetVar' src f bindingDepth) orelse (containsTargetVar' src n bindingDepth)
-       | A.Ifz (i, t, prev, e) => containsTargetVar' src i bindingDepth orelse
-                                  containsTargetVar' src t bindingDepth orelse
-                                  containsTargetVar' src e (bindingDepth+1)
-       | A.Rec (i, baseCase, prevCaseName, recCase) => containsTargetVar' src i bindingDepth orelse
-                                                       containsTargetVar' src baseCase bindingDepth orelse
-                                                       containsTargetVar' src recCase (bindingDepth+1)
-       | A.Fix (name, t, e) => containsTargetVar' src e (bindingDepth+1)
-       | A.TypFn (name, e) => containsTargetVar' src e bindingDepth
-       | A.TypApp (appType, e) => containsTargetVar' src e bindingDepth
-       | A.Impl(reprType, pkgImpl, t) => containsTargetVar' src pkgImpl bindingDepth
-       | A.Use (pkg, clientName, typeName, client) => containsTargetVar' src pkg bindingDepth orelse
-                                                      containsTargetVar' src client (bindingDepth+1)
-       | A.Pair (l, r) => containsTargetVar' src l bindingDepth orelse
-                          containsTargetVar' src r bindingDepth
-       | A.Tuple exps => List.foldl (fn (a,b) => a orelse b)
-                                    false
-                                    (List.map (fn e => containsTargetVar' src e bindingDepth) exps)
-       | A.Fold(t, e') => containsTargetVar' src e' (bindingDepth)
-       | A.Unfold(e') => containsTargetVar' src e' (bindingDepth)
-
 
 fun step e =
     let val _ = typeof' [] [] e in
