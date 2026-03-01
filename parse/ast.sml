@@ -14,8 +14,6 @@ sig
       | TyRec of typ scope (* binds *)
       | Unit (* nullary sum *)
 
-    datatype Idx = int
-
     datatype exp =
         Zero
       | Var of string * int (* idx into ctx *)
@@ -81,8 +79,6 @@ struct
       | Plus of typ list (* sum type *)
       | TyRec of typ scope (* binds *)
       | Unit (* nullary sum *)
-
-    datatype Idx = int
 
     datatype exp =
         Zero

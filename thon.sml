@@ -10,8 +10,6 @@ structure Thon : sig
                    val run : string -> A.exp
                    val eraseNamesInTyp : A.typ -> A.typ
                    val runFile : string -> A.exp
-                   val findParseErrors : string -> unit
-                   val elaborateDatatype : A.exp -> A.exp
                    val elaborateDatatypes : A.exp -> A.exp
                    val abstractOutType : string -> A.typ -> A.typ -> A.typ
                    val println : string -> unit
@@ -28,8 +26,6 @@ fun raiseIllTypedMsg msg = (print ("Type error: " ^ msg ^ "\n"); raise IllTypedM
 exception No
 exception VarNotInContext
 exception VarWithNegativeDeBruijinIndex of string * int
-exception ClientTypeCannotEscapeClientScope
-exception Unimplemented
 
 
 fun get ctx i =
@@ -39,7 +35,6 @@ fun get ctx i =
 
 
 fun printlnType t = (print (A.Print.typToString t); print "\n")
-fun printlnExp t = (print (A.Print.expToString t); print "\n")
 fun println s = (print s; print "\n")
 
 fun istype typeCtx A.Nat = true
@@ -363,12 +358,6 @@ fun parseFile filename =
     let val ast : A.exp = Parse.parseFile filename
     in
         setDeBruijnIndex ast [] []
-    end
-
-fun findParseErrors filename =
-    let val _ = parseFile filename
-    in
-        ()
     end
 
 fun eval e = if isval e then e else eval (step e)

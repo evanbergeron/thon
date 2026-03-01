@@ -77,19 +77,6 @@ val Nat = typeof' [] [] (App(isnil, nilNatList));
 (* isnil nilNatList == 1. *)
 val Succ Zero = eval (App(isnil, nilNatList));
 
-(* natlistConsType*)
-val natlistConstype = Arr(Prod([Nat, natlist]), natlist);
-
-(* Defines a type of natural number queues. Can wrap in an existential type, also. *)
-val natQueueType = Prod [
-    (* empty queue *) natlist,
-    Prod [
-          (* insert *) Arr(Prod[Nat, natlist], natlist),
-          (* remove*) Arr(natlist, (Plus[(*None*) Unit, (*Some(Nat, natlist)*)Prod[Nat, natlist]]))
-         ]
-    ]
-;
-
 val Plus[Nat, Nat] = typeof' [] [] (PlusNth (0, Plus[Nat, Nat], Zero));
 val Plus[Nat, Prod[Nat, Nat]] = typeof' [] [] (PlusNth (0, Plus[Nat, Prod([Nat, Nat])], Zero));
 val Zero = step (Case(PlusNth (0, Plus[Nat, Nat], Zero), [Scope("l", Var ("l", 0)), Scope("r", Succ(Var ("r", 0)))]));
@@ -151,9 +138,6 @@ val Some (Scope("t",Arr(TypVar ("t", 0), Nat))) = typeof' [] [] pkg;
 val Some(Scope("t",Arr(TypVar ("t", 0), Nat))) = typeof' [] [] (Impl(Nat, Fn(Nat, Scope("x", Zero)), Some(Scope("t", Arr(TypVar ("t", 0), Nat)))));
 val Some(Scope("t",Arr(TypVar ("t", 0), TypVar ("t", 0)))) = typeof' [] [] (Impl(Nat, Fn(Nat, Scope("x", Zero)), Some(Scope("t", Arr(TypVar ("t", 0), TypVar ("t", 0))))));
 val Nat = typeof' [] [] (Impl(Nat, Fn(Nat, Scope("x", Zero)), Some(Scope("t", TypVar ("t", 0))))) handle IllTyped => Nat;
-
-val zeroFnPkg = Impl(Nat, Fn(Nat, Scope("x", Zero)), Some(Scope("t", Arr(TypVar ("t", 0), Nat))));
-val zeroFnPkg2 = Impl(Nat, Fn(Nat, Scope("x", Zero)), Some(Scope("t", Arr(Nat, TypVar ("t", 0)))));
 
 (* Define identity package; can convert Nat to internal repr type and back. *)
 val idid = Tuple[Fn(Nat, Scope("x", Var ("x", 0))), Fn(Nat, Scope("x", Var ("x", 0)))];
@@ -536,9 +520,6 @@ val
      Prod [Nat,Some (Scope("t",Arr (TypVar ("t",0),TypVar ("List",1))))]],Zero)
   : Ast.exp =
     parse "data List = Nil unit | Cons nat * (some t. t -> List) in Z";
-
-val manualDatatype = parseEx "manual-datatype.thon";
-val autoDatatype = elaborateDatatypes (parse "data List = Nil unit | Cons nat * List in Z");
 
 val Zero = runEx "auto-natlist.thon";
 val Succ (Succ Zero) = runEx "bst-depth.thon";

@@ -1,4 +1,3 @@
-structure A = Ast
 structure Tokens = Tokens
 
 exception UnbalancedComments
@@ -30,16 +29,10 @@ local val commentLevel = ref 0 in
        Tokens.EOF(!pos,!pos))
 end
 
-fun error (e,l : int,_) = TextIO.output (TextIO.stdOut, String.concat[
-        "line ", (Int.toString l), ": ", e, "\n"
-      ])
-
 %%
 %header (functor ThonLexFn(structure Tokens: Thon_TOKENS));
 %s COMMENT;
-alpha=[A-Za-z];
 id=[A-Za-z_\']*;
-digit=[0-9];
 ws = [\ \t];
 %%
 <INITIAL> \n       => (pos := (!pos) + 1; lex());
@@ -55,7 +48,6 @@ ws = [\ \t];
 <INITIAL> "=>"     => (Tokens.DARROW(!pos,!pos));
 <INITIAL> "nat"    => (Tokens.NAT(!pos,!pos));
 <INITIAL> "rec"    => (Tokens.REC(!pos,!pos));
-<INITIAL> "go"     => (Tokens.GO(!pos,!pos));
 <INITIAL> "poly"   => (Tokens.POLY(!pos,!pos));
 <INITIAL> "left"   => (Tokens.LEFT(!pos,!pos));
 <INITIAL> "right"  => (Tokens.RIGHT(!pos,!pos));
@@ -85,7 +77,6 @@ ws = [\ \t];
 <INITIAL> ")"      => (Tokens.RPAREN(!pos,!pos));
 <INITIAL> "||"     => (Tokens.DPIPE(!pos,!pos));
 <INITIAL> "|"      => (Tokens.PIPE(!pos,!pos));
-<INITIAL> {digit}+ => (Tokens.IDX (valOf (Int.fromString yytext), !pos, !pos));
 <INITIAL> {id}     => (Tokens.ID(yytext, !pos, !pos));
 
 <INITIAL> "(*"        => (YYBEGIN COMMENT; enterComment yypos; lex());
