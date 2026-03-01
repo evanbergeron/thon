@@ -57,6 +57,7 @@ sig
     val typShift : int -> typ -> typ
     val typSubst : int -> typ -> typ -> typ
 
+    val expWalk : (int -> exp -> exp) -> int -> exp -> exp
     val expShift : int -> int -> exp -> exp
     val expSubst : int -> exp -> exp -> exp
 
@@ -184,39 +185,43 @@ struct
         typWalk (fn c => fn TypVar(name, n) =>
             if n >= c then TypVar(name, n+shift) else TypVar(name, n)) 0
 
-    fun expShift cutoff shift dst =
-        let fun walk c exp =
-        case exp of
+    fun expWalk onExpVar c e =
+        case e of
             Zero => Zero
           | TmUnit => TmUnit
-          | Var (name, n)  => if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n)
-          | Succ e2 => Succ (walk c e2)
-          | ProdLeft e => ProdLeft (walk c e)
-          | ProdRight e => ProdRight (walk c e)
-          | ProdNth (i, e) => ProdNth (i, walk c e)
-          | PlusLeft (t, e) => PlusLeft (t, walk c e)
-          | PlusRight (t, e) => PlusRight (t, walk c e)
-          | PlusNth (i, t, e) => PlusNth (i, t, walk c e)
+          | Var _ => onExpVar c e
+          | Succ e' => Succ (expWalk onExpVar c e')
+          | ProdLeft e' => ProdLeft (expWalk onExpVar c e')
+          | ProdRight e' => ProdRight (expWalk onExpVar c e')
+          | ProdNth (i, e') => ProdNth (i, expWalk onExpVar c e')
+          | PlusLeft (t, e') => PlusLeft (t, expWalk onExpVar c e')
+          | PlusRight (t, e') => PlusRight (t, expWalk onExpVar c e')
+          | PlusNth (i, t, e') => PlusNth (i, t, expWalk onExpVar c e')
           | Case(cas, names, exps) =>
-            Case(walk c cas, names, List.map (fn e => walk (c+1) e) exps)
-          | Fn (argName, t, f) => Fn(argName, t, (walk (c+1) f))
+            Case(expWalk onExpVar c cas, names, List.map (fn e' => expWalk onExpVar (c+1) e') exps)
+          | Fn (argName, t, f) => Fn(argName, t, expWalk onExpVar (c+1) f)
           | Let (varname, vartype, varval, varscope) =>
-            Let(varname, vartype, walk c varval, walk (c+1) varscope)
-          | App (f, n) => App((walk c f), (walk c n))
-          | Ifz (i, t, prev, e) => Ifz(walk c i, walk c t, prev, walk (c+1) e)
+            Let(varname, vartype, expWalk onExpVar c varval, expWalk onExpVar (c+1) varscope)
+          | App (f, n) => App(expWalk onExpVar c f, expWalk onExpVar c n)
+          | Ifz (i, t, prev, e') => Ifz(expWalk onExpVar c i, expWalk onExpVar c t, prev, expWalk onExpVar (c+1) e')
           | Rec (i, baseCase, prevCaseName, recCase) =>
-            Rec(walk c i, walk c baseCase, prevCaseName, walk (c+1) recCase)
-          | Fix (name, t, e) => Fix(name, t, walk (c+1) e)
-          | TypFn (name, e) => TypFn (name, walk c e)
-          | TypApp (appType, e) => TypApp(appType, walk c e)
-          | Impl(reprType, pkgImpl, t) => Impl(reprType, walk c pkgImpl, t)
+            Rec(expWalk onExpVar c i, expWalk onExpVar c baseCase, prevCaseName, expWalk onExpVar (c+1) recCase)
+          | Fix (name, t, e') => Fix(name, t, expWalk onExpVar (c+1) e')
+          | TypFn (name, e') => TypFn (name, expWalk onExpVar c e')
+          | TypApp (appType, e') => TypApp(appType, expWalk onExpVar c e')
+          | Impl(reprType, pkgImpl, t) => Impl(reprType, expWalk onExpVar c pkgImpl, t)
           | Use (pkg, clientName, typeName, client) =>
-            Use(walk c pkg, clientName, typeName, walk (c+1) client)
-          | Pair (l, r) => Pair (walk c l, walk c r)
-          | Tuple exps => Tuple (List.map (fn e => walk c e) exps)
-          | Fold(t, e') => Fold(t, (walk c e'))
-          | Unfold(e') => Unfold(walk c e')
-          in walk 0 dst end
+            Use(expWalk onExpVar c pkg, clientName, typeName, expWalk onExpVar (c+1) client)
+          | Pair (l, r) => Pair (expWalk onExpVar c l, expWalk onExpVar c r)
+          | Tuple exps => Tuple (List.map (fn e' => expWalk onExpVar c e') exps)
+          | Fold(t, e') => Fold(t, expWalk onExpVar c e')
+          | Unfold(e') => Unfold(expWalk onExpVar c e')
+          | Data(dataname, names, types, e') =>
+            Data(dataname, names, types, expWalk onExpVar c e')
+
+    fun expShift cutoff shift =
+        expWalk (fn c => fn Var(name, n) =>
+            if n >= (c+cutoff) then Var(name, n+shift) else Var(name, n)) 0
 
     (* See page 86 of Types and Programming Languages *)
     fun typSubst j s =
@@ -224,39 +229,9 @@ struct
             if n = j+c then typShift c s else TypVar(name, n)) 0
 
     (* See page 86 of Types and Programming Languages *)
-    fun expSubst j s dst =
-        let fun walk c dst =
-        case dst of
-            Zero => Zero
-          | TmUnit => TmUnit
-          | Var (name, n)  => if n = j+c then expShift 0 c s else Var(name, n)
-          | Succ e2 => Succ (walk c e2)
-          | ProdLeft e => ProdLeft (walk c e)
-          | ProdRight e => ProdRight (walk c e)
-          | ProdNth (i, e) => ProdNth (i, walk c e)
-          | PlusLeft (t, e) => PlusLeft (t, walk c e)
-          | PlusRight (t, e) => PlusRight (t, walk c e)
-          | PlusNth (i, t, e) => PlusNth (i, t, walk c e)
-          | Case(cas, names, exps) =>
-            Case(walk c cas, names, List.map (fn e => walk (c+1) e) exps)
-          | Fn (argName, t, f) => Fn(argName, t, (walk (c+1) f))
-          | Let (varname, vartype, varval, varscope) =>
-            Let(varname, vartype, (walk c varval), (walk (c+1) varscope))
-          | App (f, n) => App((walk c f), (walk c n))
-          | Ifz (i, t, prev, e) => Ifz(walk c i, walk c t, prev, walk (c+1) e)
-          | Rec (i, baseCase, prevCaseName, recCase) =>
-            Rec(walk c i, walk c baseCase, prevCaseName, walk (c+1) recCase)
-          | Fix (name, t, e) => Fix(name, t, walk (c+1) e)
-          | TypFn (name, e) => TypFn (name, walk c e)
-          | TypApp (appType, e) => TypApp(appType, walk c e)
-          | Impl(reprType, pkgImpl, t) => Impl(reprType, walk c pkgImpl, t)
-          | Use (pkg, clientName, typeName, client) =>
-            Use(walk c pkg, clientName, typeName, walk (c+1) client)
-          | Pair (l, r) => Pair (walk c l, walk c r)
-          | Tuple exps => Tuple (List.map (fn e => walk c e) exps)
-          | Fold(t, e') => Fold(t, (walk c e'))
-          | Unfold(e') => Unfold(walk c e')
-          in walk 0 dst end
+    fun expSubst j s =
+        expWalk (fn c => fn Var(name, n) =>
+            if n = j+c then expShift 0 c s else Var(name, n)) 0
 
   structure Print =
   struct
