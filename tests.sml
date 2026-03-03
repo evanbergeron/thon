@@ -8,6 +8,7 @@ open A;
 val exDir = OS.FileSys.getDir() ^ "/examples/";
 fun parseEx f = parseFile (exDir ^ f);
 fun runEx f = (println f; runFile (exDir ^ f));
+fun evalAst e = let val e = elaborateDatatypes e in if isval e then e else eval (step e) end;
 (* Data Natlist = None | Some(Nat, Natlist) *)
 val natlist : typ = TyRec(Scope("natlist",Plus[Unit, Prod [Nat, TypVar ("natlist", 0)]]));
 val Fn (TyRec (Scope("l",Plus [Unit,Prod [Nat,TypVar ("l", 0)]])), Scope("natlist", Var ("natlist",0))) =
@@ -94,11 +95,9 @@ val All(Scope("t", Arr(TypVar ("t", 0), Nat))) = abstractOutType "t" (Arr(Nat, N
 val e0 = Impl(Nat, Fn(Nat, Scope("x", Zero)), Some(Scope("t", Arr(TypVar ("t", 0), TypVar ("t", 0)))));
 val Some(Scope("t",Arr(TypVar ("t", 0), TypVar ("t", 0)))) = typeof' [] [] e0;
 
-val Impl (Nat,Fn (Nat,Scope("x",Zero)),Some (Scope("t",Arr (TypVar ("t",0),TypVar ("t",0))))) =
-    parse "impl (some t. t -> t) with nat as \\ x : nat -> Z";
-
-val Impl (Nat,Fn (Nat,Scope("x",Zero)),Some (Scope("t",Arr (TypVar ("t",0),TypVar ("t",0))))) =
-    run "impl (some t. t -> t) with nat as \\ x : nat -> Z";
+val implAst = Impl (Nat,Fn (Nat,Scope("x",Zero)),Some (Scope("t",Arr (TypVar ("t",0),TypVar ("t",0)))));
+val true = (implAst = parse "impl (some t. t -> t) with nat as \\ x : nat -> Z");
+val Impl (Nat,Fn (Nat,Scope("x",Zero)),Some (Scope("t",Arr (TypVar ("t",0),TypVar ("t",0))))) = evalAst implAst;
 
 val Impl
     (TyRec (Scope("natlist",Plus [Unit,Prod ([Nat,TypVar ("natlist",0)])])),
@@ -111,10 +110,10 @@ val Use (Impl (Nat,Fn (Nat,Scope("x",Zero)),Some (Scope("t'",Arr (TypVar ("t'",0
          Scope("s", Scope("pkg", Var ("pkg",0)))) : exp =
     parse "use (impl (some t'. t' -> t') with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)";
 
-val Use (Impl (Nat,Fn (Nat,Scope ("x",Zero)),Some (Scope ("t",Arr (TypVar ("t",0),TypVar ("t",0))))),
-         Scope ("s",Scope ("pkg",Var ("pkg",0)))) : exp =
-    parse "use (impl (some t. t -> t) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)";
-val Zero = run "use (impl (some t. t -> t) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)"
+val useImplAst = Use (Impl (Nat,Fn (Nat,Scope ("x",Zero)),Some (Scope ("t",Arr (TypVar ("t",0),TypVar ("t",0))))),
+         Scope ("s",Scope ("pkg",Var ("pkg",0))));
+val true = (useImplAst = parse "use (impl (some t. t -> t) with nat as \\ x : nat -> Z) as (pkg, s) in (pkg)");
+val Zero = evalAst useImplAst
            handle IllTyped => Zero;
 
 val Zero = runEx "doesnt-parse.sml" handle ParseError => Zero;
@@ -352,18 +351,15 @@ val multByThree = Fn(Nat, Scope("x", Rec(Var ("x", 0), Zero, Scope("prev", Succ(
 val Fn (Nat, Scope("n",Rec (Var ("n",0),Var ("n",0),Scope("prev", Succ (Succ Zero))))) =
     parse "\\ n : nat -> rec n of Z -> n | prev -> S S Z ";
 
-val App (Fn (Nat, Scope("n",Rec (Var ("n",0),Zero, Scope("prev", Succ (Succ (Var ("prev", 0))))))),Succ Zero) : Ast.exp =
-    parse "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
+val natRecAst1 = App (Fn (Nat, Scope("n",Rec (Var ("n",0),Zero, Scope("prev", Succ (Succ (Var ("prev", 0))))))),Succ Zero);
+val true = (natRecAst1 = parse "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))");
+val (Succ (Succ Zero)) = evalAst natRecAst1;
 
-val (Succ (Succ Zero)) =
-    run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S Z))";
-
-val App
+val natRecAst2 = App
     (Fn (Nat, Scope ("n",Rec (Var ("n",0),Zero,Scope ("prev",Succ (Succ (Var ("prev",0))))))),
-     Succ (Succ Zero)) : exp =
-    parse "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S S Z))";
-val Succ (Succ (Succ (Succ Zero))) : Ast.exp =
-    run "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S S Z))";
+     Succ (Succ Zero));
+val true = (natRecAst2 = parse "((\\ n : nat -> rec n of Z -> Z | prev -> S S prev ) (S S Z))");
+val Succ (Succ (Succ (Succ Zero))) = evalAst natRecAst2;
 
 val Succ (Succ (Succ Zero)) = eval (App(multByThree, Succ Zero));
 
@@ -372,19 +368,16 @@ val TypFn (Scope("s", Fn(TypVar ("s", 0), Scope("x",Var ("x", 0))))) : Ast.exp =
 (* TODO also wrong *)
 val TypFn(Scope("t", TypFn (Scope("t'",Fn (Arr (TypVar ("t",1),TypVar ("t'",0)), Scope("x",Var ("x",0))))))) =
     parse "poly t -> poly t' -> \\ x : (t -> t') -> x";
-val TypApp (Nat,TypFn (Scope("s", Fn(TypVar ("s", 0), Scope("x",Var ("x",0)))))) =
-    parse "((poly s -> \\ x : s -> x) (nat))";
-val Fn (Nat, Scope("x",Var ("x", 0))) : Ast.exp =
-    run "((poly s -> \\ x : s -> x) (nat))";
+val polyAppAst = TypApp (Nat,TypFn (Scope("s", Fn(TypVar ("s", 0), Scope("x",Var ("x",0))))));
+val true = (polyAppAst = parse "((poly s -> \\ x : s -> x) (nat))");
+val Fn (Nat, Scope("x",Var ("x", 0))) = evalAst polyAppAst;
 
-val TypApp
+val polyAppAst2 = TypApp
     (Nat,
      TypFn(Scope("t",
-       (TypFn (Scope("t'", Fn(Arr (TypVar ("t", 1),TypVar ("t'", 0)), Scope("f",Var ("f",0)))))))))
-  : Ast.exp =
-    parse "((poly t -> poly t' -> \\ f : (t -> t') -> f) (nat))";
-val TypFn (Scope("t'", Fn (Arr (Nat,TypVar ("t'",0)), Scope("f",Var ("f",0))))) =
-    run "((poly t -> poly t' -> \\ f : (t -> t') -> f) (nat))";
+       (TypFn (Scope("t'", Fn(Arr (TypVar ("t", 1),TypVar ("t'", 0)), Scope("f",Var ("f",0)))))))));
+val true = (polyAppAst2 = parse "((poly t -> poly t' -> \\ f : (t -> t') -> f) (nat))");
+val TypFn (Scope("t'", Fn (Arr (Nat,TypVar ("t'",0)), Scope("f",Var ("f",0))))) = evalAst polyAppAst2;
 
 val Tuple [Zero,Succ Zero] : Ast.exp =
     parse "(Z, S Z)";
@@ -395,16 +388,14 @@ val Tuple [Zero,Tuple [Succ Zero,Succ (Succ Zero)]] : Ast.exp =
 val Fn (Prod ([Nat,Nat]), Scope("x",Var("x", 0))) : Ast.exp =
     parse "\\ x : (nat * nat) -> x";
 
-val ProdNth (0, Tuple [Zero,Tuple [Succ Zero,Succ (Succ Zero)]]) : Ast.exp =
-    parse "fst (Z, (S Z, S S Z))";
+val fstAst = ProdNth (0, Tuple [Zero,Tuple [Succ Zero,Succ (Succ Zero)]]);
+val true = (fstAst = parse "fst (Z, (S Z, S S Z))");
 val ProdNth (1, Tuple [Zero,Tuple [Succ Zero,Succ (Succ Zero)]]) : Ast.exp =
     parse "snd (Z, (S Z, S S Z))";
-val Zero : Ast.exp =
-    run "fst (Z, (S Z, S S Z))";
-val ProdNth (0,ProdNth (1,Tuple [Zero,Tuple [Succ Zero,Succ (Succ Zero)]])) : exp =
-    parse "fst snd (Z, (S Z, S S Z))";
-val Succ Zero : Ast.exp =
-    run "fst snd (Z, (S Z, S S Z))";
+val Zero = evalAst fstAst;
+val fstSndAst = ProdNth (0,ProdNth (1,Tuple [Zero,Tuple [Succ Zero,Succ (Succ Zero)]]));
+val true = (fstSndAst = parse "fst snd (Z, (S Z, S S Z))");
+val Succ Zero = evalAst fstSndAst;
 
 val TypFn (Scope("s",Fn(All (Scope("t'", TypVar ("t'",0))), Scope("x",Var ("x",0))))) : Ast.exp =
     parse "poly s -> \\ x : (all t'. t') -> x"
@@ -415,27 +406,23 @@ val Fn (Some (Scope("t'",TypVar ("t'", 0))), Scope("pkg",Var ("pkg",0))) : Ast.e
 val Fn (Plus [Nat,Arr (Nat,Nat)], Scope("natOrFunc",Var ("natOrFunc",0))) : Ast.exp =
     parse "\\ natOrFunc : (nat || nat -> nat) -> natOrFunc"
 
-val Fn (Plus [Nat,Arr (Nat,Nat)],
-     Scope ("natOrFunc",Case (Var ("natOrFunc",0),[Scope ("l",Zero),Scope ("r",Succ Zero)]))) : exp =
-    parse "\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end";
-val Fn (Plus [Nat,Arr (Nat,Nat)], Scope("natOrFunc",Case (Var ("natOrFunc", 0), [Scope("l", Zero), Scope("r", Succ Zero)]))) : exp =
-    run "\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end"
+val caseAst = Fn (Plus [Nat,Arr (Nat,Nat)],
+     Scope ("natOrFunc",Case (Var ("natOrFunc",0),[Scope ("l",Zero),Scope ("r",Succ Zero)])));
+val true = (caseAst = parse "\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end");
+val Fn (Plus [Nat,Arr (Nat,Nat)], Scope("natOrFunc",Case (Var ("natOrFunc", 0), [Scope("l", Zero), Scope("r", Succ Zero)]))) = evalAst caseAst
 
-val App
+val caseLeftAst = App
     (Fn (Plus [Nat,Arr (Nat,Nat)], Scope("natOrFunc", Case (Var ("natOrFunc",0), [Scope("l", Zero), Scope("r", Succ Zero)]))),
-     PlusNth (0, Plus [Nat,Arr (Nat,Nat)],Zero)) : Ast.exp =
-    parse "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat || nat -> nat)))";
+     PlusNth (0, Plus [Nat,Arr (Nat,Nat)],Zero));
+val true = (caseLeftAst = parse "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat || nat -> nat)))");
+val Zero = evalAst caseLeftAst;
 
-val Zero : exp =
-    run "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (left Z : (nat || nat -> nat)))";
-
-val App
+val caseRightAst = App
     (Fn (Plus [Nat,Arr (Nat,Nat)],
          Scope ("natOrFunc",Case (Var ("natOrFunc",0),[Scope ("l",Zero),Scope ("r",Succ Zero)]))),
-     PlusNth (1,Plus [Nat,Arr (Nat,Nat)],Fn (Nat,Scope ("x",Zero)))) : exp =
-    parse "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (right (\\ x : nat -> Z) : (nat || nat -> nat)))";
-val Succ Zero: exp =
-    run "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (right (\\ x : nat -> Z) : (nat || nat -> nat)))";
+     PlusNth (1,Plus [Nat,Arr (Nat,Nat)],Fn (Nat,Scope ("x",Zero))));
+val true = (caseRightAst = parse "((\\ natOrFunc : (nat || nat -> nat) -> case natOrFunc of l => Z | r => S Z end) (right (\\ x : nat -> Z) : (nat || nat -> nat)))");
+val Succ Zero = evalAst caseRightAst;
 
 val Fn (Plus [Nat,Plus [Arr (Nat,Nat),Prod ([Nat,Nat])]], Scope("natOrFuncOrProd",Var ("natOrFuncOrProd",0))) : Ast.exp =
     parse "\\ natOrFuncOrProd : (nat || ((nat -> nat) || (nat * nat))) -> natOrFuncOrProd"
@@ -457,15 +444,16 @@ val Fn
   : exp =
     parseEx "option.thon";
 
-val Let (Nat,Zero,Scope("x",Var ("x",0))) : Ast.exp = parse "let x : nat = Z in x";
+val letAst = Let (Nat,Zero,Scope("x",Var ("x",0)));
+val true = (letAst = parse "let x : nat = Z in x");
 val Let (Nat,Zero,Scope("x",Let (Nat,Succ Zero,Scope("y",Var ("x",1))))) : Ast.exp =
     parse "let x : nat = Z in (let y : nat = S Z in x)";
 val Let (Nat,Zero,Scope("x",Let (Nat,Succ Zero,Scope("y",Var ("x",1))))) : Ast.exp =
     parse "let x : nat = Z in let y : nat = S Z in x";
 
-val Zero : Ast.exp = run "let x : nat = Z in x";
+val Zero = evalAst letAst;
 
-val Let
+val nilisemptyAst = Let
     (Arr (TyRec (Scope ("l",Plus [Unit,Prod [Nat,TypVar ("l",0)]])),Nat),
      Fix (Arr (TyRec (Scope ("l",Plus [Unit,Prod [Nat,TypVar ("l",0)]])),Nat),
           Scope ("isempty",
@@ -478,33 +466,33 @@ val Let
            Fold (TyRec (Scope ("l",Plus [Unit,Prod [Nat,TypVar ("l",0)]])),
                  PlusNth (0,Plus [Unit,Prod [Nat,TyRec (Scope ("l",Plus [Unit,Prod [Nat,TypVar ("l",0)]]))]],
                           TmUnit)),
-           Scope ("nil",App (Var ("isempty",1),Var ("nil",0)))))) : exp =
-    parseEx "nilisempty.thon";
-val Succ Zero : Ast.exp = runEx "nilisempty.thon";
+           Scope ("nil",App (Var ("isempty",1),Var ("nil",0))))));
+val true = (nilisemptyAst = parseEx "nilisempty.thon");
+val Succ Zero = evalAst nilisemptyAst;
 
-val Ifz (Zero,Succ Zero,Scope ("prev",Zero)) : exp =
-    parse "ifz Z of Z -> S Z | S prev -> Z";
-val Succ Zero : Ast.exp = run "ifz Z of Z -> S Z | S prev -> Z";
-val Ifz (Succ Zero,Succ Zero,Scope ("prev",Var ("prev",0))) : exp =
-    parse "ifz S Z of Z -> S Z | S prev -> prev";
-val Zero : Ast.exp = run "ifz S Z of Z -> S Z | S prev -> prev";
+val ifzAst1 = Ifz (Zero,Succ Zero,Scope ("prev",Zero));
+val true = (ifzAst1 = parse "ifz Z of Z -> S Z | S prev -> Z");
+val Succ Zero = evalAst ifzAst1;
+val ifzAst2 = Ifz (Succ Zero,Succ Zero,Scope ("prev",Var ("prev",0)));
+val true = (ifzAst2 = parse "ifz S Z of Z -> S Z | S prev -> prev");
+val Zero = evalAst ifzAst2;
 
-val Let
+val decrAst = Let
     (Arr (Nat,Nat),
      Fn (Nat,Scope ("n",Ifz (Var ("n",0),Zero,Scope ("p",Var ("p",0))))),
-     Scope ("decr",App (Var ("decr",0),Succ (Succ Zero)))) : exp =
-    parseEx "decr.thon";
-val Succ Zero : Ast.exp = runEx "decr.thon";
+     Scope ("decr",App (Var ("decr",0),Succ (Succ Zero))));
+val true = (decrAst = parseEx "decr.thon");
+val Succ Zero = evalAst decrAst;
 
-val Let
+val addAst = Let
     (Arr (Nat,Arr (Nat,Nat)),
      Fn (Nat,Scope ("x",
          Fn (Nat,Scope ("y",
              Rec (Var ("y",0),Var ("x",1),Scope ("prevRec",Succ (Var ("prevRec",0)))))))),
-     Scope ("add",App (App (Var ("add",0),Succ Zero),Succ Zero))) : exp =
-    parseEx "add.thon";
-val Succ (Succ Zero) : Ast.exp = runEx "add.thon";
-val Let
+     Scope ("add",App (App (Var ("add",0),Succ Zero),Succ Zero)));
+val true = (addAst = parseEx "add.thon");
+val Succ (Succ Zero) = evalAst addAst;
+val subAst = Let
     (Arr (Nat,Nat),
      Fn (Nat,Scope ("n",Ifz (Var ("n",0),Zero,Scope ("p",Var ("p",0))))),
      Scope ("decr",
@@ -514,10 +502,10 @@ val Let
                    Rec (Var ("y",0),Var ("x",1),
                         Scope ("prevRec",App (Var ("decr",3),Var ("prevRec",0)))))))),
            Scope ("sub",
-                  App (App (Var ("sub",0),Succ (Succ (Succ Zero))),Succ (Succ Zero)))))) : exp =
-    parseEx "sub.thon";
-val Succ Zero : Ast.exp = runEx "sub.thon";
-val Let
+                  App (App (Var ("sub",0),Succ (Succ (Succ Zero))),Succ (Succ Zero))))));
+val true = (subAst = parseEx "sub.thon");
+val Succ Zero = evalAst subAst;
+val eqAst = Let
     (Arr (Nat,Nat),
      Fn (Nat,Scope ("x",Ifz (Var ("x",0),Zero,Scope ("p",Var ("p",0))))),
      Scope ("decr",
@@ -534,11 +522,11 @@ val Let
                               Ifz (App (App (Var ("sub",2),Var ("y",0)),Var ("x",1)),
                                    Succ Zero,Scope ("p",Zero)),
                               Scope ("p",Zero)))))),
-                 Scope ("eq",App (App (Var ("eq",0),Succ Zero),Succ (Succ Zero)))))))) : exp =
-    parseEx "eq.thon";
-val Zero : Ast.exp = runEx "eq.thon";
+                 Scope ("eq",App (App (Var ("eq",0),Succ Zero),Succ (Succ Zero))))))));
+val true = (eqAst = parseEx "eq.thon");
+val Zero = evalAst eqAst;
 
-val Let
+val lenAst = Let
     (Arr (TyRec (Scope ("nats",Plus [Unit,Prod [Nat,TypVar ("nats",0)]])),Nat),
      Fn (TyRec (Scope ("nats",Plus [Unit,Prod [Nat,TypVar ("nats",0)]])),
          Scope ("natlist",
@@ -565,37 +553,23 @@ val Let
                                  Zero,Scope ("p",Succ (Var ("p",0)))))),
                        Scope ("len",
                         App (Var ("len",0),
-                             App (Var ("cons",1),Tuple [Zero,Var ("nil",2)])))))))))) : exp =
-    parseEx "len.thon";
-val Succ Zero : Ast.exp = runEx "len.thon";
+                             App (Var ("cons",1),Tuple [Zero,Var ("nil",2)]))))))))));
+val true = (lenAst = parseEx "len.thon");
+val Succ Zero = evalAst lenAst;
 
+val emptybstAst = Fold
+    (TyRec (Scope ("node",Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])),
+     PlusNth
+       (0,Plus [Unit,Prod [Nat,Prod [TyRec (Scope ("node",Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])),
+                                     TyRec (Scope ("node",Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]]))]]],
+        TmUnit));
+val true = (emptybstAst = parseEx "emptybst.thon");
 val Fold
     (TyRec (Scope ("node",Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])),
      PlusNth
        (0,Plus [Unit,Prod [Nat,Prod [TyRec (Scope ("node",Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])),
                                      TyRec (Scope ("node",Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]]))]]],
-        TmUnit)) : exp = parseEx "emptybst.thon";
-val Fold
-    (TyRec
-       (Scope("node",
-        Plus [Unit,Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])),
-     PlusNth
-       (0, Plus
-          [Unit, (*empty base or... *)
-           Prod (* a nat and... *)
-             [Nat,
-              Prod (* a node and... *)
-                [TyRec
-                   (Scope("node",
-                    Plus
-                      [Unit,
-                       Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]])),
-                 TyRec (* a another node. *)
-                   (Scope("node",
-                    Plus
-                      [Unit,
-                       Prod [Nat,Prod [TypVar ("node",0),TypVar ("node",0)]]]))]]],
-        TmUnit)) : Ast.exp = runEx "emptybst.thon";
+        TmUnit)) = evalAst emptybstAst;
 
 val bstType : Ast.typ = typeof (parseEx "singletonbst.thon");
 
@@ -613,7 +587,7 @@ val loop = parse "fix loop : nat in loop";
 val true = (loop) = (step loop);
 val Nat = typeof loop;
 (* 2 is even *)
-val Let
+val isevenAst = Let
     (Arr (Nat,Nat),
      Fix (Arr (Nat,Nat),
           Scope ("iseven",
@@ -621,9 +595,9 @@ val Let
                Ifz (Var ("n",0),Succ Zero,
                     Scope ("p",Ifz (App (Var ("iseven",2),Var ("p",0)),Succ Zero,
                                    Scope ("p",Zero)))))))),
-     Scope ("iseven",App (Var ("iseven",0),Succ (Succ Zero)))) : exp =
-    parseEx "iseven.thon";
-val Succ Zero = runEx "iseven.thon";;
+     Scope ("iseven",App (Var ("iseven",0),Succ (Succ Zero))));
+val true = (isevenAst = parseEx "iseven.thon");
+val Succ Zero = evalAst isevenAst;
 
 val bstinsert = parseEx "bst.thon";
 val emptybst = parseEx "emptybst.thon";
@@ -632,7 +606,7 @@ val zerobst = parseEx "singletonbst.thon";
 val appbst = eval (A.App(A.App(bstinsert, A.Zero), emptybst));
 val true = (zerobst = appbst);
 
-val Let
+val setgetAst = Let
     (Some (Scope ("t",Prod [Arr (Nat,TypVar ("t",0)),Arr (TypVar ("t",0),Nat)])),
      Impl (Nat,
            Tuple [Fn (Nat,Scope ("x",Var ("x",0))),Fn (Nat,Scope ("x",Var ("x",0)))],
@@ -647,20 +621,20 @@ val Let
                         Let (TypVar ("t",0),App (Var ("set",1),Succ (Succ Zero)),
                              Scope ("s",
                               Let (Nat,App (Var ("get",1),Var ("s",0)),
-                                   Scope ("g",Var ("g",0)))))))))))))) : exp =
-    parseEx "setget.thon";
-val Succ (Succ Zero) = runEx "setget.thon";
+                                   Scope ("g",Var ("g",0))))))))))))));
+val true = (setgetAst = parseEx "setget.thon");
+val Succ (Succ Zero) = evalAst setgetAst;
 
-val Use
+val usePolyAst = Use
     (Impl (Nat,Zero,Some (Scope ("t",Nat))),
      Scope ("t",Scope ("pkg",
-         TypFn (Scope ("a",Fn (TypVar ("a",0),Scope ("x",Var ("x",0)))))))) : exp =
-    parseEx "use-poly.thon";
-val TypFn (Scope("a", Fn (TypVar ("a", 0), Scope("x", Var ("x", 0))))) = runEx "use-poly.thon";
+         TypFn (Scope ("a",Fn (TypVar ("a",0),Scope ("x",Var ("x",0))))))));
+val true = (usePolyAst = parseEx "use-poly.thon");
+val TypFn (Scope("a", Fn (TypVar ("a", 0), Scope("x", Var ("x", 0))))) = evalAst usePolyAst;
 
-val Ifz (Zero,TypFn (Scope ("t",Zero)),Scope ("p",TypFn (Scope ("s",Zero)))) : exp =
-    parseEx "typnames.thon";
-val TypFn (Scope("t", Zero)) = runEx "typnames.thon";
+val typnamesAst = Ifz (Zero,TypFn (Scope ("t",Zero)),Scope ("p",TypFn (Scope ("s",Zero))));
+val true = (typnamesAst = parseEx "typnames.thon");
+val TypFn (Scope("t", Zero)) = evalAst typnamesAst;
 
 val
   Data
@@ -669,7 +643,7 @@ val
   : Ast.exp =
     parse "data List = Nil unit | Cons nat * (some t. t -> List) in Z";
 
-val Data
+val autoNatlistAst = Data
     ("list",["nil","cons"],[Unit,Prod [Nat,TypVar ("list",0)]],
      Let (Arr (TypVar ("list",0),Nat),
           Fix (Arr (TypVar ("list",0),Nat),
@@ -680,10 +654,10 @@ val Data
                            [Scope ("empty",Succ Zero),Scope ("not",Zero)]))))),
           Scope ("isempty",
            App (Var ("isempty",0),
-                App (Var ("cons",2),Tuple [Zero,App (Var ("nil",3),TmUnit)]))))) : exp =
-    parseEx "auto-natlist.thon";
-val Zero = runEx "auto-natlist.thon";
-val Data
+                App (Var ("cons",2),Tuple [Zero,App (Var ("nil",3),TmUnit)])))));
+val true = (autoNatlistAst = parseEx "auto-natlist.thon");
+val Zero = evalAst autoNatlistAst;
+val bstDepthAst = Data
     ("tree",["Nil","Node"],
      [Unit,Prod [Nat,Prod [TypVar ("tree",0),TypVar ("tree",0)]]],
      Let (Arr (Nat,Nat),
@@ -747,40 +721,40 @@ val Data
                                         App (App (Var ("insert",1),Succ (Succ Zero)),
                                              App (App (Var ("insert",1),Zero),
                                                   App (App (Var ("insert",1),Succ Zero),
-                                                       App (Var ("Nil",7),TmUnit)))))))))))))))) : exp =
-    parseEx "bst-depth.thon";
-val Succ (Succ Zero) = runEx "bst-depth.thon";
+                                                       App (Var ("Nil",7),TmUnit))))))))))))))));
+val true = (bstDepthAst = parseEx "bst-depth.thon");
+val Succ (Succ Zero) = evalAst bstDepthAst;
 
-val Data
+val ternaryTreeAst = Data
     ("ternaryTree",["Nil","Node"],
      [Unit,
       Prod [Nat,Prod [TypVar ("ternaryTree",0),
                        Prod [TypVar ("ternaryTree",0),TypVar ("ternaryTree",0)]]]],
-     Zero) : exp =
-    parseEx "ternary-tree.thon";
-val Zero = runEx "ternary-tree.thon";
-val Data ("TrueFalseNull",["True","False","Null"],[Unit,Unit,Unit],Zero) : exp =
-    parseEx "three-summands-to-data.thon";
-val Zero = runEx "three-summands-to-data.thon";
-val Data ("Trueth",["True"],[Unit],Zero) : exp =
-    parseEx "one-summand-to-data.thon";
-val Zero = runEx "one-summand-to-data.thon";
+     Zero);
+val true = (ternaryTreeAst = parseEx "ternary-tree.thon");
+val Zero = evalAst ternaryTreeAst;
+val threeSummandsAst = Data ("TrueFalseNull",["True","False","Null"],[Unit,Unit,Unit],Zero);
+val true = (threeSummandsAst = parseEx "three-summands-to-data.thon");
+val Zero = evalAst threeSummandsAst;
+val oneSummandAst = Data ("Trueth",["True"],[Unit],Zero);
+val true = (oneSummandAst = parseEx "one-summand-to-data.thon");
+val Zero = evalAst oneSummandAst;
 
-val Fn (Prod [Nat,Prod [Arr (Nat,Nat),Prod [Nat,Nat]]],
-     Scope ("natOrFuncOrProd",Var ("natOrFuncOrProd",0))) : exp =
-    parseEx "ternary-prod-type.thon";
+val ternaryProdTypeAst = Fn (Prod [Nat,Prod [Arr (Nat,Nat),Prod [Nat,Nat]]],
+     Scope ("natOrFuncOrProd",Var ("natOrFuncOrProd",0)));
+val true = (ternaryProdTypeAst = parseEx "ternary-prod-type.thon");
 val Fn
     (Prod [Nat,Prod [Arr (Nat,Nat),Prod [Nat,Nat]]],
      Scope("natOrFuncOrProd",
-     Var ("natOrFuncOrProd",0))) = runEx "ternary-prod-type.thon";
+     Var ("natOrFuncOrProd",0))) = evalAst ternaryProdTypeAst;
 
-val Fn (Plus [Nat,Plus [Arr (Nat,Nat),Prod [Nat,Nat]]],
-     Scope ("natOrFuncOrProd",Var ("natOrFuncOrProd",0))) : exp =
-    parseEx "ternary-sum-type.thon";
+val ternarySumTypeAst = Fn (Plus [Nat,Plus [Arr (Nat,Nat),Prod [Nat,Nat]]],
+     Scope ("natOrFuncOrProd",Var ("natOrFuncOrProd",0)));
+val true = (ternarySumTypeAst = parseEx "ternary-sum-type.thon");
 val Fn
     (Plus [Nat,Plus [Arr (Nat,Nat),Prod [Nat,Nat]]],
      Scope("natOrFuncOrProd",
-     Var ("natOrFuncOrProd",0))) = runEx "ternary-sum-type.thon";
+     Var ("natOrFuncOrProd",0))) = evalAst ternarySumTypeAst;
 
 val
   Tuple
@@ -789,7 +763,7 @@ val
        TypFn (Scope("t",Fn (TypVar ("t",0), Scope("x",Var ("x",0)))))] : exp =
 step (A.Tuple [polymorphicIdFn, A.TypApp(Nat, polymorphicIdFn), polymorphicIdFn]);
 
-val
+val unaryOrBinaryTreeAst =
   Data
     ("tree",["nil","two","cons"],
      [Unit,Prod [Nat,Prod [Nat,TypVar ("tree",0)]],
@@ -808,41 +782,42 @@ val
         Scope("isempty",
         App
           (Var ("isempty",0),
-           App (Var ("cons",2),Tuple [Zero,App (Var ("nil",4),TmUnit)])))))
-  : exp = parseEx "unary-or-binary-tree.thon";
-
-val Zero = runEx "unary-or-binary-tree.thon";
-val Let (Nat,Succ Zero,
+           App (Var ("cons",2),Tuple [Zero,App (Var ("nil",4),TmUnit)])))));
+val true = (unaryOrBinaryTreeAst = parseEx "unary-or-binary-tree.thon");
+val Zero = evalAst unaryOrBinaryTreeAst;
+val dbiManagementAst = Let (Nat,Succ Zero,
      Scope ("x",Let (Nat,Zero,
          Scope ("y",Data ("list",["nil","cons"],[Unit,Prod [Nat,TypVar ("list",0)]],
-                          Var ("y",3)))))) : exp =
-    parseEx "dbi-management-datatype-elaboration.thon";
-val Zero = runEx "dbi-management-datatype-elaboration.thon";
-val Data ("list",["nil","cons"],[Unit,Prod [Nat,TypVar ("list",0)]],
-     Let (Nat,Zero,Scope ("x",Data ("pair",["p"],[Prod [Nat,Nat]],Var ("x",2))))) : exp =
-    parseEx "expmap-data.thon";
-val Zero = runEx "expmap-data.thon";
+                          Var ("y",3))))));
+val true = (dbiManagementAst = parseEx "dbi-management-datatype-elaboration.thon");
+val Zero = evalAst dbiManagementAst;
+val expmapDataAst = Data ("list",["nil","cons"],[Unit,Prod [Nat,TypVar ("list",0)]],
+     Let (Nat,Zero,Scope ("x",Data ("pair",["p"],[Prod [Nat,Nat]],Var ("x",2)))));
+val true = (expmapDataAst = parseEx "expmap-data.thon");
+val Zero = evalAst expmapDataAst;
 
-val Zero : exp = parseEx "zero.thon";
-val Zero = runEx "zero.thon";
-val Succ Zero : exp = parseEx "one.thon";
-val Succ Zero = runEx "one.thon";
-val App (App (Fn (Arr (Nat,Nat),Scope ("f",Var ("f",0))),
-              Fn (Nat,Scope ("x",Var ("x",0)))),Succ Zero) : exp =
-    parseEx "foo.thon";
-val Succ Zero = runEx "foo.thon";
-val App (App (Fn (Arr (Nat,Nat),Scope ("f",Var ("f",0))),
-              Fn (Nat,Scope ("x",Var ("x",0)))),Succ Zero) : exp =
-    parseEx "idid.thon";
-val Succ Zero = runEx "idid.thon";
-val App (App (Fn (Arr (Nat,Nat),Scope ("f",Var ("f",0))),
-              Fn (Nat,Scope ("x",Var ("x",0)))),Succ Zero) : exp =
-    parseEx "abcd.thon";
-val Succ Zero = runEx "abcd.thon";
-val Ifz (Zero,TypFn (Scope ("t",Zero)),Scope ("p",TypFn (Scope ("s",Zero)))) : exp =
-    parseEx "aeqv.thon";
-val TypFn (Scope("t", Zero)) = runEx "aeqv.thon";
-val Let
+val zeroAst = Zero;
+val true = (zeroAst = parseEx "zero.thon");
+val Zero = evalAst zeroAst;
+val oneAst = Succ Zero;
+val true = (oneAst = parseEx "one.thon");
+val Succ Zero = evalAst oneAst;
+val fooAst = App (App (Fn (Arr (Nat,Nat),Scope ("f",Var ("f",0))),
+              Fn (Nat,Scope ("x",Var ("x",0)))),Succ Zero);
+val true = (fooAst = parseEx "foo.thon");
+val Succ Zero = evalAst fooAst;
+val ididAst = App (App (Fn (Arr (Nat,Nat),Scope ("f",Var ("f",0))),
+              Fn (Nat,Scope ("x",Var ("x",0)))),Succ Zero);
+val true = (ididAst = parseEx "idid.thon");
+val Succ Zero = evalAst ididAst;
+val abcdAst = App (App (Fn (Arr (Nat,Nat),Scope ("f",Var ("f",0))),
+              Fn (Nat,Scope ("x",Var ("x",0)))),Succ Zero);
+val true = (abcdAst = parseEx "abcd.thon");
+val Succ Zero = evalAst abcdAst;
+val aeqvAst = Ifz (Zero,TypFn (Scope ("t",Zero)),Scope ("p",TypFn (Scope ("s",Zero))));
+val true = (aeqvAst = parseEx "aeqv.thon");
+val TypFn (Scope("t", Zero)) = evalAst aeqvAst;
+val collatzAst = Let
     (Arr (Nat,Nat),
      Fn (Nat,Scope ("n",Ifz (Var ("n",0),Zero,Scope ("p",Ifz (Var ("p",0),Succ Zero,Scope ("p",Zero)))))),
      Scope ("isone",
@@ -870,9 +845,9 @@ val Let
                                                App (Var ("collatz",1),Succ (App (Var ("multbythree",2),Var ("n",0)))),
                                                Scope ("p",App (Var ("collatz",2),App (Var ("divbytwo",4),Var ("n",1))))),
                                           Scope ("p",Succ Zero)))))),
-                             Scope ("collatz",App (Var ("collatz",0),Succ (Succ Zero)))))))))))) : exp =
-    parseEx "collatz.thon";
-val Succ Zero = runEx "collatz.thon";
+                             Scope ("collatz",App (Var ("collatz",0),Succ (Succ Zero))))))))))));
+val true = (collatzAst = parseEx "collatz.thon");
+val Succ Zero = evalAst collatzAst;
 (* TODO This is wrong. *)
 val All (Scope("t",Arr (TypVar ("t",0),All (Scope("s",TypVar ("t",0 (*Should be 1 here*))))))) = typeof (parseEx "nested-poly.thon");
 (* val Zero = runEx "two-datatypes.thon"; *)
