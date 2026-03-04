@@ -1,1 +1,0 @@
-\ natOrFuncOrProd : (nat || (nat -> nat) || (nat * nat)) -> natOrFuncOrProd

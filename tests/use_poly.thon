@@ -1,0 +1,5 @@
+(* open a package then return a polymorphic identity *)
+OPEN
+  PACKAGE NAT IS ZERO AS SOME t. NAT
+AS (t, pkg) IN
+GENERIC a IS FN(x : a) x

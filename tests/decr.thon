@@ -1,0 +1,4 @@
+DECLARE decr : NAT -> NAT IS
+  FN(n : NAT)
+    IFZ n OF ZERO THEN ZERO ELSE p THEN p IN
+decr(SUCC(SUCC(ZERO)))

@@ -1,0 +1,35 @@
+DECLARE isone : NAT -> NAT IS
+  FN(n : NAT)
+    IFZ n OF ZERO THEN ZERO
+    ELSE p THEN
+      IFZ p OF ZERO THEN SUCC(ZERO)
+      ELSE p THEN ZERO IN
+DECLARE iseven : NAT -> NAT IS
+  FIX iseven : NAT -> NAT IS
+    FN(n : NAT)
+      IFZ n OF ZERO THEN SUCC(ZERO)
+      ELSE p THEN
+        IFZ iseven(p) OF ZERO THEN SUCC(ZERO)
+        ELSE p THEN ZERO IN
+DECLARE divbytwo : NAT -> NAT IS
+  FIX divbytwo : NAT -> NAT IS
+    FN(n : NAT)
+      IFZ n OF ZERO THEN ZERO
+      ELSE p THEN
+        IFZ p OF ZERO THEN ZERO
+        ELSE p' THEN SUCC(divbytwo(p')) IN
+DECLARE multbythree : NAT -> NAT IS
+  FIX multbythree : NAT -> NAT IS
+    FN(n : NAT)
+      IFZ n OF ZERO THEN ZERO
+      ELSE nminusone THEN SUCC(SUCC(SUCC(multbythree(nminusone)))) IN
+DECLARE collatz : NAT -> NAT IS
+  FIX collatz : NAT -> NAT IS
+    FN(n : NAT)
+      IFZ isone(n) OF
+        ZERO THEN
+          IFZ iseven(n) OF
+            ZERO THEN collatz(SUCC(multbythree(n)))
+          ELSE p THEN collatz(divbytwo(n))
+      ELSE p THEN SUCC(ZERO) IN
+collatz(SUCC(SUCC(ZERO)))

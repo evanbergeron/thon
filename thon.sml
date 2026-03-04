@@ -1,20 +1,19 @@
 (* thon - a small functional language *)
+structure A = Ast
 structure Thon : sig
-                   val parse : string -> Ast.exp
-                   val parseFile : string -> Ast.exp
                    val typeof : A.exp -> A.typ
                    val typeof' : A.typ list -> A.typ option list -> A.exp -> A.typ
                    val eval : A.exp -> A.exp
                    val isval : A.exp -> bool
                    val step : A.exp -> A.exp
-                   val run : string -> A.exp
                    val eraseNamesInTyp : A.typ -> A.typ
-                   val runFile : string -> A.exp
                    val elaborateDatatypes : A.exp -> A.exp
                    val abstractOutType : string -> A.typ -> A.typ -> A.typ
                    val println : string -> unit
                    val get : 'a list -> int -> 'a
                    val istype : 'a option list -> A.typ -> bool
+                   val run : string -> A.exp
+                   val runFile : string -> A.exp
                    exception IllTyped
                    exception IllTypedMsg of string
                  end =
@@ -348,32 +347,20 @@ fun step e =
       | _ => if (isval e) then e else raise No
     end
 
-fun parse s =
-    let val ast : A.exp = Parse.parse s
-    in
-        setDeBruijnIndex ast [] []
-    end
-
-fun parseFile filename =
-    let val ast : A.exp = Parse.parseFile filename
-    in
-        setDeBruijnIndex ast [] []
-    end
-
 fun eval e = if isval e then e else eval (step e)
 
-fun run s =
-    let val e' = parse s
-        val e = elaborateDatatypes e'
-    in
-        if isval e then e else eval (step e)
-    end
+fun run src =
+    let val ast = Parse.parse src
+        val ast = setDeBruijnIndex ast [] []
+        val ast = elaborateDatatypes ast
+        val _ = typeof ast
+    in eval ast end
 
-fun runFile s =
-    let val e' = parseFile s
-        val e = elaborateDatatypes e'
-    in
-        if isval e then e else eval (step e)
-    end
+fun runFile filename =
+    let val ast = Parse.parseFile filename
+        val ast = setDeBruijnIndex ast [] []
+        val ast = elaborateDatatypes ast
+        val _ = typeof ast
+    in eval ast end
 
 end (* structure Thon *)

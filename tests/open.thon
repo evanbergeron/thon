@@ -1,0 +1,6 @@
+OPEN
+  PACKAGE NAT IS
+    (FN(x : NAT) ZERO, SUCC(ZERO))
+  AS SOME t. (t -> NAT) * t
+AS (s, pkg) IN
+FST(pkg)(SND(pkg))

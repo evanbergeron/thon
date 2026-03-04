@@ -1,0 +1,10 @@
+(* natlist isempty using fold/unfold and fix *)
+DECLARE isempty : (REC l. UNIT | NAT * l) -> NAT IS
+  FIX isempty : (REC l. UNIT | NAT * l) -> NAT IS
+    FN(natlist : REC l. UNIT | NAT * l)
+      CASE UNFOLD(natlist) OF
+        WHEN empty => SUCC(ZERO)
+      | WHEN not => ZERO IN
+DECLARE nil : REC l. UNIT | NAT * l IS
+  FOLD[REC l. UNIT | NAT * l](LEFT[UNIT | NAT * REC l. UNIT | NAT * l](UNIT)) IN
+isempty(nil)

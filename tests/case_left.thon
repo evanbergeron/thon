@@ -1,0 +1,5 @@
+(FN(natOrFunc : NAT | (NAT -> NAT))
+  CASE natOrFunc OF
+    WHEN l => ZERO
+  | WHEN r => SUCC(ZERO)
+)(LEFT[NAT | (NAT -> NAT)](ZERO))

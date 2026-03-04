@@ -1,0 +1,7 @@
+(* option with none: falls back to default *)
+(FN(x : NAT | UNIT)
+  FN(y : NAT)
+    CASE x OF
+      WHEN somex => somex
+    | WHEN none => y
+)(RIGHT[NAT | UNIT](UNIT))(ZERO)

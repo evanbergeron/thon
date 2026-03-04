@@ -3,14 +3,9 @@ Group is
 #if defined (NEW_CM)
   $/basis.cm
   $/smlnj-lib.cm
-  $/ml-yacc-lib.cm
-#else
-  ml-yacc-lib.cm
 #endif
 
   parse/ast.sml
-  parse/thon.grm
-  parse/thon.lex
   parse/parse.sml
   thon.sml
   tests.sml

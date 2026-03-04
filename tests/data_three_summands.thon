@@ -1,0 +1,3 @@
+DATA TrueFalseNull IS
+  True(UNIT) | False(UNIT) | Null(UNIT) IN
+ZERO

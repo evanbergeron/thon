@@ -1,0 +1,57 @@
+(* LRU Cache: a list of (key, value) pairs, most recently used at front *)
+(* Operations: lookup, remove, put (insert/update moves entry to front) *)
+DATA cache IS
+  empty(UNIT) | entry((NAT * NAT) * cache) IN
+
+(* Nat equality: returns SUCC(ZERO) if equal, ZERO if not *)
+DECLARE eq : NAT -> NAT -> NAT IS
+  FIX eq : NAT -> NAT -> NAT IS
+    FN(a : NAT)
+      FN(b : NAT)
+        IFZ a OF ZERO THEN
+          IFZ b OF ZERO THEN SUCC(ZERO)
+          ELSE pb THEN ZERO
+        ELSE pa THEN
+          IFZ b OF ZERO THEN ZERO
+          ELSE pb THEN eq(pa)(pb) IN
+
+(* Lookup: find value for key, return ZERO if not found *)
+DECLARE lookup : NAT -> cache -> NAT IS
+  FIX lookup : NAT -> cache -> NAT IS
+    FN(key : NAT)
+      FN(c : cache)
+        CASE exposecache(c) OF
+          WHEN e => ZERO
+        | WHEN kvrest =>
+            IFZ eq(key)(FST(FST(kvrest))) OF
+              ZERO THEN lookup(key)(SND(kvrest))
+            ELSE p THEN SND(FST(kvrest)) IN
+
+(* Remove all entries with a given key *)
+DECLARE remove : NAT -> cache -> cache IS
+  FIX remove : NAT -> cache -> cache IS
+    FN(key : NAT)
+      FN(c : cache)
+        CASE exposecache(c) OF
+          WHEN e => empty(UNIT)
+        | WHEN kvrest =>
+            IFZ eq(key)(FST(FST(kvrest))) OF
+              ZERO THEN entry((FST(kvrest), remove(key)(SND(kvrest))))
+            ELSE p THEN remove(key)(SND(kvrest)) IN
+
+(* Put: remove old entry with same key, prepend new entry at front *)
+(* This is the core LRU behavior: updated/accessed keys move to front *)
+DECLARE put : NAT -> NAT -> cache -> cache IS
+  FN(key : NAT)
+    FN(v : NAT)
+      FN(c : cache)
+        entry(((key, v), remove(key)(c))) IN
+
+(* Test: build cache, update a key, verify lookup returns updated value *)
+(* put(1, 3) -> put(2, 5) -> put(1, 4)  [updates key 1, moves to front] *)
+(* lookup(1) should return 4 *)
+DECLARE c0 : cache IS empty(UNIT) IN
+DECLARE c1 : cache IS put(SUCC(ZERO))(SUCC(SUCC(SUCC(ZERO))))(c0) IN
+DECLARE c2 : cache IS put(SUCC(SUCC(ZERO)))(SUCC(SUCC(SUCC(SUCC(SUCC(ZERO))))))(c1) IN
+DECLARE c3 : cache IS put(SUCC(ZERO))(SUCC(SUCC(SUCC(SUCC(ZERO)))))(c2) IN
+lookup(SUCC(ZERO))(c3)

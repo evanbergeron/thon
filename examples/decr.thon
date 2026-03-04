@@ -1,7 +1,0 @@
-let decr : nat -> nat =
-  \ n : nat ->
-    ifz n of
-      Z -> Z
-    | S p -> p
-in
-(decr (S S Z))

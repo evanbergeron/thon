@@ -1,0 +1,1 @@
+(FN(x : NAT) SUCC(x))(ZERO)

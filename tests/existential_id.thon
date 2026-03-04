@@ -1,0 +1,2 @@
+(* existential identity function *)
+FN(pkg : SOME t'. t') pkg

@@ -1,0 +1,11 @@
+(* natlist as an existential package *)
+PACKAGE REC l. UNIT | NAT * l IS
+  (FOLD[REC l. UNIT | NAT * l](LEFT[UNIT | NAT * REC l. UNIT | NAT * l](UNIT)),
+   (FN(natAndNatList : NAT * REC l. UNIT | NAT * l)
+      FOLD[REC l. UNIT | NAT * l](
+        RIGHT[UNIT | NAT * REC l. UNIT | NAT * l](natAndNatList)),
+    FN(natlist : REC l. UNIT | NAT * l)
+      CASE UNFOLD(natlist) OF
+        WHEN empty => ZERO
+      | WHEN hdAndTl => SUCC(ZERO)))
+AS SOME t. t * ((NAT * t -> t) * (t -> NAT))

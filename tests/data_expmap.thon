@@ -1,0 +1,7 @@
+(* nested data with let in between *)
+DATA list IS
+  nil(UNIT) | cons(NAT * list) IN
+DECLARE x : NAT IS ZERO IN
+DATA pair IS
+  p(NAT * NAT) IN
+x

@@ -1,1 +1,0 @@
-(poly t -> \ x : t -> poly s -> x)

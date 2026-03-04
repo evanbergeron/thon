@@ -1,2 +1,0 @@
-use (impl (some t. nat) with nat as Z) as (pkg, t) in
-(poly a -> \ x : a -> x)

@@ -1,0 +1,10 @@
+(* natlist isempty using DATA *)
+DATA list IS
+  nil(UNIT) | cons(NAT * list) IN
+DECLARE isempty : list -> NAT IS
+  FIX isempty : list -> NAT IS
+    FN(natlist : list)
+      CASE exposelist(natlist) OF
+        WHEN empty => SUCC(ZERO)
+      | WHEN not => ZERO IN
+isempty(cons((ZERO, nil(UNIT))))

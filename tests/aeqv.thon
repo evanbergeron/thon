@@ -1,0 +1,5 @@
+(* alpha equivalence: both branches produce generic zero with different type var names *)
+IFZ ZERO OF ZERO THEN
+  GENERIC t IS ZERO
+ELSE p THEN
+  GENERIC s IS ZERO

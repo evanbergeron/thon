@@ -1,0 +1,6 @@
+(* de bruijn index management across let and data *)
+DECLARE x : NAT IS SUCC(ZERO) IN
+DECLARE y : NAT IS ZERO IN
+DATA list IS
+  nil(UNIT) | cons(NAT * list) IN
+y

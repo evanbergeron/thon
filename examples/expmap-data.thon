@@ -1,4 +1,0 @@
-data list = nil unit | cons nat * list in
-let x : nat = Z in
-data pair = p nat * nat in
-x

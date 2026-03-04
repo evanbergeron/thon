@@ -1,0 +1,1 @@
+FUN f(x : NAT) : NAT IS x IN f(SUCC(ZERO))

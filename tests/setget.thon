@@ -1,0 +1,11 @@
+(* set/get with existential types *)
+DECLARE setget : SOME t. (NAT -> t) * (t -> NAT) IS
+  PACKAGE NAT IS
+    (FN(x : NAT) x, FN(x : NAT) x)
+  AS SOME t. (NAT -> t) * (t -> NAT) IN
+OPEN setget AS (t, sg) IN
+DECLARE set : NAT -> t IS FST(sg) IN
+DECLARE get : t -> NAT IS SND(sg) IN
+DECLARE s : t IS set(SUCC(SUCC(ZERO))) IN
+DECLARE g : NAT IS get(s) IN
+g

@@ -1,7 +1,0 @@
-let add : nat -> nat -> nat =
-  \ x : nat ->
-  \ y : nat ->
-    rec y of
-      Z -> x
-    | prevRec -> S prevRec
-in (add (S Z) (S Z))

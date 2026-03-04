@@ -1,0 +1,4 @@
+DATA ternaryTree IS
+  Nil(UNIT)
+| Node(NAT * (ternaryTree * (ternaryTree * ternaryTree))) IN
+ZERO

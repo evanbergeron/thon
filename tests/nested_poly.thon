@@ -1,0 +1,4 @@
+(GENERIC t IS
+  GENERIC t' IS
+    FN(x : t -> t') x
+)[NAT][NAT](FN(x : NAT) x)(ZERO)

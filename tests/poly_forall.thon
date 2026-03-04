@@ -1,0 +1,2 @@
+(* poly function taking a forall type *)
+(GENERIC s IS FN(x : FORALL t'. t') x)[NAT]

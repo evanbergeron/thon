@@ -1,0 +1,11 @@
+(* tree with nil, binary, and unary nodes *)
+DATA tree IS
+  nil(UNIT) | two(NAT * (NAT * tree)) | cons(NAT * tree) IN
+DECLARE isempty : tree -> NAT IS
+  FIX isempty : tree -> NAT IS
+    FN(t : tree)
+      CASE exposetree(t) OF
+        WHEN empty => SUCC(ZERO)
+      | WHEN twocase => ZERO
+      | WHEN conscase => ZERO IN
+isempty(cons((ZERO, nil(UNIT))))

@@ -1,6 +1,0 @@
-fun iseven : nat -> nat =
-  \ n : nat ->
-    ifz n of
-      Z -> S Z (*true*)
-    | S p -> ifz (iseven p) of Z -> S Z | S p -> Z
-in (iseven (S S Z))

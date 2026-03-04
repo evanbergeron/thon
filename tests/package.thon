@@ -1,0 +1,3 @@
+PACKAGE NAT IS
+  FN(x : NAT) ZERO
+AS SOME t. t -> t

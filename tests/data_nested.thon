@@ -1,0 +1,4 @@
+(* nested datatypes *)
+DATA typ IS Arr(typ) IN
+DATA exp IS Fn(typ) IN
+ZERO

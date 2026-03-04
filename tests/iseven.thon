@@ -1,0 +1,8 @@
+DECLARE iseven : NAT -> NAT IS
+  FIX iseven : NAT -> NAT IS
+    FN(n : NAT)
+      IFZ n OF ZERO THEN SUCC(ZERO)
+      ELSE p THEN
+        IFZ iseven(p) OF ZERO THEN SUCC(ZERO)
+        ELSE p THEN ZERO IN
+iseven(SUCC(SUCC(ZERO)))

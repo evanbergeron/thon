@@ -1,0 +1,2 @@
+(* sum identity applied to left injection *)
+(FN(natOrFunc : NAT | (NAT -> NAT)) natOrFunc)(LEFT[NAT | (NAT -> NAT)](ZERO))
