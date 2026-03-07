@@ -50,6 +50,8 @@ fun abstractOutType name search =
     A.typWalk (fn c => fn t => if t = search then A.TypVar(name, c) else t)
         A.incrDepth 0
 
+fun typOpen s t = A.typShift ~1 (A.typSubst 0 (A.typShift 1 s) t)
+
 fun find name names =
     (case List.findi (fn (_, n : string) => n = name) names
      of NONE => NONE
@@ -90,17 +92,17 @@ fun elaborateDatatype e =
                                               List.map (fn t => A.Arr(t, A.TypVar("t", 0))) tInTypes),
                                          exposeFnType])
                                 ))
-            val sumTypeForInjection = List.map (A.typSubst 0 withType) types;
+            fun typOpenBinder t =
+                A.typShift ~1 (A.typSubst 0 (A.typShift 1 withType) t)
+            val openedTypes = List.map typOpenBinder types;
+            val sumTypeForFold = List.map (A.typShift 1) openedTypes;
             fun makeInjectionExprFromSummandType (i, t) =
                 let val name = "summand" ^ Int.toString i
                 in
-                A.Fn(A.typSubst 0 withType t, (* getting typ, 0 instead of typ,1 here *)
+                A.Fn(List.nth(openedTypes, i),
                      A.Scope(name,
                      A.Fold(withType,
-                            (* UNDONE is DeBruijin index 0 ok here?
-                             * Do we need to be incrementing a bindingDepth somewhere else?
-                             *)
-                            A.PlusNth(i, A.Plus sumTypeForInjection, A.Var(name, 0)))))
+                            A.PlusNth(i, A.Plus sumTypeForFold, A.Var(name, 0)))))
                 end
 
             val fns = List.mapi makeInjectionExprFromSummandType types;
@@ -204,47 +206,49 @@ fun typeof' ctx typCtx A.Zero = A.Nat
         if not (typeEq t t2) then raise IllTyped else t
     end
   | typeof' ctx typCtx (A.Fix (typ, A.Scope(name, e))) = typeof' (typ::ctx) typCtx e
-  | typeof' ctx typCtx (A.TypFn (A.Scope(name, e))) = A.All(A.Scope(name, typeof' ctx (NONE::typCtx) e))
+  | typeof' ctx typCtx (A.TypFn (A.Scope(name, e))) =
+    let val ctx' = List.map (A.typShift 1) ctx
+    in A.All(A.Scope(name, typeof' ctx' (NONE::typCtx) e)) end
   | typeof' ctx typCtx (A.TypApp (appType, e)) =
     if not (istype typCtx appType) then raise IllTyped else
     let val A.All(A.Scope(name, t)) = typeof' ctx typCtx e
     in
-        A.typSubst 0 appType t
+        typOpen appType t
     end
   | typeof' ctx typCtx (A.Impl (reprType, pkgImpl, pkgType)) =
     if not (istype typCtx reprType) then (
         print ("Package implementation representation type:\n" ^ A.Print.typToString(reprType) ^ "\nis not a type.\n");
         raise IllTyped
     ) else
-    (* pkgType : [reprType/A.TypVar 0](t') *)
-    let val deducedPkgType = typeof' ctx (NONE::typCtx) pkgImpl
-        val A.Some(A.Scope(name, pkgType')) = pkgType
+    let val A.Some(A.Scope(name, pkgType')) = pkgType
+        val expectedType = typOpen reprType pkgType'
+        val deducedType = typeof' ctx typCtx pkgImpl
     in
-        if not (typeEq (abstractOutType name reprType deducedPkgType)
-                       (abstractOutType name reprType pkgType')) then
+        if not (typeEq deducedType expectedType) then
             raise IllTyped
         else
             pkgType
     end
   | typeof' ctx typCtx (A.Use (pkg, A.Scope(typeName, A.Scope(clientName, client)))) =
     let val A.Some(A.Scope(name, r)) = typeof' ctx typCtx pkg
-        (* binds BOTH a A.TypVar and a exp A.Var *)
-        val clientType = typeof' (r::ctx) (NONE::typCtx) client
+        val ctx' = List.map (A.typShift 1) ctx
+        val clientType = typeof' (r::ctx') (NONE::typCtx) client
         val resType = A.typShift ~1 clientType
     in
         if not (istype typCtx resType) then raise IllTyped else
         resType
     end
   | typeof' ctx typCtx (A.Fold(A.TyRec(A.Scope(name, t)) (*declared type*), e'(* binds a typ var *))) =
-    let val deduced = typeof' ctx (NONE::typCtx) e'
+    let val ctx' = List.map (A.typShift 1) ctx
+        val deduced = typeof' ctx' (NONE::typCtx) e'
         val finalType = A.TyRec(A.Scope(name, t))
-        val absDeduced = A.TyRec(A.Scope(name, abstractOutType name finalType deduced))
+        val unfoldedAtDepth = A.typSubst 0 (A.typShift 1 finalType) t
     in
-        if not (typeEq absDeduced finalType) then (
+        if not (typeEq deduced unfoldedAtDepth) then (
             print "Recursive type deduced type:\n";
-            print (A.Print.typToString absDeduced);
-            print "\nis not type-equal to declared type:\n";
-            printlnType (A.TyRec(A.Scope(name, t)));
+            printlnType deduced;
+            print "does not match unfolded declared type:\n";
+            printlnType unfoldedAtDepth;
             raise IllTyped
          ) else
             finalType
@@ -253,7 +257,7 @@ fun typeof' ctx typCtx A.Zero = A.Nat
     raiseIllTypedMsg "Fold type argument must be a recursive type"
   | typeof' ctx typCtx (A.Unfold(e')) =
     let val A.TyRec(A.Scope(name, t)) = typeof' ctx typCtx e' in
-        A.typSubst 0 (A.TyRec(A.Scope(name, t))) t
+        typOpen (A.TyRec(A.Scope(name, t))) t
     end
 
 fun typeof e = typeof' [] [] e

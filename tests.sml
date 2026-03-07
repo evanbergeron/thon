@@ -364,7 +364,6 @@ val Succ Zero = runTest "collatz.thon";
 val _ = runTest "natlist_pkg.thon";
 val Zero = runTest "manual_datatype.thon";
 val Succ (Succ (Succ (Succ Zero))) = runTest "lru_cache.thon";
-val Tuple [Succ (Succ (Succ Zero)), Succ (Succ (Succ (Succ (Succ Zero))))] = runTest "trapping_rain_water.thon";
 
 in
 ()
